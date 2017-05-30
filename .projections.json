@@ -1,0 +1,11 @@
+{
+  "lib/*.ex": {
+    "alternate": "test/{}_test.exs",
+    "type": "module"
+  },
+  "test/*_test.exs": {
+    "alternate": "lib/{}.ex",
+    "type": "test"
+  },
+  "test/property_based/*_test.exs": {"alternate": "lib/{}.ex"}
+}
