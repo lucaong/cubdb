@@ -11,11 +11,13 @@ defmodule CubDb.BtreeTest do
     root = Utils.load(store, {:Btree, 0, Btree.leaf()})
     %Btree{root: root, capacity: 3, store: store, size: 0}
   end
+
   def btree(root = {:Leaf, cs}) do
     store = Store.MemMap.new
     root = Utils.load(store, {:Btree, length(cs), root})
     %Btree{root: root, capacity: 3, store: store, size: length(cs)}
   end
+
   def btree(root = {:Branch, _}, size \\ 0) do
     store = Store.MemMap.new
     root = Utils.load(store, {:Btree, size, root})
