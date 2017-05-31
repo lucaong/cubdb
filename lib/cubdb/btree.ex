@@ -75,28 +75,28 @@ defmodule CubDB.Btree do
   end
 
   defp build_up(store, node, to_merge, to_delete, [], cap) do
-    to_merge_locs = Enum.map(to_merge, fn {k, v} ->
-      {k, Store.put_node(store, v)}
-    end)
+    to_merge_locs = store_nodes(store, to_merge)
     case replace_node(store, node, to_merge_locs, to_delete, nil, cap) do
       [] -> Store.put_node(store, leaf())
       [{_, {:Branch, [{_, loc}]}}] -> loc
       [{_, node}] -> Store.put_node(store, node)
       new_nodes ->
-        new_locs = Enum.map(new_nodes, fn {k, v} ->
-          {k, Store.put_node(store, v)}
-        end)
+        new_locs = store_nodes(store, new_nodes)
         Store.put_node(store, {:Branch, new_locs})
     end
   end
 
   defp build_up(store, node, to_merge, to_delete, [parent | up], cap) do
-    to_merge_locs = Enum.map(to_merge, fn {k, v} ->
-      {k, Store.put_node(store, v)}
-    end)
+    to_merge_locs = store_nodes(store, to_merge)
     new_nodes = replace_node(store, node, to_merge_locs, to_delete, parent, cap)
     deleted = keys(elem(node, 1)) -- keys(new_nodes)
     build_up(store, parent, new_nodes, deleted, up, cap)
+  end
+
+  defp store_nodes(store, nodes) do
+    Enum.map(nodes, fn {k, v} ->
+      {k, Store.put_node(store, v)}
+    end)
   end
 
   defp replace_node(store, node, merge, delete, parent, cap) do
@@ -222,7 +222,7 @@ defimpl Enumerable, for: CubDB.Btree do
     next({[], [children | [rest | todo]]}, store)
   end
 
-  defp next({[{k, {:Value, v}} | rest], todo}, store) do
+  defp next({[{k, {:Value, v}} | rest], todo}, _) do
     {{rest, todo}, {k, v}}
   end
 end
