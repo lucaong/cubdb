@@ -1,4 +1,4 @@
-defmodule CubDb.BtreeTest do
+defmodule CubDB.BtreeTest do
   use ExUnit.Case
 
   alias CubDB.Store

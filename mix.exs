@@ -7,6 +7,7 @@ defmodule CubDB.Mixfile do
      elixir: "~> 1.4",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+     elixirc_paths: elixirc_paths(Mix.env),
      deps: deps()]
   end
 
@@ -32,4 +33,7 @@ defmodule CubDB.Mixfile do
       { :quixir, "~> 0.9", only: :test }
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/shared_examples/"]
+  defp elixirc_paths(_), do: ["lib"]
 end

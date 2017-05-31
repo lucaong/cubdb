@@ -1,2 +1,2 @@
-defmodule CubDB.Persistence.File do
+defmodule CubDB.Store.File do
 end
