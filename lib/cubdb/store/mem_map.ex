@@ -30,7 +30,7 @@ defimpl CubDB.Store, for: CubDB.Store.MemMap do
 
   def get_node(%MemMap{agent: agent}, location) do
     Agent.get(agent, fn {map, _} ->
-      Map.get(map, location)
+      Map.get(map, location, {:error, "No node found at location #{location}"})
     end)
   end
 
