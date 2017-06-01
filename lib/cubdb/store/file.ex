@@ -7,11 +7,18 @@ defmodule CubDB.Store.File do
   alias CubDB.Store.File
 
   def new(file_path) do
-    with {:ok, file} <- :file.open(file_path, [:read, :append, :binary]),
-         {:ok, pos} <- :file.position(file, :eof),
-         {:ok, pid} <- Agent.start_link(fn -> {file, pos} end) do
-      %File{pid: pid, file: file, file_path: file_path}
+    with {:ok, pid} <- Agent.start_link(fn -> nil end) do
+      open(pid, file_path)
     end
+  end
+
+  defp open(pid, file_path) do
+    Agent.get_and_update(pid, fn _ ->
+      with {:ok, file} <- :file.open(file_path, [:read, :append, :raw, :binary]),
+           {:ok, pos} <- :file.position(file, :eof) do
+        {%File{pid: pid, file: file, file_path: file_path}, {file, pos}}
+      end
+    end)
   end
 end
 
