@@ -28,8 +28,12 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   def put_node(%File{pid: pid}, node) do
     Agent.get_and_update(pid, fn {file, pos} ->
       {bytes, size} = serialize(node, pos)
-      :ok = :file.pwrite(file, :eof, bytes)
-      {pos, {file, pos + size}}
+      case :file.write(file, bytes) do
+        :ok -> {pos, {file, pos + size}}
+        _ ->
+          {:ok, pos} = :file.position(file, :eof)
+          {{:error, "Write error"}, {file, pos}}
+      end
     end)
   end
 
