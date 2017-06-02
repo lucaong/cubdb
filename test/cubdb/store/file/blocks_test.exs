@@ -3,7 +3,7 @@ defmodule CubDB.Store.File.BlocksTest do
 
   alias CubDB.Store.File.Blocks
 
-  test "read_length/3 computes the actual length including block headers" do
+  test "read_length/3 computes the length including block headers" do
     #  *
     # |x|.| | |
     assert Blocks.read_length(0, 1, 4) == 2

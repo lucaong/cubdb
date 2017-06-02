@@ -21,4 +21,3 @@ defmodule CubDB.Store.File.Blocks do
     Float.ceil(length / (block_size - 1))
   end
 end
-
