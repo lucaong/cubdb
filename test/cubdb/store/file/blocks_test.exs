@@ -1,29 +1,43 @@
 defmodule CubDB.Store.File.BlocksTest do
   use ExUnit.Case
 
-  alias CubDB.Store.File.Blocks
+  import CubDB.Store.File.Blocks
 
-  test "read_length/3 computes the length including block headers" do
+  test "length_with_headers/3 computes length including block headers" do
     #  - -
     # |x|.| | |
-    assert Blocks.read_length(0, 1, 4) == 2
+    assert length_with_headers(0, 1, 4) == 2
     #    - -
     # |x|.|.|.|
-    assert Blocks.read_length(1, 3, 4) == 3
+    assert length_with_headers(1, 3, 4) == 3
     #  - - - - - - - - - - -
     # |x|.|.|.|x|.|.|.|x|.|.| |
-    assert Blocks.read_length(0, 8, 4) == 11
+    assert length_with_headers(0, 8, 4) == 11
     #    - - - - - - - - - -
     # |x|.|.|.|x|.|.|.|x|.|.| |
-    assert Blocks.read_length(1, 8, 4) == 10
+    assert length_with_headers(1, 8, 4) == 10
     #      - - - - - - - - - -
     # |x| |.|.|x|.|.|.|x|.|.|.|
-    assert Blocks.read_length(2, 8, 4) == 10
+    assert length_with_headers(2, 8, 4) == 10
     #        - - - - - - - - - - -
     # |x| | |.|x|.|.|.|x|.|.|.|x|.|
-    assert Blocks.read_length(3, 8, 4) == 11
+    assert length_with_headers(3, 8, 4) == 11
     #  - - - - - - - - - - - - - -
     # |x|.|.|.|x|.|.|.|x|.|.|.|x|.|
-    assert Blocks.read_length(0, 10, 4) == 14
+    assert length_with_headers(0, 10, 4) == 14
+  end
+
+  test "strip_headers/3 removes the block headers" do
+    assert <<1, 2, 3>> =
+      strip_headers(<<0, 1, 2, 3>>, 0, 4)
+
+    assert <<1, 2>> =
+      strip_headers(<<1, 2>>, 2, 4)
+
+    assert <<1, 2, 3, 4, 5, 6, 7, 8>> =
+      strip_headers(<<0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 0, 4)
+
+    assert <<1, 2, 3, 4, 5, 6, 7, 8>> =
+      strip_headers(<<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 1, 4)
   end
 end
