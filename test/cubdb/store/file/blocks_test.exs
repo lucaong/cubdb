@@ -3,6 +3,10 @@ defmodule CubDB.Store.File.BlocksTest do
 
   import CubDB.Store.File.Blocks
 
+  test "length_with_headers/3 returns an integer" do
+    assert is_integer(length_with_headers(0, 1, 4))
+  end
+
   test "length_with_headers/3 computes length including block headers" do
     #  - -
     # |x|.| | |

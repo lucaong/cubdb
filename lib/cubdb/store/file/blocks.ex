@@ -11,11 +11,11 @@ defmodule CubDB.Store.File.Blocks do
 
   def length_with_headers(loc, length, block_size \\ @block_size) do
     case rem(loc, block_size) do
-      0 -> headers_length(length, block_size) + length
+      0 -> trunc(headers_length(length, block_size) + length)
       r ->
         prefix = block_size - r
         rest = length - prefix
-        prefix + headers_length(rest, block_size) + rest
+        trunc(prefix + headers_length(rest, block_size) + rest)
     end
   end
 

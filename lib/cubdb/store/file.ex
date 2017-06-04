@@ -24,12 +24,13 @@ end
 
 defimpl CubDB.Store, for: CubDB.Store.File do
   alias CubDB.Store.File
+  alias CubDB.Store.File.Blocks
 
   def put_node(%File{pid: pid}, node) do
     Agent.get_and_update(pid, fn {file, pos} ->
-      {bytes, size} = serialize(node, pos)
-      case :file.write(file, bytes) do
-        :ok -> {pos, {file, pos + size}}
+      bytes = serialize(node)
+      case append_blocks(file, bytes, pos) do
+        {:ok, written_size} -> {pos, {file, pos + written_size}}
         _ ->
           {:ok, pos} = :file.position(file, :eof)
           {{:error, "Write error"}, {file, pos}}
@@ -39,8 +40,8 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
   def get_node(%File{pid: pid}, location) do
     Agent.get(pid, fn {file, _} ->
-      with {:ok, <<length::32>>} <- :file.pread(file, location, 4),
-           {:ok, bytes} <- :file.pread(file, location + 4, length) do
+      with {:ok, <<length::32>>, len} <- read_blocks(file, location, 4),
+           {:ok, bytes, _} <- read_blocks(file, location + len, length) do
              deserialize(bytes)
       else
         :eof -> {:error, "End of file"}
@@ -51,10 +52,24 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   def get_latest_header(%File{}) do
   end
 
-  defp serialize(node, _) do
+  defp read_blocks(file, location, length) do
+    length_with_headers = Blocks.length_with_headers(location, length)
+    with {:ok, bin} <- :file.pread(file, location, length_with_headers) do
+      {:ok, Blocks.strip_headers(bin, location), length_with_headers}
+    end
+  end
+
+  defp append_blocks(file, bytes, pos) do
+    bytes_with_headers = Blocks.add_headers(bytes, pos)
+    with :ok <- :file.write(file, bytes_with_headers) do
+      {:ok, byte_size(bytes_with_headers)}
+    end
+  end
+
+  defp serialize(node) do
     node_bytes = :erlang.term_to_binary(node)
     size = byte_size(node_bytes)
-    {<<size::32>> <> node_bytes, size + 4}
+    <<size::32>> <> node_bytes
   end
 
   defp deserialize(bytes) do
