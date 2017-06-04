@@ -16,11 +16,11 @@ defmodule CubDB.Btree do
 
   def new(store, cap) when is_integer(cap) do
     case Store.get_latest_header(store) do
-      {_, {:Btree, s, loc}} ->
+      {_, {s, loc}} ->
         %Btree{root: loc, size: s, capacity: cap, store: store}
       nil ->
         loc = Store.put_node(store, leaf())
-        Store.put_node(store, {:Btree, 0, loc})
+        Store.put_header(store, {0, loc})
         %Btree{root: loc, size: 0, capacity: cap, store: store}
     end
   end
@@ -45,7 +45,7 @@ defmodule CubDB.Btree do
     {leaf = {:Leaf, children}, path} = lookup_leaf(root, store, key, [])
     new_root = build_up(store, leaf, [{key, {:Value, value}}], [], path, cap)
     s = if List.keymember?(children, key, 0), do: s, else: s + 1
-    Store.put_node(store, {:Btree, s, new_root})
+    Store.put_header(store, {s, new_root})
     %Btree{root: new_root, capacity: cap, store: store, size: s}
   end
 
@@ -54,11 +54,15 @@ defmodule CubDB.Btree do
     {leaf = {:Leaf, children}, path} = lookup_leaf(root, store, key, [])
     if List.keymember?(children, key, 0) do
       new_root = build_up(store, leaf, [], [key], path, cap)
-      Store.put_node(store, {:Btree, s - 1, new_root})
+      Store.put_header(store, {s - 1, new_root})
       %Btree{root: new_root, capacity: cap, store: store, size: s - 1}
     else
       btree
     end
+  end
+
+  def commit(%Btree{store: store}) do
+    Store.commit(store)
   end
 
   defp lookup_leaf(branch = {:Branch, children}, store, key, path) do

@@ -2,7 +2,7 @@ defmodule CubDB.Store.Utils do
   alias CubDB.Store
 
   def debug(store) do
-    {_, {:Btree, size, root_loc}} = Store.get_latest_header(store)
+    {_, {size, root_loc}} = Store.get_latest_header(store)
     {:Btree, size, debug_node(store, root_loc)}
   end
 

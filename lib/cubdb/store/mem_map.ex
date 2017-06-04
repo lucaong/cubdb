@@ -20,13 +20,18 @@ defimpl CubDB.Store, for: CubDB.Store.MemMap do
   def put_node(%MemMap{agent: agent}, node) do
     Agent.get_and_update(agent, fn {map, latest_header_loc} ->
       loc = Enum.count(map)
-      if elem(node, 0) == :Btree do
-        {loc, {Map.put(map, loc, node), loc}}
-      else
-        {loc, {Map.put(map, loc, node), latest_header_loc}}
-      end
+      {loc, {Map.put(map, loc, node), latest_header_loc}}
     end)
   end
+
+  def put_header(%MemMap{agent: agent}, header) do
+    Agent.get_and_update(agent, fn {map, _} ->
+      loc = Enum.count(map)
+      {loc, {Map.put(map, loc, header), loc}}
+    end)
+  end
+
+  def commit(%MemMap{}), do: :ok
 
   def get_node(%MemMap{agent: agent}, location) do
     Agent.get(agent, fn {map, _} ->

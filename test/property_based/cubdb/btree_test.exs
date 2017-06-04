@@ -46,8 +46,8 @@ defmodule PropertyBased.BtreeTest do
         t
       end)
 
+      Btree.commit(tree)
       assert {:Btree, 0, {:Leaf, []}} = Utils.debug(tree.store)
     end
   end
 end
-

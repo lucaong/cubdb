@@ -11,10 +11,10 @@ defmodule PropertyBased.CubDb.Store.File.BlocksTest do
       bin: string(min: 1, max: 64, chars: :ascii),
       loc: int(min: 0, max: 256)
     ], repeat_for: 100 do
-      bin_with_headers = Blocks.add_headers(bin, loc, block_size)
+      bin_with_headers = Blocks.add_markers(bin, loc, block_size)
       assert Blocks.length_with_headers(loc, byte_size(bin), block_size) ==
         byte_size(bin_with_headers)
-      assert Blocks.strip_headers(bin_with_headers, loc, block_size) ==
+      assert Blocks.strip_markers(bin_with_headers, loc, block_size) ==
         bin
     end
   end

@@ -31,31 +31,51 @@ defmodule CubDB.Store.File.BlocksTest do
     assert length_with_headers(0, 10, 4) == 14
   end
 
-  test "strip_headers/3 removes the block headers" do
+  test "strip_markers/3 removes the block headers" do
     assert <<1, 2, 3>> =
-      strip_headers(<<0, 1, 2, 3>>, 0, 4)
+      strip_markers(<<0, 1, 2, 3>>, 0, 4)
 
     assert <<1, 2>> =
-      strip_headers(<<1, 2>>, 2, 4)
+      strip_markers(<<1, 2>>, 2, 4)
 
     assert <<1, 2, 3, 4, 5, 6, 7, 8>> =
-      strip_headers(<<0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 0, 4)
+      strip_markers(<<0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 0, 4)
 
     assert <<1, 2, 3, 4, 5, 6, 7, 8>> =
-      strip_headers(<<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 1, 4)
+      strip_markers(<<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 1, 4)
   end
 
-  test "add_headers/3 adds the block headers" do
+  test "add_markers/3 adds the block headers" do
     assert <<0, 1, 2, 3>> =
-      add_headers(<<1, 2, 3>>, 0, 4)
+      add_markers(<<1, 2, 3>>, 0, 4)
 
     assert <<1, 2>> =
-      add_headers(<<1, 2>>, 2, 4)
+      add_markers(<<1, 2>>, 2, 4)
 
     assert <<0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8>> =
-      add_headers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 0, 4)
+      add_markers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 0, 4)
 
     assert <<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>> =
-      add_headers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 1, 4)
+      add_markers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 1, 4)
+  end
+
+  test "add_header_marker/3 adds padding and header marker" do
+    assert {0, <<42, 1, 2, 3>>} =
+      add_header_marker(<<1, 2, 3>>, 0, 4)
+
+    assert {4, <<0, 0, 42, 1, 2, 3>>} =
+      add_header_marker(<<1, 2, 3>>, 2, 4)
+
+    assert {4, <<0, 0, 0, 42, 1, 2, 3>>} =
+      add_header_marker(<<1, 2, 3>>, 1, 4)
+
+    assert {4, <<0, 0, 42, 1, 2, 3, 0, 4, 5>>} =
+      add_header_marker(<<1, 2, 3, 4, 5>>, 2, 4)
+  end
+
+  test "latest_possible_header/2 returns latest possible header loc" do
+    assert latest_possible_header(10, 4) == 8
+    assert latest_possible_header(8, 4) == 4
+    assert latest_possible_header(2, 4) == 0
   end
 end
