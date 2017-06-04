@@ -40,4 +40,18 @@ defmodule CubDB.Store.File.BlocksTest do
     assert <<1, 2, 3, 4, 5, 6, 7, 8>> =
       strip_headers(<<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 1, 4)
   end
+
+  test "add_headers/3 adds the block headers" do
+    assert <<0, 1, 2, 3>> =
+      add_headers(<<1, 2, 3>>, 0, 4)
+
+    assert <<1, 2>> =
+      add_headers(<<1, 2>>, 2, 4)
+
+    assert <<0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8>> =
+      add_headers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 0, 4)
+
+    assert <<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>> =
+      add_headers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 1, 4)
+  end
 end

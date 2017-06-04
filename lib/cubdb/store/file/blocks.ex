@@ -2,6 +2,27 @@ defmodule CubDB.Store.File.Blocks do
   @block_size 4096
 
   def add_headers(bin, loc, block_size \\ @block_size) do
+    case rem(loc, block_size) do
+      0 -> add(bin, <<>>, block_size)
+      r ->
+        block_rest = block_size - r
+        if byte_size(bin) <= block_rest do
+          bin
+        else
+          <<prefix::binary-size(block_rest), rest::binary>> = bin
+          add(rest, prefix, block_size)
+        end
+    end
+  end
+
+  defp add(bin, acc, block_size) do
+    data_size = block_size - 1
+    if byte_size(bin) <= data_size do
+      acc <> <<0>> <> bin
+    else
+      <<block::binary-size(data_size), rest::binary>> = bin
+      add(rest, acc <> <<0>> <> block, block_size)
+    end
   end
 
   def strip_headers(bin, loc, block_size \\ @block_size) do
