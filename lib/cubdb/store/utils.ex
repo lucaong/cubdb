@@ -18,19 +18,22 @@ defmodule CubDB.Store.Utils do
   end
 
   def load(store, {:Btree, size, root}) do
-    root_loc = load_node(store, root)
-    Store.put_node(store, {:Btree, size, root_loc})
-    root_loc
+    {root_loc, root_node} = load_node(store, root)
+    Store.put_header(store, {:Btree, size, root_loc})
+    root_node
   end
 
   defp load_node(store, {type, children}) do
     locs = Enum.map(children, fn {k, child} ->
-      {k, load_node(store, child)}
+      {loc, _} = load_node(store, child)
+      {k, loc}
     end)
-    Store.put_node(store, {type, locs})
+    node = {type, locs}
+    {Store.put_node(store, node), node}
   end
 
   defp load_node(store, value) do
-    Store.put_node(store, {:Value, value})
+    node = {:Value, value}
+    {Store.put_node(store, node), node}
   end
 end
