@@ -3,22 +3,20 @@ defmodule CubDB.Store.File do
   Append-only file-based store implementation
   """
 
-  defstruct [:pid, :file, :file_path]
+  defstruct [:pid, :file_path]
   alias CubDB.Store.File
 
   def new(file_path) do
-    with {:ok, pid} <- Agent.start_link(fn -> nil end) do
-      open(pid, file_path)
+    with {:ok, pid} <- Agent.start_link(fn -> start(file_path) end) do
+      %File{pid: pid, file_path: file_path}
     end
   end
 
-  defp open(pid, file_path) do
-    Agent.get_and_update(pid, fn _ ->
-      with {:ok, file} <- :file.open(file_path, [:read, :append, :raw, :binary]),
-           {:ok, pos} <- :file.position(file, :eof) do
-        {%File{pid: pid, file: file, file_path: file_path}, {file, pos}}
-      end
-    end)
+  defp start(file_path) do
+    with {:ok, file} <- :file.open(file_path, [:read, :append, :raw, :binary]),
+         {:ok, pos} <- :file.position(file, :eof) do
+      {file, pos}
+    end
   end
 end
 
