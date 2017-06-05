@@ -69,6 +69,15 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end)
   end
 
+  def close(%File{pid: pid}) do
+    with :ok <- Agent.update(pid, fn {file, pos} ->
+      :file.sync(file)
+      {file, pos}
+    end) do
+      Agent.stop(pid)
+    end
+  end
+
   defp read_term(file, location) do
     with {:ok, <<length::32>>, len} <- read_blocks(file, location, 4),
          {:ok, bytes, _} <- read_blocks(file, location + len, length) do

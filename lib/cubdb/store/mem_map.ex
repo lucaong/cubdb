@@ -45,4 +45,6 @@ defimpl CubDB.Store, for: CubDB.Store.MemMap do
       {map, header_loc} -> {header_loc, Map.get(map, header_loc)}
     end)
   end
+
+  def close(%MemMap{}), do: :ok
 end

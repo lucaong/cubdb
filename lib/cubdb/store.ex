@@ -18,4 +18,7 @@ defprotocol CubDB.Store do
 
   @spec get_latest_header(any) :: {location, btree_node} | nil
   def get_latest_header(store)
+
+  @spec close(any) :: :ok | {:error, String.t}
+  def close(store)
 end

@@ -3,8 +3,13 @@ defmodule CubDB.Store.FileTest do
 
   setup do
     tmp_path = :lib.nonl(:os.cmd('mktemp'))
-    on_exit(fn -> :file.delete(tmp_path) end)
-    {:ok, store: CubDB.Store.File.new(tmp_path)}
+    store = CubDB.Store.File.new(tmp_path)
+
+    on_exit(fn ->
+      :file.delete(tmp_path)
+    end)
+
+    {:ok, store: store}
   end
 end
 
