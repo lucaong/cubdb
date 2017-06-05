@@ -2,13 +2,16 @@ defmodule CubDB.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :cubdb,
-     version: "0.1.0",
-     elixir: "~> 1.4",
-     build_embedded: Mix.env == :prod,
-     start_permanent: Mix.env == :prod,
-     elixirc_paths: elixirc_paths(Mix.env),
-     deps: deps()]
+    [
+      app: :cubdb,
+      version: "0.1.0",
+      elixir: "~> 1.4",
+      build_embedded: Mix.env == :prod,
+      start_permanent: Mix.env == :prod,
+      elixirc_paths: elixirc_paths(Mix.env),
+      deps: deps(),
+      dialyzer: [ignore_warnings: "dialyzer_ignore.txt"]
+    ]
   end
 
   # Configuration for the OTP application
@@ -30,7 +33,8 @@ defmodule CubDB.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      { :quixir, "~> 0.9", only: :test }
+      { :quixir, "~> 0.9", only: :test },
+      {:dialyxir, "~> 0.5", only: [:dev], runtime: false}
     ]
   end
 

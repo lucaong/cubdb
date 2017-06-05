@@ -191,7 +191,7 @@ defimpl Enumerable, for: CubDB.Btree do
   def count(%Btree{size: size}), do: {:ok, size}
 
   def member?(btree, key) do
-    Btree.lookup(btree, key) != nil
+    {:ok, Btree.lookup(btree, key) != nil}
   end
 
   defp do_reduce(_, {:halt, acc}, _, _), do: {:halted, acc}
