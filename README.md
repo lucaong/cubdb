@@ -1,6 +1,6 @@
 # CubDB
 
-**TODO: Add description**
+*CubDB* is a key-value database written in Elixir and inspired by CouchDB
 
 ## Installation
 
@@ -16,4 +16,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/cubdb](https://hexdocs.pm/cubdb).
-
