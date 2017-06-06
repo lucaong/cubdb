@@ -1,7 +1,7 @@
 defmodule CubDB.Btree do
-  @type node_type :: atom
+  @type btree_node_type :: atom
   @type location :: non_neg_integer
-  @type btree_node :: {node_type, list({any, non_neg_integer})}
+  @type btree_node :: {btree_node_type, list({any, non_neg_integer})}
   @type btree_header :: {non_neg_integer, non_neg_integer}
   @type key :: any
   @type val :: any
@@ -18,12 +18,12 @@ defmodule CubDB.Btree do
   @enforce_keys [:root, :size, :store]
   defstruct root: nil, size: 0, store: nil, capacity: @default_capacity
 
-  @spec new(any) :: %Btree{}
+  @spec new(Store.t) :: %Btree{}
   def new(store) do
     new(store, @default_capacity)
   end
 
-  @spec new(any, non_neg_integer) :: %Btree{}
+  @spec new(Store.t, non_neg_integer) :: %Btree{}
   def new(store, cap) when is_integer(cap) do
     case Store.get_latest_header(store) do
       {_, {s, loc}} ->
@@ -37,12 +37,12 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec new(any, list(key_val), non_neg_integer) :: %Btree{}
+  @spec new(Store.t, list(key_val), non_neg_integer) :: %Btree{}
   def new(store, elems, cap \\ @default_capacity) when is_list(elems) do
     load(Enum.sort_by(elems, &(elem(&1, 0))), store, cap)
   end
 
-  @spec load(any, any, non_neg_integer) :: %Btree{}
+  @spec load(Enumerable.t, Store.t, non_neg_integer) :: %Btree{}
   def load(enum, store, cap \\ @default_capacity) do
     {st, count} = Enum.reduce(enum, {[], 0}, fn ({k, v}, {st, count}) ->
       {load_node(store, k, {:Value, v}, st, 1, cap), count + 1}
