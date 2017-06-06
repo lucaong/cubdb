@@ -241,6 +241,12 @@ defmodule CubDB.BtreeTest do
       assert Stream.map(tree, &(&1)) |> Enum.to_list == sorted_elems
       assert Stream.zip(tree, elems) |> Enum.to_list ==
         Enum.zip(sorted_elems, elems)
+
+      if length(elems) > 0 do
+        assert Enum.member?(tree, List.first(elems))
+        assert Enum.member?(tree, {:not_there, nil}) == false
+        assert Enum.member?(tree, :not_a_key_value_tuple) == false
+      end
     end
   end
 end

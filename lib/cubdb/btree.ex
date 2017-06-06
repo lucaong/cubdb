@@ -44,11 +44,20 @@ defmodule CubDB.Btree do
     end
   end
 
-  def lookup(%Btree{root: root, store: store}, key) do
+  def lookup(tree = %Btree{}, key) do
+    case has_key?(tree, key) do
+      {true, value} -> value
+      {false, _}    -> nil
+    end
+  end
+
+  def has_key?(%Btree{root: root, store: store}, key) do
     {{:Leaf, children}, _} = lookup_leaf(root, store, key, [])
-    with {_, loc} <- Enum.find(children, &match?({^key, _}, &1)) do
-      {:Value, value} = Store.get_node(store, loc)
-      value
+    case Enum.find(children, &match?({^key, _}, &1)) do
+      nil -> {false, nil}
+      {_, loc} ->
+        {:Value, value} = Store.get_node(store, loc)
+        {true, value}
     end
   end
 
@@ -243,9 +252,14 @@ defimpl Enumerable, for: CubDB.Btree do
 
   def count(%Btree{size: size}), do: {:ok, size}
 
-  def member?(btree, key) do
-    {:ok, Btree.lookup(btree, key) != nil}
+  def member?(btree, {key, value}) do
+    case Btree.has_key?(btree, key) do
+      {true, ^value} -> {:ok, true}
+      _              -> {:ok, false}
+    end
   end
+
+  def member?(_, _), do: {:ok, false}
 
   defp do_reduce(_, {:halt, acc}, _, _), do: {:halted, acc}
 
