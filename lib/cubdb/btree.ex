@@ -23,7 +23,7 @@ defmodule CubDB.Btree do
     new(store, @default_capacity)
   end
 
-  @spec new(Store.t, non_neg_integer) :: %Btree{}
+  @spec new(Store.t, pos_integer) :: %Btree{}
   def new(store, cap) when is_integer(cap) do
     case Store.get_latest_header(store) do
       {_, {s, loc}} ->
@@ -37,12 +37,12 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec new(Store.t, list(key_val), non_neg_integer) :: %Btree{}
+  @spec new(Store.t, list(key_val), pos_integer) :: %Btree{}
   def new(store, elems, cap \\ @default_capacity) when is_list(elems) do
     load(Enum.sort_by(elems, &(elem(&1, 0))), store, cap)
   end
 
-  @spec load(Enumerable.t, Store.t, non_neg_integer) :: %Btree{}
+  @spec load(Enumerable.t, Store.t, pos_integer) :: %Btree{}
   def load(enum, store, cap \\ @default_capacity) do
     {st, count} = Enum.reduce(enum, {[], 0}, fn ({k, v}, {st, count}) ->
       {load_node(store, k, {:Value, v}, st, 1, cap), count + 1}
