@@ -1,4 +1,12 @@
 defmodule CubDB.Btree do
+  @type node_type :: atom
+  @type location :: non_neg_integer
+  @type btree_node :: {node_type, list({any, non_neg_integer})}
+  @type btree_header :: {non_neg_integer, non_neg_integer}
+  @type key :: any
+  @type val :: any
+  @type key_val :: {key, val}
+
   require Record
   Record.defrecord :leaf, :Leaf, children: []
   Record.defrecord :branch, :Branch, children: []
@@ -10,10 +18,12 @@ defmodule CubDB.Btree do
   @enforce_keys [:root, :size, :store]
   defstruct root: nil, size: 0, store: nil, capacity: @default_capacity
 
+  @spec new(any) :: %Btree{}
   def new(store) do
     new(store, @default_capacity)
   end
 
+  @spec new(any, non_neg_integer) :: %Btree{}
   def new(store, cap) when is_integer(cap) do
     case Store.get_latest_header(store) do
       {_, {s, loc}} ->
@@ -27,10 +37,12 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec new(any, list(key_val), non_neg_integer) :: %Btree{}
   def new(store, elems, cap \\ @default_capacity) when is_list(elems) do
     load(Enum.sort_by(elems, &(elem(&1, 0))), store, cap)
   end
 
+  @spec load(any, any, non_neg_integer) :: %Btree{}
   def load(enum, store, cap \\ @default_capacity) do
     {st, count} = Enum.reduce(enum, {[], 0}, fn ({k, v}, {st, count}) ->
       {load_node(store, k, {:Value, v}, st, 1, cap), count + 1}
@@ -44,6 +56,7 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec lookup(%Btree{}, key) :: val | nil
   def lookup(tree = %Btree{}, key) do
     case has_key?(tree, key) do
       {true, value} -> value
@@ -51,6 +64,7 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec has_key?(%Btree{}, key) :: {true, val} | {false, nil}
   def has_key?(%Btree{root: root, store: store}, key) do
     {{:Leaf, children}, _} = lookup_leaf(root, store, key, [])
     case Enum.find(children, &match?({^key, _}, &1)) do
@@ -61,6 +75,7 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec insert(%Btree{}, key, val) :: %Btree{}
   def insert(%Btree{root: root, store: store, capacity: cap, size: s}, key, value) do
     {leaf = {:Leaf, children}, path} = lookup_leaf(root, store, key, [])
     {root_loc, new_root} = build_up(store, leaf, [{key, {:Value, value}}], [], path, cap)
@@ -69,6 +84,7 @@ defmodule CubDB.Btree do
     %Btree{root: new_root, capacity: cap, store: store, size: s}
   end
 
+  @spec delete(%Btree{}, key) :: %Btree{}
   def delete(btree = %Btree{root: root, store: store, capacity: cap, size: s}, key) do
     {leaf = {:Leaf, children}, path} = lookup_leaf(root, store, key, [])
     if List.keymember?(children, key, 0) do
@@ -80,8 +96,10 @@ defmodule CubDB.Btree do
     end
   end
 
-  def commit(%Btree{store: store}) do
+  @spec commit(%Btree{}) :: %Btree{}
+  def commit(tree = %Btree{store: store}) do
     Store.commit(store)
+    tree
   end
 
   defp load_node(store, key, node, [], _, _) do
