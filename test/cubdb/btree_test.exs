@@ -215,6 +215,13 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 3} = tree
   end
 
+  test "load/3 creates a Btree from a sorted enumerable of key/values" do
+    store = Store.MemMap.new
+    key_vals = Stream.map((0..20), &({&1, &1}))
+    tree = key_vals |> Btree.load(store, 4)
+    assert key_vals |> Enum.to_list == tree |> Enum.to_list
+  end
+
   test "Btree implements Enumerable" do
     Protocol.assert_impl!(Enumerable, Btree)
 
@@ -231,8 +238,8 @@ defmodule CubDB.BtreeTest do
 
       assert Enum.count(tree) == length(elems)
       assert Enum.into(tree, []) == sorted_elems
-      assert Stream.map(tree, &(&1)) |> Enum.into([]) == sorted_elems
-      assert Stream.zip(tree, elems) |> Enum.into([]) ==
+      assert Stream.map(tree, &(&1)) |> Enum.to_list == sorted_elems
+      assert Stream.zip(tree, elems) |> Enum.to_list ==
         Enum.zip(sorted_elems, elems)
     end
   end

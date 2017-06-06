@@ -28,9 +28,20 @@ defmodule CubDB.Btree do
   end
 
   def new(store, elems, cap \\ @default_capacity) when is_list(elems) do
-    Enum.reduce(elems, new(store, cap), fn {k, v}, tree ->
-      Btree.insert(tree, k, v)
+    load(Enum.sort_by(elems, &(elem(&1, 0))), store, cap)
+  end
+
+  def load(enum, store, cap \\ @default_capacity) do
+    {st, count} = Enum.reduce(enum, {[], 0}, fn ({k, v}, {st, count}) ->
+      {load_node(store, k, {:Value, v}, st, 1, cap), count + 1}
     end)
+    if count == 0 do
+      new(store, cap)
+    else
+      {root, root_loc} = finalize_load(store, st, 1, cap)
+      Store.put_header(store, {count, root_loc})
+      %Btree{root: root, capacity: cap, store: store, size: count}
+    end
   end
 
   def lookup(%Btree{root: root, store: store}, key) do
@@ -62,6 +73,48 @@ defmodule CubDB.Btree do
 
   def commit(%Btree{store: store}) do
     Store.commit(store)
+  end
+
+  defp load_node(store, key, node, [], _, _) do
+    loc = Store.put_node(store, node)
+    [[{key, loc}]]
+  end
+
+  defp load_node(store, key, node, [children | rest], level, cap) do
+    loc = Store.put_node(store, node)
+    children = [{key, loc} | children]
+    if length(children) == cap do
+      parent = make_node(children, level)
+      parent_key = List.last(keys(children))
+      [[] | load_node(store, parent_key, parent, rest, level + 1, cap)]
+    else
+      [children | rest]
+    end
+  end
+
+  defp finalize_load(store, [children], level, _) do
+    case children do
+      [{_, loc}] -> {Store.get_node(store, loc), loc}
+      _ ->
+        node = make_node(children, level)
+        {node, Store.put_node(store, node)}
+    end
+  end
+
+  defp finalize_load(store, [children | rest], level, cap) do
+    case children do
+      [] -> finalize_load(store, rest, level + 1, cap)
+      _  ->
+        node = make_node(children, level)
+        key = List.last(keys(children))
+        stack = load_node(store, key, node, rest, level + 1, cap)
+        finalize_load(store, stack, level + 1, cap)
+    end
+  end
+
+  defp make_node(children, level) do
+    children = Enum.reverse(children)
+    if level == 1, do: {:Leaf, children}, else: {:Branch, children}
   end
 
   defp lookup_leaf(branch = {:Branch, children}, store, key, path) do
