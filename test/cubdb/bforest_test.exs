@@ -73,8 +73,11 @@ defmodule CubDB.BforestTest do
 
     assert Stream.map(forest, &(&1)) |> Enum.to_list ==
       [{1, 1}, {2, 1}, {3, 1}, {4, 2}, {5, 3}]
+
     assert Stream.zip(forest, Stream.cycle([42])) |> Enum.to_list
-      == [{{1, 1}, 42}, {{2, 1}, 42}, {{3, 1}, 42}, {{4, 2}, 42}, {{5, 3}, 42}]
+      == [{{1, 1}, 42}, {{2, 1}, 42}, {{3, 1}, 42},
+          {{4, 2}, 42}, {{5, 3}, 42}]
+
     assert 5 == Enum.count(forest)
     assert true == Enum.member?(forest, {3, 1})
     assert false == Enum.member?(forest, {3, 2})
