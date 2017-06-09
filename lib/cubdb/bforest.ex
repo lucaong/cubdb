@@ -52,6 +52,11 @@ defmodule CubDB.Bforest do
   def commit(%Bforest{btrees: [live_tree | rest]}) do
     %Bforest{btrees: [Btree.commit(live_tree) | rest]}
   end
+
+  @spec compact(bforest, Store.t) :: %Btree{}
+  def compact(forest = %Bforest{}, store) do
+    Btree.load(forest, store)
+  end
 end
 
 defimpl Enumerable, for: CubDB.Bforest do

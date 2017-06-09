@@ -56,6 +56,29 @@ defmodule CubDB.BforestTest do
     assert 3 == Bforest.lookup(forest, 3)
   end
 
+  test "compact/2 merges the forest into one compacted tree",
+  %{forest: forest} do
+    store = Store.MemMap.new
+    compacted = Bforest.compact(forest, store)
+    assert %Btree{} = compacted
+    assert Enum.to_list(compacted) == Enum.to_list(forest)
+  end
+
+  test "compact/2 reduces the storage needed by the compacted tree" do
+    store = Store.MemMap.new
+    tree = Btree.new(store)
+    Enum.reduce(1..4, tree, fn x, tree ->
+      Btree.insert(tree, x, x)
+    end)
+
+    forest = Bforest.new([tree])
+    compacted = Bforest.compact(forest, Store.MemMap.new)
+    {compacted_header_loc, _} = Store.get_latest_header(compacted.store)
+    {tree_header_loc, _} = Store.get_latest_header(store)
+
+    assert compacted_header_loc < tree_header_loc
+  end
+
   test "Bforest implements Enumerable" do
     Protocol.assert_impl!(Enumerable, Bforest)
 
