@@ -8,11 +8,15 @@ defmodule CubDB.Store.Utils do
 
   defp debug_node(store, loc) do
     case Store.get_node(store, loc) do
-      {:Value, value} -> value
+      {:Value, value} ->
+        value
+
       {type, locs} ->
-        children = Enum.map(locs, fn {k, loc} ->
-          {k, debug_node(store, loc)}
-        end)
+        children =
+          Enum.map(locs, fn {k, loc} ->
+            {k, debug_node(store, loc)}
+          end)
+
         {type, children}
     end
   end
@@ -24,10 +28,12 @@ defmodule CubDB.Store.Utils do
   end
 
   defp load_node(store, {type, children}) do
-    locs = Enum.map(children, fn {k, child} ->
-      {loc, _} = load_node(store, child)
-      {k, loc}
-    end)
+    locs =
+      Enum.map(children, fn {k, child} ->
+        {loc, _} = load_node(store, child)
+        {k, loc}
+      end)
+
     node = {type, locs}
     {Store.put_node(store, node), node}
   end

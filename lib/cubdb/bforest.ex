@@ -53,7 +53,7 @@ defmodule CubDB.Bforest do
     %Bforest{btrees: [Btree.commit(live_tree) | rest]}
   end
 
-  @spec compact(bforest, Store.t) :: %Btree{}
+  @spec compact(bforest, Store.t()) :: %Btree{}
   def compact(forest = %Bforest{}, store) do
     Btree.load(forest, store)
   end
@@ -63,9 +63,11 @@ defimpl Enumerable, for: CubDB.Bforest do
   alias CubDB.Bforest
 
   def reduce(%Bforest{btrees: trees}, cmd_acc, fun) do
-    tuples = Enum.map(trees, fn tree ->
-      Enumerable.reduce(tree, cmd_acc, &step/2)
-    end)
+    tuples =
+      Enum.map(trees, fn tree ->
+        Enumerable.reduce(tree, cmd_acc, &step/2)
+      end)
+
     do_reduce(tuples, cmd_acc, fun)
   end
 
@@ -75,12 +77,12 @@ defimpl Enumerable, for: CubDB.Bforest do
   def member?(forest = %Bforest{}, {key, value}) do
     case Bforest.has_key?(forest, key) do
       {true, ^value} -> {:ok, true}
-      _              -> {:ok, false}
+      _ -> {:ok, false}
     end
   end
 
   defp step(x, _) do
-    { :suspend, x }
+    {:suspend, x}
   end
 
   defp do_reduce(tuples, {:halt, acc}, _) do
@@ -93,21 +95,27 @@ defimpl Enumerable, for: CubDB.Bforest do
   end
 
   defp do_reduce(tuples, {:cont, acc}, fun) do
-    tuples = Enum.filter(tuples, fn tuple ->
-      elem(tuple, 0) != :done
-    end)
-    min = Enum.min_by(tuples, fn {_, {k, _}, _} -> k end,
-                      fn -> nil end)
+    tuples =
+      Enum.filter(tuples, fn tuple ->
+        elem(tuple, 0) != :done
+      end)
+
+    min = Enum.min_by(tuples, fn {_, {k, _}, _} -> k end, fn -> nil end)
+
     case min do
-      nil -> {:done, acc}
+      nil ->
+        {:done, acc}
+
       {:suspended, item = {key, _}, _} ->
-        tuples = Enum.map(tuples, fn fun_val = {_, {k, _}, f} ->
-          if k == key do
-            f.({:cont, nil})
-          else
-            fun_val
-          end
-        end)
+        tuples =
+          Enum.map(tuples, fn fun_val = {_, {k, _}, f} ->
+            if k == key do
+              f.({:cont, nil})
+            else
+              fun_val
+            end
+          end)
+
         do_reduce(tuples, fun.(item, acc), fun)
     end
   end

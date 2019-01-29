@@ -13,7 +13,9 @@ defmodule CubDB.Store.File.Blocks do
 
   def length_with_headers(loc, length, block_size \\ @block_size) do
     case rem(loc, block_size) do
-      0 -> trunc(headers_length(length, block_size) + length)
+      0 ->
+        trunc(headers_length(length, block_size) + length)
+
       r ->
         prefix = block_size - r
         rest = length - prefix
@@ -25,6 +27,7 @@ defmodule CubDB.Store.File.Blocks do
     case rem(loc, block_size) do
       0 ->
         {loc, <<@header_marker>> <> add_markers(bin, loc + 1, block_size)}
+
       r ->
         block_rest = block_size - r
         padding = String.pad_leading(<<>>, block_rest, <<@data_marker>>)
@@ -41,9 +44,12 @@ defmodule CubDB.Store.File.Blocks do
 
   defp at_block_boundary(bin, loc, block_size, function) do
     case rem(loc, block_size) do
-      0 -> function.(bin, <<>>, block_size)
+      0 ->
+        function.(bin, <<>>, block_size)
+
       r ->
         block_rest = block_size - r
+
         if byte_size(bin) <= block_rest do
           bin
         else
@@ -55,6 +61,7 @@ defmodule CubDB.Store.File.Blocks do
 
   defp add(bin, acc, block_size) do
     data_size = block_size - 1
+
     if byte_size(bin) <= data_size do
       acc <> <<@data_marker>> <> bin
     else
