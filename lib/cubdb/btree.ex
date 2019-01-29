@@ -316,6 +316,8 @@ defimpl Enumerable, for: CubDB.Btree do
 
   def member?(_, _), do: {:ok, false}
 
+  def slice(_), do: {:error, __MODULE__}
+
   defp do_reduce(_, {:halt, acc}, _, _), do: {:halted, acc}
 
   defp do_reduce(t, {:suspend, acc}, fun, store) do

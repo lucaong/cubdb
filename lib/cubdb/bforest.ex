@@ -81,6 +81,8 @@ defimpl Enumerable, for: CubDB.Bforest do
     end
   end
 
+  def slice(_), do: {:error, __MODULE__}
+
   defp step(x, _) do
     {:suspend, x}
   end
