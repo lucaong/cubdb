@@ -157,14 +157,15 @@ defmodule CubDB.Btree do
   end
 
   defp lookup_leaf(branch = {:Branch, children}, store, key, path) do
-    child =
+    loc =
       Enum.reduce_while(children, nil, fn
         {_, loc}, nil ->
-          {:cont, Store.get_node(store, loc)}
+          {:cont, loc}
 
         {k, loc}, acc ->
-          if k <= key, do: {:cont, Store.get_node(store, loc)}, else: {:halt, acc}
+          if k <= key, do: {:cont, loc}, else: {:halt, acc}
       end)
+    child = Store.get_node(store, loc)
 
     lookup_leaf(child, store, key, [branch | path])
   end
