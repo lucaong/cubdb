@@ -35,6 +35,14 @@ defmodule CubDB.StoreExamples do
         CubDB.Store.put_node(store, {@value, 4})
         assert {^loc, {42, 0}} = CubDB.Store.get_latest_header(store)
       end
+
+      test "blank?/1 returns true if store is blank, and false otherwise", %{store: store} do
+        assert CubDB.Store.blank?(store) == true
+        CubDB.Store.put_node(store, {@value, 1})
+        CubDB.Store.put_header(store, {0, 0})
+        CubDB.Store.commit(store)
+        assert CubDB.Store.blank?(store) == false
+      end
     end
   end
 end

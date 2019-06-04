@@ -47,4 +47,11 @@ defimpl CubDB.Store, for: CubDB.Store.MemMap do
   end
 
   def close(%MemMap{}), do: :ok
+
+  def blank?(%MemMap{agent: agent}) do
+    Agent.get(agent, fn
+      {_, nil} -> true
+      _ -> false
+    end)
+  end
 end

@@ -85,6 +85,13 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end
   end
 
+  def blank?(%File{file_path: path}) do
+    case :"Elixir.File".stat!(path) do
+      %{size: 0} -> true
+      _ -> false
+    end
+  end
+
   defp read_term(file, location) do
     with {:ok, <<length::32>>, len} <- read_blocks(file, location, 4),
          {:ok, bytes, _} <- read_blocks(file, location + len, length) do

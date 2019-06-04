@@ -49,6 +49,9 @@ defmodule CubDB.Btree do
 
   @spec load(Enumerable.t(), Store.t(), pos_integer) :: %Btree{}
   def load(enum, store, cap \\ @default_capacity) do
+    unless Store.blank?(store),
+      do: raise(ArgumentError, message: "cannot load into non-empty store")
+
     {st, count} =
       Enum.reduce(enum, {[], 0}, fn {k, v}, {st, count} ->
         {load_node(store, k, {@value, v}, st, 1, cap), count + 1}

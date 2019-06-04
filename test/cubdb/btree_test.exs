@@ -225,6 +225,15 @@ defmodule CubDB.BtreeTest do
     assert key_vals |> Enum.to_list == tree |> Enum.to_list
   end
 
+  test "load/3 raises ArgumentError if the given store is not empty" do
+    store = Store.MemMap.new
+    key_vals = Stream.map((0..20), &({&1, &1}))
+    key_vals |> Btree.load(store, 4)
+    assert_raise ArgumentError, fn ->
+      key_vals |> Btree.load(store, 4)
+    end
+  end
+
   test "Btree implements Enumerable" do
     Protocol.assert_impl!(Enumerable, Btree)
 

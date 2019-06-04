@@ -21,4 +21,7 @@ defprotocol CubDB.Store do
 
   @spec close(Store.t()) :: :ok | {:error, String.t()}
   def close(store)
+
+  @spec blank?(Store.t()) :: boolean
+  def blank?(store)
 end
