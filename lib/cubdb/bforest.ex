@@ -1,4 +1,5 @@
 defmodule CubDB.Bforest do
+  alias CubDB.Store
   alias CubDB.Btree
   alias CubDB.Bforest
 
