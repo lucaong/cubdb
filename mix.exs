@@ -10,7 +10,7 @@ defmodule CubDB.Mixfile do
       start_permanent: Mix.env == :prod,
       elixirc_paths: elixirc_paths(Mix.env),
       deps: deps(),
-      dialyzer: [ignore_warnings: "dialyzer_ignore.txt"]
+      dialyzer: [ignore_warnings: "dialyzer_ignore.exs"]
     ]
   end
 
