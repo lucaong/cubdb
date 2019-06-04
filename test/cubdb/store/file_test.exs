@@ -12,4 +12,3 @@ defmodule CubDB.Store.FileTest do
     {:ok, store: store}
   end
 end
-

@@ -19,5 +19,3 @@ defmodule PropertyBased.CubDb.Store.File.BlocksTest do
     end
   end
 end
-
-
