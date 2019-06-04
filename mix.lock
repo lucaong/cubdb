@@ -1,3 +1,6 @@
-%{"dialyxir": {:hex, :dialyxir, "0.5.0", "5bc543f9c28ecd51b99cc1a685a3c2a1a93216990347f259406a910cf048d1d7", [:mix], [], "hexpm"},
+%{
+  "dialyxir": {:hex, :dialyxir, "1.0.0-rc.6", "78e97d9c0ff1b5521dd68041193891aebebce52fc3b93463c0a6806874557d7d", [:mix], [{:erlex, "~> 0.2.1", [hex: :erlex, repo: "hexpm", optional: false]}], "hexpm"},
+  "erlex": {:hex, :erlex, "0.2.1", "cee02918660807cbba9a7229cae9b42d1c6143b768c781fa6cee1eaf03ad860b", [:mix], [], "hexpm"},
   "pollution": {:hex, :pollution, "0.9.1", "16ea6dc065cb46ba39f8c2ae5470570a21f85b0fb4b388d6ad2e7a39cf040921", [:mix], [], "hexpm"},
-  "quixir": {:hex, :quixir, "0.9.2", "16c178de603daa9a152d8df67dc469babcded98e337ba54afbd079729912959e", [:mix], [{:pollution, "~> 0.9.1", [hex: :pollution, repo: "hexpm", optional: false]}], "hexpm"}}
+  "quixir": {:hex, :quixir, "0.9.2", "16c178de603daa9a152d8df67dc469babcded98e337ba54afbd079729912959e", [:mix], [{:pollution, "~> 0.9.1", [hex: :pollution, repo: "hexpm", optional: false]}], "hexpm"},
+}

@@ -34,7 +34,7 @@ defmodule CubDB.Mixfile do
   defp deps do
     [
       {:quixir, "~> 0.9", only: :test},
-      {:dialyxir, "~> 0.5", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.0.0-rc.6", only: [:dev], runtime: false}
     ]
   end
 
