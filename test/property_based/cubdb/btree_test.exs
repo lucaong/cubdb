@@ -6,6 +6,8 @@ defmodule PropertyBased.BtreeTest do
   alias CubDB.Btree
   alias Store.Utils
 
+  @leaf Btree.__leaf__
+
   @tag property_based: true
   test "a Btree grows and shrinks" do
     ptest [
@@ -47,7 +49,7 @@ defmodule PropertyBased.BtreeTest do
       end)
 
       Btree.commit(tree)
-      assert {:Btree, 0, {:Leaf, []}} = Utils.debug(tree.store)
+      assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
     end
   end
 end

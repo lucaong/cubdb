@@ -1,5 +1,8 @@
 defmodule CubDB.Store.Utils do
   alias CubDB.Store
+  alias CubDB.Btree
+
+  @value Btree.__value__
 
   def debug(store) do
     {_, {size, root_loc}} = Store.get_latest_header(store)
@@ -8,7 +11,7 @@ defmodule CubDB.Store.Utils do
 
   defp debug_node(store, loc) do
     case Store.get_node(store, loc) do
-      {:Value, value} ->
+      {@value, value} ->
         value
 
       {type, locs} ->
@@ -39,7 +42,7 @@ defmodule CubDB.Store.Utils do
   end
 
   defp load_node(store, value) do
-    node = {:Value, value}
+    node = {@value, value}
     {Store.put_node(store, node), node}
   end
 end

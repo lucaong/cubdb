@@ -3,9 +3,13 @@ defmodule CubDB.StoreExamples do
 
   using do
     quote do
+      alias CubDB.Btree
+
+      @value Btree.__value__
+
       test "put_node/2 and get_node/2 set and get a node at location", %{store: store} do
         Enum.each((1..10), fn value ->
-          node = {:Value, value}
+          node = {@value, value}
           loc = CubDB.Store.put_node(store, node)
           assert node == CubDB.Store.get_node(store, loc)
         end)
@@ -16,19 +20,19 @@ defmodule CubDB.StoreExamples do
       end
 
       test "put_header/2 sets a header", %{store: store} do
-        root_loc = CubDB.Store.put_node(store, {:Value, 1})
+        root_loc = CubDB.Store.put_node(store, {@value, 1})
         loc = CubDB.Store.put_header(store, {root_loc, 1})
         assert {^loc, {^root_loc, 1}} =
           CubDB.Store.get_latest_header(store)
       end
 
       test "get_latest_header/1 returns the most recently stored header", %{store: store} do
-        CubDB.Store.put_node(store, {:Value, 1})
-        CubDB.Store.put_node(store, {:Value, 2})
+        CubDB.Store.put_node(store, {@value, 1})
+        CubDB.Store.put_node(store, {@value, 2})
         CubDB.Store.put_header(store, {0, 0})
-        CubDB.Store.put_node(store, {:Value, 3})
+        CubDB.Store.put_node(store, {@value, 3})
         loc = CubDB.Store.put_header(store, {42, 0})
-        CubDB.Store.put_node(store, {:Value, 4})
+        CubDB.Store.put_node(store, {@value, 4})
         assert {^loc, {42, 0}} = CubDB.Store.get_latest_header(store)
       end
     end

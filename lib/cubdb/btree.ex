@@ -7,9 +7,13 @@ defmodule CubDB.Btree do
   @type val :: any
   @type key_val :: {key, val}
 
+  @leaf :l
+  @branch :b
+  @value :v
+
   require Record
-  Record.defrecord(:leaf, :Leaf, children: [])
-  Record.defrecord(:branch, :Branch, children: [])
+  Record.defrecord(:leaf, @leaf, children: [])
+  Record.defrecord(:branch, @branch, children: [])
 
   alias CubDB.Store
   alias CubDB.Btree
@@ -47,7 +51,7 @@ defmodule CubDB.Btree do
   def load(enum, store, cap \\ @default_capacity) do
     {st, count} =
       Enum.reduce(enum, {[], 0}, fn {k, v}, {st, count} ->
-        {load_node(store, k, {:Value, v}, st, 1, cap), count + 1}
+        {load_node(store, k, {@value, v}, st, 1, cap), count + 1}
       end)
 
     if count == 0 do
@@ -69,22 +73,22 @@ defmodule CubDB.Btree do
 
   @spec has_key?(%Btree{}, key) :: {true, val} | {false, nil}
   def has_key?(%Btree{root: root, store: store}, key) do
-    {{:Leaf, children}, _} = lookup_leaf(root, store, key, [])
+    {{@leaf, children}, _} = lookup_leaf(root, store, key, [])
 
     case Enum.find(children, &match?({^key, _}, &1)) do
       nil ->
         {false, nil}
 
       {_, loc} ->
-        {:Value, value} = Store.get_node(store, loc)
+        {@value, value} = Store.get_node(store, loc)
         {true, value}
     end
   end
 
   @spec insert(%Btree{}, key, val) :: %Btree{}
   def insert(%Btree{root: root, store: store, capacity: cap, size: s}, key, value) do
-    {leaf = {:Leaf, children}, path} = lookup_leaf(root, store, key, [])
-    {root_loc, new_root} = build_up(store, leaf, [{key, {:Value, value}}], [], path, cap)
+    {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
+    {root_loc, new_root} = build_up(store, leaf, [{key, {@value, value}}], [], path, cap)
     s = if List.keymember?(children, key, 0), do: s, else: s + 1
     Store.put_header(store, {s, root_loc})
     %Btree{root: new_root, capacity: cap, store: store, size: s}
@@ -92,7 +96,7 @@ defmodule CubDB.Btree do
 
   @spec delete(%Btree{}, key) :: %Btree{}
   def delete(btree = %Btree{root: root, store: store, capacity: cap, size: s}, key) do
-    {leaf = {:Leaf, children}, path} = lookup_leaf(root, store, key, [])
+    {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
 
     if List.keymember?(children, key, 0) do
       {root_loc, new_root} = build_up(store, leaf, [], [key], path, cap)
@@ -108,6 +112,10 @@ defmodule CubDB.Btree do
     Store.commit(store)
     tree
   end
+
+  def __leaf__, do: @leaf
+  def __branch__, do: @branch
+  def __value__, do: @value
 
   defp load_node(store, key, node, [], _, _) do
     loc = Store.put_node(store, node)
@@ -153,10 +161,10 @@ defmodule CubDB.Btree do
 
   defp make_node(children, level) do
     children = Enum.reverse(children)
-    if level == 1, do: {:Leaf, children}, else: {:Branch, children}
+    if level == 1, do: {@leaf, children}, else: {@branch, children}
   end
 
-  defp lookup_leaf(branch = {:Branch, children}, store, key, path) do
+  defp lookup_leaf(branch = {@branch, children}, store, key, path) do
     loc =
       Enum.reduce_while(children, nil, fn
         {_, loc}, nil ->
@@ -165,12 +173,13 @@ defmodule CubDB.Btree do
         {k, loc}, acc ->
           if k <= key, do: {:cont, loc}, else: {:halt, acc}
       end)
+
     child = Store.get_node(store, loc)
 
     lookup_leaf(child, store, key, [branch | path])
   end
 
-  defp lookup_leaf(leaf = {:Leaf, _}, _, _, path) do
+  defp lookup_leaf(leaf = {@leaf, _}, _, _, path) do
     {leaf, path}
   end
 
@@ -182,7 +191,7 @@ defmodule CubDB.Btree do
         root = leaf()
         {Store.put_node(store, root), root}
 
-      [{_, {:Branch, [{_, loc}]}}] ->
+      [{_, {@branch, [{_, loc}]}}] ->
         {loc, Store.get_node(store, loc)}
 
       [{_, node}] ->
@@ -190,7 +199,7 @@ defmodule CubDB.Btree do
 
       new_nodes ->
         new_locs = store_nodes(store, new_nodes)
-        root = {:Branch, new_locs}
+        root = {@branch, new_locs}
         {Store.put_node(store, root), root}
     end
   end
@@ -263,7 +272,7 @@ defmodule CubDB.Btree do
     |> split_merge(store, nil, parent, cap)
   end
 
-  defp left_sibling(store, {:Branch, children}, key) do
+  defp left_sibling(store, {@branch, children}, key) do
     left =
       children
       |> Enum.take_while(fn {k, _} -> k < key end)
@@ -292,6 +301,10 @@ defimpl Enumerable, for: CubDB.Btree do
   alias CubDB.Store
   alias CubDB.Btree
 
+  @leaf Btree.__leaf__
+  @branch Btree.__branch__
+  @value Btree.__value__
+
   def reduce(%Btree{root: root, store: store}, cmd_acc, fun) do
     {_, locs} = root
 
@@ -301,8 +314,8 @@ defimpl Enumerable, for: CubDB.Btree do
       end)
 
     case root do
-      {:Branch, _} -> do_reduce({[], [children]}, cmd_acc, fun, store)
-      {:Leaf, _} -> do_reduce({children, []}, cmd_acc, fun, store)
+      {@branch, _} -> do_reduce({[], [children]}, cmd_acc, fun, store)
+      {@leaf, _} -> do_reduce({children, []}, cmd_acc, fun, store)
     end
   end
 
@@ -341,7 +354,7 @@ defimpl Enumerable, for: CubDB.Btree do
     end
   end
 
-  defp next({[], [[{_, {:Leaf, locs}} | rest] | todo]}, store) do
+  defp next({[], [[{_, {@leaf, locs}} | rest] | todo]}, store) do
     children =
       Enum.map(locs, fn {k, v} ->
         {k, Store.get_node(store, v)}
@@ -350,7 +363,7 @@ defimpl Enumerable, for: CubDB.Btree do
     next({children, [rest | todo]}, store)
   end
 
-  defp next({[], [[{_, {:Branch, locs}} | rest] | todo]}, store) do
+  defp next({[], [[{_, {@branch, locs}} | rest] | todo]}, store) do
     children =
       Enum.map(locs, fn {k, v} ->
         {k, Store.get_node(store, v)}
@@ -359,7 +372,7 @@ defimpl Enumerable, for: CubDB.Btree do
     next({[], [children | [rest | todo]]}, store)
   end
 
-  defp next({[{k, {:Value, v}} | rest], todo}, _) do
+  defp next({[{k, {@value, v}} | rest], todo}, _) do
     {{rest, todo}, {k, v}}
   end
 end

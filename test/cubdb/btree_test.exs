@@ -6,19 +6,22 @@ defmodule CubDB.BtreeTest do
   alias CubDB.Btree
   doctest Btree
 
+  @leaf Btree.__leaf__
+  @branch Btree.__branch__
+
   def btree() do
     store = Store.MemMap.new
     root = Utils.load(store, {:Btree, 0, Btree.leaf()})
     %Btree{root: root, capacity: 3, store: store, size: 0}
   end
 
-  def btree(root = {:Leaf, cs}) do
+  def btree(root = {@leaf, cs}) do
     store = Store.MemMap.new
     root = Utils.load(store, {:Btree, length(cs), root})
     %Btree{root: root, capacity: 3, store: store, size: length(cs)}
   end
 
-  def btree(root = {:Branch, _}, size \\ 0) do
+  def btree(root = {@branch, _}, size \\ 0) do
     store = Store.MemMap.new
     root = Utils.load(store, {:Btree, size, root})
     %Btree{root: root, capacity: 3, store: store, size: size}
@@ -26,30 +29,30 @@ defmodule CubDB.BtreeTest do
 
   test "insert/3 called on non-full leaf inserts the key/value tuple" do
     tree = Btree.insert(btree(), :foo, 1)
-    assert {:Btree, 1, {:Leaf, [foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
 
     tree = Btree.insert(tree, :bar, 2)
     assert {:Btree, 2,
-      {:Leaf, [bar: 2, foo: 1]}
+      {@leaf, [bar: 2, foo: 1]}
     } = Utils.debug(tree.store)
     tree = Btree.insert(tree, :baz, 3)
     assert {:Btree, 3,
-      {:Leaf, [bar: 2, baz: 3, foo: 1]}
+      {@leaf, [bar: 2, baz: 3, foo: 1]}
     } = Utils.debug(tree.store)
     tree = Btree.insert(tree, :baz, 4)
     assert {:Btree, 3,
-      {:Leaf, [bar: 2, baz: 4, foo: 1]}
+      {@leaf, [bar: 2, baz: 4, foo: 1]}
     } = Utils.debug(tree.store)
   end
 
   test "insert/3 called on full leaf splits it when overflowing" do
-    tree = btree({:Leaf, [bar: 2, baz: 3, foo: 1]})
+    tree = btree({@leaf, [bar: 2, baz: 3, foo: 1]})
     tree = Btree.insert(tree, :qux, 4)
     assert {:Btree, 4,
       {
-        :Branch, [
-          bar: {:Leaf, [bar: 2, baz: 3]},
-          foo: {:Leaf, [foo: 1, qux: 4]}
+        @branch, [
+          bar: {@leaf, [bar: 2, baz: 3]},
+          foo: {@leaf, [foo: 1, qux: 4]}
         ]
       }
     } = Utils.debug(tree.store)
@@ -57,16 +60,16 @@ defmodule CubDB.BtreeTest do
 
   test "insert/3 called on a branch inserts the key/value" do
     tree = btree({
-      :Branch, [
-        bar: {:Leaf, [bar: 2, baz: 3]},
-        foo: {:Leaf, [foo: 1, qux: 4]}
+      @branch, [
+        bar: {@leaf, [bar: 2, baz: 3]},
+        foo: {@leaf, [foo: 1, qux: 4]}
       ]
     })
     assert {:Btree, _,
       {
-        :Branch, [
-          abc: {:Leaf, [abc: 5, bar: 2, baz: 3]},
-          foo: {:Leaf, [foo: 1, qux: 4]}
+        @branch, [
+          abc: {@leaf, [abc: 5, bar: 2, baz: 3]},
+          foo: {@leaf, [foo: 1, qux: 4]}
         ]
       }
     } = Utils.debug(Btree.insert(tree, :abc, 5).store)
@@ -74,25 +77,25 @@ defmodule CubDB.BtreeTest do
 
   test "insert/3 called on a branch splits the branch if necessary" do
     tree = btree({
-      :Branch, [
-        bar: {:Leaf, [bar: 2, baz: 3]},
-        foo: {:Leaf, [foo: 1, quux: 5, qux: 4]},
-        xxx: {:Leaf, [xxx: 6, yyy: 7]}
+      @branch, [
+        bar: {@leaf, [bar: 2, baz: 3]},
+        foo: {@leaf, [foo: 1, quux: 5, qux: 4]},
+        xxx: {@leaf, [xxx: 6, yyy: 7]}
       ]
     })
     assert {:Btree, _,
       {
-        :Branch, [
+        @branch, [
           bar: {
-            :Branch, [
-              bar: {:Leaf, [bar: 2, baz: 3]},
-              foo: {:Leaf, [foo: 1, quuux: 8]}
+            @branch, [
+              bar: {@leaf, [bar: 2, baz: 3]},
+              foo: {@leaf, [foo: 1, quuux: 8]}
             ]
           },
           quux: {
-            :Branch, [
-              quux: {:Leaf, [quux: 5, qux: 4]},
-              xxx: {:Leaf, [xxx: 6, yyy: 7]}
+            @branch, [
+              quux: {@leaf, [quux: 5, qux: 4]},
+              xxx: {@leaf, [xxx: 6, yyy: 7]}
             ]
           }
         ]
@@ -110,22 +113,22 @@ defmodule CubDB.BtreeTest do
   end
 
   test "lookup/2 finds key and returns its value" do
-    tiny_tree = btree({:Leaf, [bar: 2, foo: 1]})
+    tiny_tree = btree({@leaf, [bar: 2, foo: 1]})
     assert 1 = Btree.lookup(tiny_tree, :foo)
     assert nil == Btree.lookup(tiny_tree, :non_existing)
 
     big_tree = btree({
-      :Branch, [
+      @branch, [
         bar: {
-          :Branch, [
-            bar: {:Leaf, [bar: 2, baz: 3]},
-            foo: {:Leaf, [foo: 1, quuux: 8]}
+          @branch, [
+            bar: {@leaf, [bar: 2, baz: 3]},
+            foo: {@leaf, [foo: 1, quuux: 8]}
           ]
         },
         quux: {
-          :Branch, [
-            quux: {:Leaf, [quux: 5, qux: 4]},
-            xxx: {:Leaf, [xxx: 6, yyy: 7]}
+          @branch, [
+            quux: {@leaf, [quux: 5, qux: 4]},
+            xxx: {@leaf, [xxx: 6, yyy: 7]}
           ]
         }
       ]
@@ -135,23 +138,23 @@ defmodule CubDB.BtreeTest do
   end
 
   test "delete/2 removes a key/value" do
-    tiny_tree = btree({:Leaf, [bar: 2, foo: 1]})
+    tiny_tree = btree({@leaf, [bar: 2, foo: 1]})
     assert {:Btree, _,
-      {:Leaf, [bar: 2]}
+      {@leaf, [bar: 2]}
     } = Utils.debug(Btree.delete(tiny_tree, :foo).store)
     assert tiny_tree == Btree.delete(tiny_tree, :non_existing)
 
     big_tree = btree({
-      :Branch, [
-        bar: {:Leaf, [bar: 2, baz: 3]},
-        foo: {:Leaf, [foo: 1, fox: 5, qux: 4]}
+      @branch, [
+        bar: {@leaf, [bar: 2, baz: 3]},
+        foo: {@leaf, [foo: 1, fox: 5, qux: 4]}
       ]
     })
     assert {:Btree, _,
       {
-        :Branch, [
-          bar: {:Leaf, [bar: 2, baz: 3]},
-          fox: {:Leaf, [fox: 5, qux: 4]}
+        @branch, [
+          bar: {@leaf, [bar: 2, baz: 3]},
+          fox: {@leaf, [fox: 5, qux: 4]}
         ]
       }
     } = Utils.debug(Btree.delete(big_tree, :foo).store)
@@ -160,27 +163,27 @@ defmodule CubDB.BtreeTest do
 
   test "delete/2 merges nodes if necessary" do
     big_tree = btree({
-      :Branch, [
+      @branch, [
         bar: {
-          :Branch, [
-            bar: {:Leaf, [bar: 2, baz: 3]},
-            foo: {:Leaf, [foo: 1, quuux: 8]}
+          @branch, [
+            bar: {@leaf, [bar: 2, baz: 3]},
+            foo: {@leaf, [foo: 1, quuux: 8]}
           ]
         },
         quux: {
-          :Branch, [
-            quux: {:Leaf, [quux: 5, qux: 4]},
-            xxx: {:Leaf, [xxx: 6, yyy: 7]}
+          @branch, [
+            quux: {@leaf, [quux: 5, qux: 4]},
+            xxx: {@leaf, [xxx: 6, yyy: 7]}
           ]
         }
       ]
     })
     assert {:Btree, _,
       {
-        :Branch, [
-          bar: {:Leaf, [bar: 2, baz: 3]},
-          foo: {:Leaf, [foo: 1, quuux: 8]},
-          quux: {:Leaf, [quux: 5, qux: 4, yyy: 7]},
+        @branch, [
+          bar: {@leaf, [bar: 2, baz: 3]},
+          foo: {@leaf, [foo: 1, quuux: 8]},
+          quux: {@leaf, [quux: 5, qux: 4, yyy: 7]},
         ]
       }
     } = Utils.debug(Btree.delete(big_tree, :xxx).store)
@@ -188,20 +191,20 @@ defmodule CubDB.BtreeTest do
 
   test "delete/2 removes a node when empty" do
     tree = btree({
-      :Branch, [
-        bar: {:Leaf, [bar: 2]},
-        foo: {:Leaf, [foo: 1]}
+      @branch, [
+        bar: {@leaf, [bar: 2]},
+        foo: {@leaf, [foo: 1]}
       ]
     })
 
     tree = Btree.delete(tree, :bar)
     assert {:Btree, _,
-      {:Leaf, [foo: 1]}
+      {@leaf, [foo: 1]}
     } = Utils.debug(tree.store)
 
     tree = Btree.delete(tree, :foo)
     assert {:Btree, _,
-      {:Leaf, []}
+      {@leaf, []}
     } = Utils.debug(tree.store)
   end
 
