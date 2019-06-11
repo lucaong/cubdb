@@ -9,12 +9,13 @@ defmodule CubDB.Btree do
 
   @type key :: any
   @type val :: any
-  @type key_val :: {key, val}
+  @type btree_size :: non_neg_integer
   @type location :: non_neg_integer
-  @type leaf :: record(:leaf, children: list({key, location}))
-  @type branch :: record(:branch, children: list({key, location}))
-  @type btree_node :: leaf | branch
-  @type btree_header :: {non_neg_integer, non_neg_integer}
+  @type leaf_node :: record(:leaf, children: list({key, location}))
+  @type branch_node :: record(:branch, children: list({key, location}))
+  @type value_node :: {:v, val}
+  @type btree_node :: leaf_node | branch_node | value_node
+  @type btree_header :: {btree_size, location}
 
   alias CubDB.Store
   alias CubDB.Btree
@@ -43,7 +44,7 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec new(Store.t(), list(key_val), pos_integer) :: %Btree{}
+  @spec new(Store.t(), list({key, val}), pos_integer) :: %Btree{}
   def new(store, elems, cap \\ @default_capacity) when is_list(elems) do
     load(Enum.sort_by(elems, &elem(&1, 0)), store, cap)
   end
