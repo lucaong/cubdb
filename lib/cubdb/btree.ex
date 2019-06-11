@@ -1,12 +1,4 @@
 defmodule CubDB.Btree do
-  @type btree_node_type :: atom
-  @type location :: non_neg_integer
-  @type btree_node :: {btree_node_type, list({any, non_neg_integer})}
-  @type btree_header :: {non_neg_integer, non_neg_integer}
-  @type key :: any
-  @type val :: any
-  @type key_val :: {key, val}
-
   @leaf :l
   @branch :b
   @value :v
@@ -14,6 +6,15 @@ defmodule CubDB.Btree do
   require Record
   Record.defrecord(:leaf, @leaf, children: [])
   Record.defrecord(:branch, @branch, children: [])
+
+  @type key :: any
+  @type val :: any
+  @type key_val :: {key, val}
+  @type location :: non_neg_integer
+  @type leaf :: record(:leaf, children: list({key, location}))
+  @type branch :: record(:branch, children: list({key, location}))
+  @type btree_node :: leaf | branch
+  @type btree_header :: {non_neg_integer, non_neg_integer}
 
   alias CubDB.Store
   alias CubDB.Btree
