@@ -3,22 +3,23 @@ defmodule CubDB.Bforest do
   alias CubDB.Btree
   alias CubDB.Bforest
 
-  @type bforest :: %Bforest{btrees: nonempty_list(%Btree{})}
+  @type bforest :: %Bforest{btree: %Btree{}, bforest: %Bforest{} | nil, frozen: boolean}
   @type key :: any
   @type val :: any
 
-  @enforce_keys [:btrees]
-  defstruct btrees: nil
+  @enforce_keys [:btree, :frozen]
+  defstruct btree: nil, bforest: nil, frozen: false
 
   @moduledoc """
-  A Bforest contains a list of Btrees. All write operations are made on
-  the first Btree (called live tree), while lookup operations are tried
-  on all trees in order, and the first result is returned.
+  A Bforest is a recursive structure that contains a Btree and, optionally, a
+  Bforest. All write operations are made on the Btree (called the live tree),
+  while lookup operations are tried on the Btree first, and then on the Bforest,
+  and the first result is returned.
   """
 
-  @spec new(nonempty_list(%Btree{})) :: bforest
-  def new(btrees) do
-    %Bforest{btrees: btrees}
+  @spec new(%Btree{}, %Bforest{} | nil, boolean) :: bforest
+  def new(btree, bforest \\ nil, frozen \\ false) do
+    %Bforest{btree: btree, bforest: bforest, frozen: frozen}
   end
 
   @spec lookup(bforest, key) :: val | nil
@@ -30,45 +31,55 @@ defmodule CubDB.Bforest do
   end
 
   @spec has_key?(bforest, key) :: {true, val} | {false, nil}
-  def has_key?(%Bforest{btrees: btrees}, key) do
-    Enum.reduce_while(btrees, nil, fn tree, _ ->
-      case Btree.has_key?(tree, key) do
-        tuple = {true, _} -> {:halt, tuple}
-        tuple -> {:cont, tuple}
-      end
-    end)
+  def has_key?(%Bforest{btree: btree, bforest: nil}, key) do
+    Btree.has_key?(btree, key)
+  end
+
+  def has_key?(%Bforest{btree: btree, bforest: bforest}, key) do
+    case Btree.has_key?(btree, key) do
+      {false, _} -> has_key?(bforest, key)
+      found -> found
+    end
   end
 
   @spec insert(bforest, key, val) :: bforest
-  def insert(%Bforest{btrees: [live_tree | rest]}, key, value) do
-    %Bforest{btrees: [Btree.insert(live_tree, key, value) | rest]}
+  def insert(bforest, key, value) do
+    ensure_editable!(bforest)
+    %Bforest{bforest | btree: Btree.insert(bforest.btree, key, value)}
   end
 
   @spec delete(bforest, key) :: bforest
-  def delete(%Bforest{btrees: [live_tree | rest]}, key) do
-    %Bforest{btrees: [Btree.delete(live_tree, key) | rest]}
+  def delete(bforest, key) do
+    ensure_editable!(bforest)
+    %Bforest{bforest | btree: Btree.delete(bforest.btree, key)}
   end
 
   @spec commit(bforest) :: bforest
-  def commit(%Bforest{btrees: [live_tree | rest]}) do
-    %Bforest{btrees: [Btree.commit(live_tree) | rest]}
+  def commit(bforest) do
+    ensure_editable!(bforest)
+    %Bforest{bforest | btree: Btree.commit(bforest.btree)}
   end
 
   @spec compact(bforest, Store.t()) :: %Btree{}
   def compact(forest = %Bforest{}, store) do
     Btree.load(forest, store)
   end
+
+  defp ensure_editable!(bforest) do
+    if bforest.frozen,
+      do: raise(ArgumentError, message: "cannot modify frozen Bforest")
+  end
 end
 
 defimpl Enumerable, for: CubDB.Bforest do
   alias CubDB.Bforest
 
-  def reduce(%Bforest{btrees: trees}, cmd_acc, fun) do
-    tuples =
-      Enum.map(trees, fn tree ->
-        Enumerable.reduce(tree, cmd_acc, &step/2)
-      end)
+  def reduce(%Bforest{btree: btree, bforest: nil}, cmd_acc, fun) do
+    Enumerable.reduce(btree, cmd_acc, fun)
+  end
 
+  def reduce(bforest, cmd_acc, fun) do
+    tuples = get_tuples(bforest, cmd_acc, [])
     do_reduce(tuples, cmd_acc, fun)
   end
 
@@ -83,6 +94,14 @@ defimpl Enumerable, for: CubDB.Bforest do
   end
 
   def slice(_), do: {:error, __MODULE__}
+
+  defp get_tuples(%Bforest{btree: btree, bforest: nil}, cmd_acc, tuples) do
+    Enum.reverse([Enumerable.reduce(btree, cmd_acc, &step/2) | tuples])
+  end
+
+  defp get_tuples(%Bforest{btree: btree, bforest: bforest}, cmd_acc, tuples) do
+    get_tuples(bforest, cmd_acc, [Enumerable.reduce(btree, cmd_acc, &step/2) | tuples])
+  end
 
   defp step(x, _) do
     {:suspend, x}
