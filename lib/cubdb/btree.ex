@@ -305,25 +305,13 @@ defmodule CubDB.Btree do
 end
 
 defimpl Enumerable, for: CubDB.Btree do
-  alias CubDB.Store
   alias CubDB.Btree
+  alias CubDB.Store
 
-  @leaf Btree.__leaf__
-  @branch Btree.__branch__
   @value Btree.__value__
 
-  def reduce(%Btree{root: root, store: store}, cmd_acc, fun) do
-    {_, locs} = root
-
-    children =
-      Enum.map(locs, fn {k, v} ->
-        {k, Store.get_node(store, v)}
-      end)
-
-    case root do
-      {@branch, _} -> do_reduce({[], [children]}, cmd_acc, fun, store)
-      {@leaf, _} -> do_reduce({children, []}, cmd_acc, fun, store)
-    end
+  def reduce(btree, cmd_acc, fun) do
+    Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children/2)
   end
 
   def count(%Btree{size: size}), do: {:ok, size}
@@ -339,47 +327,11 @@ defimpl Enumerable, for: CubDB.Btree do
 
   def slice(_), do: {:error, __MODULE__}
 
-  defp do_reduce(_, {:halt, acc}, _, _), do: {:halted, acc}
+  defp get_children({@value, v}, _), do: v
 
-  defp do_reduce(t, {:suspend, acc}, fun, store) do
-    {:suspended, acc, &do_reduce(t, &1, fun, store)}
-  end
-
-  defp do_reduce({[], []}, {:cont, acc}, _, _), do: {:done, acc}
-
-  defp do_reduce(t, {:cont, acc}, fun, store) do
-    case next(t, store) do
-      {t, item} -> do_reduce(t, fun.(item, acc), fun, store)
-      :done -> {:done, acc}
-    end
-  end
-
-  defp next({[], [[] | todo]}, store) do
-    case todo do
-      [] -> :done
-      _ -> next({[], todo}, store)
-    end
-  end
-
-  defp next({[], [[{_, {@leaf, locs}} | rest] | todo]}, store) do
-    children =
-      Enum.map(locs, fn {k, v} ->
-        {k, Store.get_node(store, v)}
-      end)
-
-    next({children, [rest | todo]}, store)
-  end
-
-  defp next({[], [[{_, {@branch, locs}} | rest] | todo]}, store) do
-    children =
-      Enum.map(locs, fn {k, v} ->
-        {k, Store.get_node(store, v)}
-      end)
-
-    next({[], [children | [rest | todo]]}, store)
-  end
-
-  defp next({[{k, {@value, v}} | rest], todo}, _) do
-    {{rest, todo}, {k, v}}
+  defp get_children({_, locs}, store) do
+    Enum.map(locs, fn {k, v} ->
+      {k, Store.get_node(store, v)}
+    end)
   end
 end
