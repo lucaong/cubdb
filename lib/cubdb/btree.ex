@@ -47,7 +47,8 @@ defmodule CubDB.Btree do
 
   @spec new(Store.t(), list({key, val}), pos_integer) :: %Btree{}
   def new(store, elems, cap \\ @default_capacity) when is_list(elems) do
-    load(Enum.sort_by(elems, &elem(&1, 0)), store, cap)
+    entries = elems |> Enum.reverse |> Enum.uniq_by(&(elem(&1, 0))) |> List.keysort(0)
+    load(entries, store, cap)
   end
 
   @spec load(Enumerable.t(), Store.t(), pos_integer) :: %Btree{}
@@ -143,7 +144,7 @@ defmodule CubDB.Btree do
 
   defp finalize_load(store, [children], level, _) do
     case children do
-      [{_, loc}] ->
+      [{_, loc}] when level > 1 ->
         {Store.get_node(store, loc), loc}
 
       _ ->

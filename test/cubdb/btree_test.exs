@@ -225,6 +225,13 @@ defmodule CubDB.BtreeTest do
     assert key_vals |> Enum.to_list == tree |> Enum.to_list
   end
 
+  test "load/3 creates a Btree from a single item sorted Enumerable" do
+    store = Store.MemMap.new
+    key_vals = [foo: 123]
+    tree = key_vals |> Btree.load(store, 4)
+    assert key_vals |> Enum.to_list == tree |> Enum.to_list
+  end
+
   test "load/3 raises ArgumentError if the given store is not empty" do
     store = Store.MemMap.new
     key_vals = Stream.map((0..20), &({&1, &1}))
