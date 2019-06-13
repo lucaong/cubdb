@@ -6,6 +6,7 @@ defmodule CubDB.Btree do
   require Record
   Record.defrecord(:leaf, @leaf, children: [])
   Record.defrecord(:branch, @branch, children: [])
+  Record.defrecord(:value, @value, val: nil)
 
   @type key :: any
   @type val :: any
@@ -13,7 +14,7 @@ defmodule CubDB.Btree do
   @type location :: non_neg_integer
   @type leaf_node :: record(:leaf, children: list({key, location}))
   @type branch_node :: record(:branch, children: list({key, location}))
-  @type value_node :: {:v, val}
+  @type value_node :: record(:value, val: val)
   @type btree_node :: leaf_node | branch_node | value_node
   @type btree_header :: {btree_size, location}
 
