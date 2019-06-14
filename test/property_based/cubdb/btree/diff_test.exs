@@ -39,7 +39,7 @@ defmodule PropertyBased.Btree.DiffTest do
 
       diff = Diff.new(from_btree, to_btree)
 
-      expected_updates =
+      expected_diff =
         updates
         |> Enum.map(fn {key, value} -> {key, {@value, value}} end)
         |> Enum.concat(deletions)
@@ -47,8 +47,7 @@ defmodule PropertyBased.Btree.DiffTest do
         |> Enum.uniq_by(&(elem(&1, 0)))
         |> List.keysort(0)
 
-      assert Enum.to_list(diff) == expected_updates
+      assert Enum.to_list(diff) == expected_diff
     end
   end
 end
-
