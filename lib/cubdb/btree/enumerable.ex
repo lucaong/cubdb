@@ -5,6 +5,7 @@ defmodule CubDB.Btree.Enumerable do
   @leaf Btree.__leaf__
   @branch Btree.__branch__
   @value Btree.__value__
+  @deleted Btree.__deleted__
 
   @spec reduce(%Btree{}, Enumerable.acc, Enumerable.reducer, (Btree.btree_node, Store.t -> any)) :: Enumerable.result
   def reduce(%Btree{root: root, store: store}, cmd_acc, fun, get_children) do
@@ -45,5 +46,9 @@ defmodule CubDB.Btree.Enumerable do
 
   defp next({[{k, value = {@value, _}} | rest], todo}, store, get_children) do
     {{rest, todo}, {k, get_children.(value, store)}}
+  end
+
+  defp next({[{k, @deleted} | rest], todo}, store, get_children) do
+    {{rest, todo}, {k, get_children.(@deleted, store)}}
   end
 end

@@ -2,6 +2,7 @@ defmodule CubDB.Btree do
   @leaf :l
   @branch :b
   @value :v
+  @deleted :d
 
   require Record
   Record.defrecord(:leaf, @leaf, children: [])
@@ -15,28 +16,30 @@ defmodule CubDB.Btree do
   @type leaf_node :: record(:leaf, children: list({key, location}))
   @type branch_node :: record(:branch, children: list({key, location}))
   @type value_node :: record(:value, val: val)
-  @type btree_node :: leaf_node | branch_node | value_node
+  @type deleted_node :: :d
+  @type terminal_node :: value_node | deleted_node
+  @type btree_node :: leaf_node | branch_node | value_node | deleted_node
   @type btree_header :: {btree_size, location}
 
   alias CubDB.Store
   alias CubDB.Btree
 
   @default_capacity 32
-  @enforce_keys [:root, :size, :store]
-  defstruct root: nil, size: 0, store: nil, capacity: @default_capacity
+  @enforce_keys [:root, :root_loc, :size, :store]
+  defstruct root: nil, root_loc: nil, size: 0, store: nil, capacity: @default_capacity
 
   @spec new(Store.t(), pos_integer) :: %Btree{}
   def new(store, cap \\ @default_capacity) do
     case Store.get_latest_header(store) do
       {_, {s, loc}} ->
         root = Store.get_node(store, loc)
-        %Btree{root: root, size: s, capacity: cap, store: store}
+        %Btree{root: root, root_loc: loc, size: s, capacity: cap, store: store}
 
       nil ->
         root = leaf()
         loc = Store.put_node(store, root)
         Store.put_header(store, {0, loc})
-        %Btree{root: root, size: 0, capacity: cap, store: store}
+        %Btree{root: root, root_loc: loc, size: 0, capacity: cap, store: store}
     end
   end
 
@@ -55,7 +58,7 @@ defmodule CubDB.Btree do
     else
       {root, root_loc} = finalize_load(store, st, 1, cap)
       Store.put_header(store, {count, root_loc})
-      %Btree{root: root, capacity: cap, store: store, size: count}
+      %Btree{root: root, root_loc: root_loc, capacity: cap, store: store, size: count}
     end
   end
 
@@ -82,12 +85,8 @@ defmodule CubDB.Btree do
   end
 
   @spec insert(%Btree{}, key, val) :: %Btree{}
-  def insert(%Btree{root: root, store: store, capacity: cap, size: s}, key, value) do
-    {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
-    {root_loc, new_root} = build_up(store, leaf, [{key, {@value, value}}], [], path, cap)
-    s = if List.keymember?(children, key, 0), do: s, else: s + 1
-    Store.put_header(store, {s, root_loc})
-    %Btree{root: new_root, capacity: cap, store: store, size: s}
+  def insert(btree, key, value) do
+    insert_terminal_node(btree, key, {@value, value})
   end
 
   @spec delete(%Btree{}, key) :: %Btree{}
@@ -97,10 +96,15 @@ defmodule CubDB.Btree do
     if List.keymember?(children, key, 0) do
       {root_loc, new_root} = build_up(store, leaf, [], [key], path, cap)
       Store.put_header(store, {s - 1, root_loc})
-      %Btree{root: new_root, capacity: cap, store: store, size: s - 1}
+      %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: s - 1}
     else
       btree
     end
+  end
+
+  @spec mark_deleted(%Btree{}, key) :: %Btree{}
+  def mark_deleted(btree, key) do
+    insert_terminal_node(btree, key, @deleted)
   end
 
   @spec commit(%Btree{}) :: %Btree{}
@@ -117,6 +121,16 @@ defmodule CubDB.Btree do
   def __leaf__, do: @leaf
   def __branch__, do: @branch
   def __value__, do: @value
+  def __deleted__, do: @deleted
+
+  @spec insert_terminal_node(%Btree{}, key, terminal_node) :: %Btree{}
+  defp insert_terminal_node(%Btree{root: root, store: store, capacity: cap, size: s}, key, terminal_node) do
+    {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
+    {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
+    s = if List.keymember?(children, key, 0), do: s, else: s + 1
+    Store.put_header(store, {s, root_loc})
+    %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: s}
+  end
 
   defp load_node(store, key, node, [], _, _) do
     loc = Store.put_node(store, node)
@@ -303,6 +317,7 @@ defimpl Enumerable, for: CubDB.Btree do
   alias CubDB.Store
 
   @value Btree.__value__
+  @deleted Btree.__deleted__
 
   def reduce(btree, cmd_acc, fun) do
     Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children/2)
@@ -324,8 +339,12 @@ defimpl Enumerable, for: CubDB.Btree do
   defp get_children({@value, v}, _), do: v
 
   defp get_children({_, locs}, store) do
-    Enum.map(locs, fn {k, v} ->
-      {k, Store.get_node(store, v)}
+    locs
+    |> Enum.map(fn {k, loc} ->
+      {k, Store.get_node(store, loc)}
+    end)
+    |> Enum.filter(fn {_, node} ->
+      node != @deleted
     end)
   end
 end

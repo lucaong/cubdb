@@ -59,4 +59,11 @@ defmodule CubDB.Btree.KeyRangeTest do
     assert Enum.member?(KeyRange.new(btree, :b, :nil), {:d, 4}) == true
     assert Enum.member?(KeyRange.new(btree, :nil, :b), {:b, 2}) == true
   end
+
+  test "Enumerable.Btree.KeyRange.reduce/3 skips nodes marked as deleted" do
+    store = Store.MemMap.new
+    tree = make_btree(store, [a: 1, b: 2, c: 3, d: 4], 3) |> Btree.mark_deleted(:b)
+    key_range = KeyRange.new(tree, :a, :c)
+    assert Enum.to_list(key_range) == [a: 1, c: 3]
+  end
 end

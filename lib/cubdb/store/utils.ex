@@ -27,7 +27,7 @@ defmodule CubDB.Store.Utils do
   def load(store, {:Btree, size, root}) do
     {root_loc, root_node} = load_node(store, root)
     Store.put_header(store, {size, root_loc})
-    root_node
+    {root_loc, root_node}
   end
 
   defp load_node(store, {type, children}) do

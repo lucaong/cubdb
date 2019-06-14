@@ -14,20 +14,20 @@ defmodule CubDB.BtreeTest do
 
   def btree() do
     store = Store.MemMap.new
-    root = Utils.load(store, {:Btree, 0, Btree.leaf()})
-    %Btree{root: root, capacity: 3, store: store, size: 0}
+    {root_loc, root} = Utils.load(store, {:Btree, 0, Btree.leaf()})
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0}
   end
 
   def btree(root = {@leaf, cs}) do
     store = Store.MemMap.new
-    root = Utils.load(store, {:Btree, length(cs), root})
-    %Btree{root: root, capacity: 3, store: store, size: length(cs)}
+    {root_loc, root} = Utils.load(store, {:Btree, length(cs), root})
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: length(cs)}
   end
 
   def btree(root = {@branch, _}, size \\ 0) do
     store = Store.MemMap.new
-    root = Utils.load(store, {:Btree, size, root})
-    %Btree{root: root, capacity: 3, store: store, size: size}
+    {root_loc, root} = Utils.load(store, {:Btree, size, root})
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size}
   end
 
   test "insert/3 called on non-full leaf inserts the key/value tuple" do
@@ -279,5 +279,11 @@ defmodule CubDB.BtreeTest do
         assert Enum.member?(tree, :not_a_key_value_tuple) == false
       end
     end
+  end
+
+  test "Enumerable.Btree.reduce/3 skips nodes marked as deleted" do
+    store = Store.MemMap.new
+    tree = make_btree(store, [a: 1, b: 2, c: 3, d: 4], 3) |> Btree.mark_deleted(:b)
+    assert Enum.to_list(tree) == [a: 1, c: 3, d: 4]
   end
 end
