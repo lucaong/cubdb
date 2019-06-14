@@ -35,7 +35,7 @@ defmodule CubDB.Btree.KeyRangeTest do
         end)
         |> List.keysort(0)
 
-      # assert Enum.count(key_range) == length(expected_entries)
+      assert Enum.count(key_range) == length(expected_entries)
       assert Enum.into(key_range, []) == expected_entries
       assert Stream.map(key_range, &(&1)) |> Enum.to_list == expected_entries
       assert Stream.zip(key_range, entries) |> Enum.to_list ==

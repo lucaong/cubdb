@@ -24,7 +24,7 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
     Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children(from, to, &1, &2))
   end
 
-  def count(%KeyRange{btree: %Btree{size: size}}), do: {:ok, size}
+  def count(_), do: {:error, __MODULE__}
 
   def member?(%KeyRange{from: from, to: to}, {key, _})
   when (is_nil(from) == false and key < from) or (is_nil(to) == false and key > to) do
