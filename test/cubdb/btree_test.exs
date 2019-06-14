@@ -244,6 +244,15 @@ defmodule CubDB.BtreeTest do
     end
   end
 
+  test "key_range/3 returns a KeyRange" do
+    store = Store.MemMap.new
+    btree = make_btree(store, [a: 1, b: 2, c: 3, d: 4, e: 5])
+    from = :b
+    to = :e
+
+    assert %Btree.KeyRange{btree: ^btree, from: ^from, to: ^to} = Btree.key_range(btree, from, to)
+  end
+
   test "Btree implements Enumerable" do
     Protocol.assert_impl!(Enumerable, Btree)
 

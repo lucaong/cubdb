@@ -109,6 +109,11 @@ defmodule CubDB.Btree do
     tree
   end
 
+  @spec key_range(%Btree{}, key, key) :: %Btree.KeyRange{}
+  def key_range(tree, from \\ nil, to \\ nil) do
+    Btree.KeyRange.new(tree, from, to)
+  end
+
   def __leaf__, do: @leaf
   def __branch__, do: @branch
   def __value__, do: @value
