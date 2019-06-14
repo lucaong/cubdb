@@ -141,7 +141,10 @@ defmodule CubDB.Btree do
   defp insert_terminal_node(%Btree{root: root, store: store, capacity: cap, size: s}, key, terminal_node) do
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
     {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
-    s = if List.keymember?(children, key, 0), do: s, else: s + 1
+    s = case terminal_node do
+      {@value, _} -> if List.keymember?(children, key, 0), do: s, else: s + 1
+      @deleted -> if List.keymember?(children, key, 0), do: s - 1, else: s
+    end
     Store.put_header(store, {s, root_loc})
     %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: s}
   end

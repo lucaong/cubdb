@@ -221,6 +221,23 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 3} = tree
   end
 
+  test "mark_deleted/2 removes an entry" do
+    store = Store.MemMap.new
+    btree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3) |> Btree.mark_deleted(:bar)
+    assert Btree.has_key?(btree, :bar) == {false, nil}
+    assert Btree.lookup(btree, :bar) == nil
+  end
+
+  test "mark_deleted/2 decrements the size of the tree only when necessary" do
+    store = Store.MemMap.new
+    tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
+    assert %Btree{size: 4} = tree
+    tree = Btree.mark_deleted(tree, :bar)
+    assert %Btree{size: 3} = tree
+    tree = Btree.mark_deleted(tree, :bar)
+    assert %Btree{size: 3} = tree
+  end
+
   test "load/3 creates a Btree from a sorted enumerable of key/values" do
     store = Store.MemMap.new
     key_vals = Stream.map((0..20), &({&1, &1}))

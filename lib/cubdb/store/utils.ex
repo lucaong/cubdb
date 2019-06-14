@@ -3,6 +3,7 @@ defmodule CubDB.Store.Utils do
   alias CubDB.Btree
 
   @value Btree.__value__
+  @deleted Btree.__deleted__
 
   def debug(store) do
     {_, {size, root_loc}} = Store.get_latest_header(store)
@@ -13,6 +14,9 @@ defmodule CubDB.Store.Utils do
     case Store.get_node(store, loc) do
       {@value, value} ->
         value
+
+      @deleted ->
+        @deleted
 
       {type, locs} ->
         children =

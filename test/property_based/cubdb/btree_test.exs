@@ -37,7 +37,10 @@ defmodule PropertyBased.BtreeTest do
 
       tree = Enum.reduce(tuples, tree, fn {key, _}, t ->
         previous_count = Enum.count(t)
-        t = Btree.delete(t, key)
+
+        t = if rem(previous_count, 2) == 0,
+          do: Btree.delete(t, key),
+          else: Btree.mark_deleted(t, key)
 
         assert Enum.count(t) <= previous_count
 
@@ -48,8 +51,11 @@ defmodule PropertyBased.BtreeTest do
         t
       end)
 
-      Btree.commit(tree)
-      assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+      compacted = Btree.load(tree, Store.MemMap.new, cap)
+      Btree.commit(compacted)
+
+      assert Enum.to_list(tree) == Enum.to_list(compacted)
+      assert {:Btree, 0, {@leaf, []}} = Utils.debug(compacted.store)
     end
   end
 end
