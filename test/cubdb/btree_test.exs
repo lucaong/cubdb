@@ -253,6 +253,19 @@ defmodule CubDB.BtreeTest do
     assert %Btree.KeyRange{btree: ^btree, from: ^from, to: ^to} = Btree.key_range(btree, from, to)
   end
 
+  test "catch_up/2 makes a Btree catch-up with a newer one" do
+    entries =  [a: 1, b: 2, c: 3, d: 4, e: 5]
+    older_btree = make_btree(Store.MemMap.new, entries)
+    newer_btree = make_btree(Store.MemMap.new, entries)
+                  |> Btree.insert(:c, 6)
+                  |> Btree.insert(:f, 7)
+                  |> Btree.mark_deleted(:b)
+                  |> Btree.mark_deleted(:x)
+
+    catched_up_btree = Btree.catch_up(older_btree, newer_btree)
+    assert Enum.to_list(catched_up_btree) == Enum.to_list(newer_btree)
+  end
+
   test "Btree implements Enumerable" do
     Protocol.assert_impl!(Enumerable, Btree)
 
