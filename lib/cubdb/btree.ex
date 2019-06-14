@@ -45,12 +45,6 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec new(Store.t(), list({key, val}), pos_integer) :: %Btree{}
-  def new(store, elems, cap \\ @default_capacity) when is_list(elems) do
-    entries = elems |> Enum.reverse |> Enum.uniq_by(&(elem(&1, 0))) |> List.keysort(0)
-    load(entries, store, cap)
-  end
-
   @spec load(Enumerable.t(), Store.t(), pos_integer) :: %Btree{}
   def load(enum, store, cap \\ @default_capacity) do
     unless Store.blank?(store),

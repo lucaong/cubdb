@@ -5,6 +5,8 @@ defmodule CubDB.Btree.KeyRangeTest do
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
 
+  import TestHelper
+
   doctest Btree.KeyRange
 
   test "KeyRange implements Enumerable" do
@@ -24,7 +26,7 @@ defmodule CubDB.Btree.KeyRangeTest do
     ]
 
     store = Store.MemMap.new
-    btree = Btree.new(store, entries, 3)
+    btree = make_btree(store, entries, 3)
 
     for {from, to} <- [{nil, nil}, {:bar, :qux}, {:ba, :zz}, {nil, :qux}, {:yy, :zz}, {:baz, nil}, {:c, :a}] do
       key_range = KeyRange.new(btree, from, to)
@@ -46,7 +48,7 @@ defmodule CubDB.Btree.KeyRangeTest do
   test "Enum.member/2 returns false if key is outside of range, or not in the btree, and true otherwise" do
     entries = [a: 1, b: 2, c: 3, d: 4]
     store = Store.MemMap.new
-    btree = Btree.new(store, entries, 3)
+    btree = make_btree(store, entries, 3)
 
     assert Enum.member?(KeyRange.new(btree, :b, :c), {:a, 1}) == false
     assert Enum.member?(KeyRange.new(btree, :b, :z), {:e, 1}) == false

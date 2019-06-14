@@ -3,8 +3,9 @@ defmodule PropertyBased.Btree.KeyRangeTest do
   use Quixir
 
   alias CubDB.Store
-  alias CubDB.Btree
   alias CubDB.Btree.KeyRange
+
+  import TestHelper
 
   @tag property_based: true
   test "a KeyRange enumerates through a range of keys" do
@@ -19,7 +20,7 @@ defmodule PropertyBased.Btree.KeyRangeTest do
       to: string(max: 8, chars: :printable)
     ], repeat_for: 50 do
       store = Store.MemMap.new
-      btree = Btree.new(store, key_values, cap)
+      btree = make_btree(store, key_values, cap)
       key_range = KeyRange.new(btree, from, to)
 
       expected_key_values =

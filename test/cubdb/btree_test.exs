@@ -4,6 +4,9 @@ defmodule CubDB.BtreeTest do
   alias CubDB.Store
   alias Store.Utils
   alias CubDB.Btree
+
+  import TestHelper
+
   doctest Btree
 
   @leaf Btree.__leaf__
@@ -210,7 +213,7 @@ defmodule CubDB.BtreeTest do
 
   test "delete/2 decrements the size of the tree only when necessary" do
     store = Store.MemMap.new
-    tree = Btree.new(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
+    tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
     assert %Btree{size: 4} = tree
     tree = Btree.delete(tree, :bar)
     assert %Btree{size: 3} = tree
@@ -253,7 +256,7 @@ defmodule CubDB.BtreeTest do
       sorted_elems = elems |> List.keysort(0)
 
       store = Store.MemMap.new
-      tree = Btree.new(store, elems, 3)
+      tree = make_btree(store, elems, 3)
 
       assert Enum.count(tree) == length(elems)
       assert Enum.into(tree, []) == sorted_elems

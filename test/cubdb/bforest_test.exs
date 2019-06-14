@@ -4,6 +4,9 @@ defmodule CubDB.BforestTest do
   alias CubDB.Store
   alias CubDB.Btree
   alias CubDB.Bforest
+
+  import TestHelper
+
   doctest Bforest
 
   setup do
@@ -103,7 +106,7 @@ defmodule CubDB.BforestTest do
       if n < 4 do
         store = Store.MemMap.new
         key_vals = Enum.zip(n..(n + 2), Stream.cycle([n]))
-        Btree.new(store, key_vals)
+        make_btree(store, key_vals)
       else
         Btree.new(Store.MemMap.new)
       end
