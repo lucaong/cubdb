@@ -128,15 +128,6 @@ defmodule CubDB.Btree do
     Btree.KeyRange.new(tree, from, to)
   end
 
-  @spec catch_up(%Btree{}, %Btree{}) :: %Btree{}
-  def catch_up(btree, newer_btree) do
-    diff = Btree.Diff.new(btree, newer_btree)
-    Enum.reduce(diff, btree, fn
-      {key, {@value, value}}, btree -> Btree.insert(btree, key, value)
-      {key, @deleted}, btree -> Btree.delete(btree, key)
-    end)
-  end
-
   def __leaf__, do: @leaf
   def __branch__, do: @branch
   def __value__, do: @value
