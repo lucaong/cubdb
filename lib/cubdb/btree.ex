@@ -25,13 +25,8 @@ defmodule CubDB.Btree do
   @enforce_keys [:root, :size, :store]
   defstruct root: nil, size: 0, store: nil, capacity: @default_capacity
 
-  @spec new(Store.t()) :: %Btree{}
-  def new(store) do
-    new(store, @default_capacity)
-  end
-
   @spec new(Store.t(), pos_integer) :: %Btree{}
-  def new(store, cap) when is_integer(cap) do
+  def new(store, cap \\ @default_capacity) do
     case Store.get_latest_header(store) do
       {_, {s, loc}} ->
         root = Store.get_node(store, loc)
