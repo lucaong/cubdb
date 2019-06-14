@@ -95,12 +95,17 @@ defmodule CubDB.Btree do
   def delete(btree = %Btree{root: root, store: store, capacity: cap, size: s}, key) do
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
 
-    if List.keymember?(children, key, 0) do
-      {root_loc, new_root} = build_up(store, leaf, [], [key], path, cap)
-      Store.put_header(store, {s - 1, root_loc})
-      %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: s - 1}
-    else
-      btree
+    case List.keyfind(children, key, 0) do
+      {^key, loc} ->
+        size = case Store.get_node(store, loc) do
+          @deleted -> s
+          _ -> s - 1
+        end
+        {root_loc, new_root} = build_up(store, leaf, [], [key], path, cap)
+        Store.put_header(store, {size, root_loc})
+        %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: size}
+
+      nil -> btree
     end
   end
 

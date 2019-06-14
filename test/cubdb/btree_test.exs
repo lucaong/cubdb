@@ -236,6 +236,10 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 3} = tree
     tree = Btree.mark_deleted(tree, :bar)
     assert %Btree{size: 3} = tree
+    tree = Btree.delete(tree, :bar)
+    assert %Btree{size: 3} = tree
+    tree = Btree.mark_deleted(tree, :bar)
+    assert %Btree{size: 3} = tree
   end
 
   test "load/3 creates a Btree from a sorted enumerable of key/values" do
