@@ -79,8 +79,10 @@ defmodule CubDB.Btree do
         {false, nil}
 
       {_, loc} ->
-        {@value, value} = Store.get_node(store, loc)
-        {true, value}
+        case Store.get_node(store, loc) do
+          {@value, value} -> {true, value}
+          @deleted -> {false, nil}
+        end
     end
   end
 
@@ -104,7 +106,10 @@ defmodule CubDB.Btree do
 
   @spec mark_deleted(%Btree{}, key) :: %Btree{}
   def mark_deleted(btree, key) do
-    insert_terminal_node(btree, key, @deleted)
+    case has_key?(btree, key) do
+      {true, _} -> insert_terminal_node(btree, key, @deleted)
+      {false, _} -> btree
+    end
   end
 
   @spec commit(%Btree{}) :: %Btree{}
