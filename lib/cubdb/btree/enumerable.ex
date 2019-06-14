@@ -1,10 +1,12 @@
 defmodule CubDB.Btree.Enumerable do
   alias CubDB.Btree
+  alias CubDB.Store
 
   @leaf Btree.__leaf__
   @branch Btree.__branch__
   @value Btree.__value__
 
+  @spec reduce(%Btree{}, Enumerable.acc, Enumerable.reducer, (Btree.btree_node, Store.t -> any)) :: Enumerable.result
   def reduce(%Btree{root: root, store: store}, cmd_acc, fun, get_children) do
     do_reduce({[], [[{nil, root}]]}, cmd_acc, fun, get_children, store)
   end
@@ -14,8 +16,6 @@ defmodule CubDB.Btree.Enumerable do
   defp do_reduce(t, {:suspend, acc}, fun, get_children, store) do
     {:suspended, acc, &do_reduce(t, &1, fun, get_children, store)}
   end
-
-  defp do_reduce({[], []}, {:cont, acc}, _, _, _), do: {:done, acc}
 
   defp do_reduce(t, {:cont, acc}, fun, get_children, store) do
     case next(t, store, get_children) do
