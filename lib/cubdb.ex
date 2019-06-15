@@ -34,6 +34,11 @@ defmodule CubDB do
     GenServer.call(pid, {:has_key?, key})
   end
 
+  @spec select(GenServer.server, Keyword.t) :: {:ok, any} | {:error, Exception.t}
+  def select(pid, options \\ []) when is_list(options) do
+    GenServer.call(pid, {:select, options})
+  end
+
   @spec size(GenServer.server) :: pos_integer
   def size(pid) do
     GenServer.call(pid, :size)
@@ -80,6 +85,11 @@ defmodule CubDB do
   end
 
   def handle_call(operation = {:has_key?, _}, from, state = %State{btree: btree}) do
+    Reader.start_link(from, btree, operation)
+    {:noreply, state}
+  end
+
+  def handle_call(operation = {:select, _}, from, state = %State{btree: btree}) do
     Reader.start_link(from, btree, operation)
     {:noreply, state}
   end
