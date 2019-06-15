@@ -5,9 +5,13 @@ defmodule CubDB.Compactor do
   alias CubDB.Store
   alias CubDB.CleanUp
 
+  @spec start_link(pid, %Btree{}, binary) :: {:ok, pid}
+
   def start_link(caller, btree, data_dir) do
     Task.start_link(__MODULE__, :run, [caller, btree, data_dir])
   end
+
+  @spec run(pid, %Btree{}, binary) :: :ok
 
   def run(caller, btree, data_dir) do
     clean_up = Task.async(CleanUp, :run, [data_dir, btree])

@@ -4,9 +4,13 @@ defmodule CubDB.CleanUp do
   alias CubDB.Btree
   alias CubDB.Store
 
+  @spec start_link(binary, %Btree{}) :: {:ok, pid}
+
   def start_link(data_dir, btree) do
     Task.start_link(__MODULE__, :run, [data_dir, btree])
   end
+
+  @spec run(binary, %Btree{}) :: :ok | {:error, any}
 
   def run(data_dir, btree) do
     clean_up(data_dir, btree)
