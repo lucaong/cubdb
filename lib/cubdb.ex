@@ -119,7 +119,8 @@ defmodule CubDB do
   def handle_call(:compact, _, state = %State{compactor: compactor, btree: btree, data_dir: data_dir}) do
     reply = case compactor do
       nil ->
-        Compactor.start_link(self(), btree, data_dir)
+        store = new_compaction_store(data_dir, btree)
+        Compactor.start_link(self(), btree, store, data_dir)
 
       _ ->
         {:error, "compaction already in progress"}
@@ -164,5 +165,16 @@ defmodule CubDB do
 
     store = Store.File.new(new_path)
     Btree.new(store)
+  end
+
+  defp new_compaction_store(data_dir, %Btree{store: %Store.File{file_path: file_path}}) do
+    new_filename =
+      file_path
+      |> Path.basename(@db_file_extension)
+      |> String.to_integer(16)
+      |> (&(&1 + 1)).()
+      |> Integer.to_string(16)
+      |> (&(&1 <> @compaction_file_extension)).()
+    Store.File.new(Path.join(data_dir, new_filename))
   end
 end
