@@ -36,50 +36,152 @@ defmodule CubDB do
 
   @spec start_link(binary, GenServer.options()) :: GenServer.on_start()
 
+  @doc """
+  Starts the `CubDB` database process linked to the current process.
+
+  The `data_dir` argument is a directory name where the database files will be
+  stored. Only one `CubDB` instance can run per directory, so if you run several
+  databases, they should each use their own data directory.
+
+  The `options` are passed to `GenServer.start_link/3`.
+  """
   def start_link(data_dir, options \\ []) do
     GenServer.start_link(__MODULE__, data_dir, options)
   end
 
+  @spec start(binary, GenServer.options()) :: GenServer.on_start()
+
+  @doc """
+  Starts the `CubDB` database without a link.
+
+  See `start_link/2` for more informations.
+  """
+  def start(data_dir, options \\ []) do
+    GenServer.start(__MODULE__, data_dir, options)
+  end
+
   @spec get(GenServer.server(), any) :: any
 
-  def get(pid, key) do
-    GenServer.call(pid, {:get, key})
+  @doc """
+  Get the value associated to `key` from the database.
+
+  If no value is associated with `key`, `nil` is returned.
+  """
+  def get(db, key) do
+    GenServer.call(db, {:get, key})
   end
 
   @spec has_key?(GenServer.server(), any) :: {boolean, any}
 
-  def has_key?(pid, key) do
-    GenServer.call(pid, {:has_key?, key})
+  @doc """
+  Returns a tuple indicating if `key` is associated to a value in the database.
+
+  If `key` is associated to a value, it returns `{true, value}`. Otherwise, it
+  returns `{false, nil}`
+  """
+  def has_key?(db, key) do
+    GenServer.call(db, {:has_key?, key})
   end
 
-  @spec select(GenServer.server(), Keyword.t()) :: {:ok, any} | {:error, Exception.t()}
+  @spec select(GenServer.server(), Keyword.t(), GenServer.timeout()) ::
+          {:ok, any} | {:error, Exception.t()}
 
-  def select(pid, options \\ []) when is_list(options) do
-    GenServer.call(pid, {:select, options})
+  @doc """
+  Selects a range of entries from the database, and optionally performs a
+  pipeline of operations on them.
+
+  It returns `{:ok, result}` if successful, or `{:error, exception}` if an
+  exception is raised.
+
+  ## Options
+
+  The `from_key` and `to_key` options specify an optional start and end of the
+  range of entries. All entries that have a key greater or equal than `from_key`
+  and lower or equal then `to_key` are selected. If one or both of `from_key`
+  and `to_key` are omitted, the range is open-ended.
+
+  The `pipe` option specifies an optional list of operations performed
+  sequentially on the selected entries. The available operations are `:filter`,
+  `:take`, and `:map`, and are specified by tuples. The given order of
+  operations is respected.
+
+  The `reduce` option specifies how the selected entries are aggregated. If
+  `reduce` is omitted, the entries are returned as a list. If `reduce` is a
+  function, it is used to reduce the collection of entries. If `reduce` is a
+  tuple, the first element is the starting value of the reduction, and the
+  second is the reducing function.
+
+  # Example
+
+  To select all entries with keys between `:a` and `:c` as a list of `{key,
+  value}` we can do:
+
+      {:ok, entries} = CubDB.select(db, from_key: :a, to_key: :c)
+
+  Assuming that we want to obtain the sum of the first 10 positive numeric
+  values associated to keys from `:a` to `:f`, we can do:
+
+      {:ok, sum} = CubDB.select(db, [
+        from_key: :a,
+        to_key: :f,
+        pipe: [
+          map: fn {_key, value} -> value end, # map values
+          filter: fn n -> is_number(n) and n > 0 end # only positive numbers
+          take: 10, # take only the first 10 entries in the range
+        ],
+        reduce: fn n, sum -> sum + n end # reduce to the sum of selected values
+      ])
+  """
+  def select(db, options \\ [], timeout \\ 5000) when is_list(options) do
+    GenServer.call(db, {:select, options})
   end
 
   @spec size(GenServer.server()) :: pos_integer
 
-  def size(pid) do
-    GenServer.call(pid, :size)
+  @doc """
+  Returns the number of entries present in the database.
+  """
+  def size(db) do
+    GenServer.call(db, :size)
   end
 
   @spec put(GenServer.server(), any, any) :: :ok
 
-  def put(pid, key, value) do
-    GenServer.call(pid, {:put, key, value})
+  @doc """
+  Writes an entry in the database, associating `key` to `value`.
+
+  If `key` was already present, it is overwritten.
+  """
+  def put(db, key, value) do
+    GenServer.call(db, {:put, key, value})
   end
 
   @spec delete(GenServer.server(), any) :: :ok
 
-  def delete(pid, key) do
-    GenServer.call(pid, {:delete, key})
+  @doc """
+  Deletes the entry associated to `key` from the database.
+
+  If `key` was not present in the database, nothing is done.
+  """
+  def delete(db, key) do
+    GenServer.call(db, {:delete, key})
   end
 
   @spec compact(GenServer.server()) :: :ok | {:error, binary}
 
-  def compact(pid) do
-    GenServer.call(pid, :compact)
+  @doc """
+  Runs a database compaction.
+
+  As write operations are performed on a database, its file grows. Occasionally,
+  a compaction operation can be ran to shrink the file to its optimal size.
+  Compaction is ran in the background and does not block operations.
+
+  Only one compaction operation can run at any time, therefore if this function
+  is called when a compaction is already running, it returns `{:error,
+  :pending_compaction}`.
+  """
+  def compact(db) do
+    GenServer.call(db, :compact)
   end
 
   @spec cubdb_file?(binary) :: boolean
