@@ -83,7 +83,7 @@ defmodule CubDB do
     GenServer.call(db, {:has_key?, key})
   end
 
-  @spec select(GenServer.server(), Keyword.t(), GenServer.timeout()) ::
+  @spec select(GenServer.server(), Keyword.t(), timeout) ::
           {:ok, any} | {:error, Exception.t()}
 
   @doc """
@@ -133,7 +133,7 @@ defmodule CubDB do
       ])
   """
   def select(db, options \\ [], timeout \\ 5000) when is_list(options) do
-    GenServer.call(db, {:select, options})
+    GenServer.call(db, {:select, options}, timeout)
   end
 
   @spec size(GenServer.server()) :: pos_integer
