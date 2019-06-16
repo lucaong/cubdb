@@ -57,7 +57,9 @@ defmodule CubDB.CleanUp do
       files
       |> Enum.filter(&CubDB.compaction_file?/1)
       |> Enum.reject(&(&1 == file_name))
-      |> Enum.reduce(:ok, fn file, _ -> :ok = File.rm(file) end)
+      |> Enum.reduce(:ok, fn file, _ ->
+        :ok = File.rm(Path.join(data_dir, file))
+      end)
     end
   end
 end
