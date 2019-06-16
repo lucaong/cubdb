@@ -3,8 +3,9 @@ defmodule CubDB.Reader do
 
   alias CubDB.Btree
 
-  @spec start_link(GenServer.from(), GenServer.server(), %Btree{}, {atom, any} | atom) ::
-          {:ok, pid}
+  @type operation :: {:get, any} | {:has_key?, any} | {:select, Keyword.t()} | :size
+
+  @spec start_link(GenServer.from(), GenServer.server(), %Btree{}, operation) :: {:ok, pid}
 
   def start_link(caller, db, btree, read_operation) do
     Task.start_link(__MODULE__, :run, [caller, db, btree, read_operation])

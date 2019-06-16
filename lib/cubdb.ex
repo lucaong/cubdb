@@ -34,6 +34,8 @@ defmodule CubDB do
               busy_files: %{}
   end
 
+  @spec start_link(binary, GenServer.options()) :: GenServer.on_start()
+
   def start_link(data_dir, options \\ []) do
     GenServer.start_link(__MODULE__, data_dir, options)
   end
