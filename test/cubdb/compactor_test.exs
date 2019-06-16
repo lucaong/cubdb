@@ -20,7 +20,7 @@ defmodule CubDB.Store.CompactorTest do
 
   test "start_link/3 runs compaction on a Btree and sends back the result", %{tmp_dir: tmp_dir} do
     entries = [foo: 1, bar: 2, baz: 3]
-    btree = Enum.reduce(entries, Btree.new(Store.MemMap.new), fn {key, value}, btree ->
+    btree = Enum.reduce(entries, Btree.new(Store.TestStore.new), fn {key, value}, btree ->
       Btree.insert(btree, key, value)
     end)
     store = Store.File.new(Path.join(tmp_dir, "1.compact"))

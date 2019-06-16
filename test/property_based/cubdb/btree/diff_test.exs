@@ -26,7 +26,7 @@ defmodule PropertyBased.Btree.DiffTest do
                                string(max: 5, chars: :printable)
                              }))
     ], repeat_for: 50 do
-      store = Store.MemMap.new
+      store = Store.TestStore.new
       from_btree = make_btree(store, entries, cap)
       to_btree = Enum.reduce(updates, from_btree, fn {key, value}, btree ->
         Btree.insert(btree, key, value)

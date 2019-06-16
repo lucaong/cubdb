@@ -18,7 +18,7 @@ defmodule PropertyBased.BtreeTest do
                                string(max: 10)
                              }))
     ], repeat_for: 50 do
-      store = Store.MemMap.new
+      store = Store.TestStore.new
       tree = Btree.new(store, cap)
       tree = Enum.reduce(tuples, tree, fn {key, value}, t ->
         previous_count = Enum.count(t)
@@ -51,7 +51,7 @@ defmodule PropertyBased.BtreeTest do
         t
       end)
 
-      compacted = Btree.load(tree, Store.MemMap.new, cap)
+      compacted = Btree.load(tree, Store.TestStore.new, cap)
       Btree.commit(compacted)
 
       assert Enum.to_list(tree) == Enum.to_list(compacted)

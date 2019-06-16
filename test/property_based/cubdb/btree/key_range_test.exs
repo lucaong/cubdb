@@ -19,7 +19,7 @@ defmodule PropertyBased.Btree.KeyRangeTest do
       from: string(max: 8, chars: :printable),
       to: string(max: 8, chars: :printable)
     ], repeat_for: 50 do
-      store = Store.MemMap.new
+      store = Store.TestStore.new
       btree = make_btree(store, key_values, cap)
       key_range = KeyRange.new(btree, from, to)
 

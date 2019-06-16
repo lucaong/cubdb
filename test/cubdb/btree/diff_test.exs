@@ -17,7 +17,7 @@ defmodule CubDB.Btree.DiffTest do
   end
 
   test "iterates through updates between from_btree and to_btree" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     from_btree = make_btree(store, [foo: 1, bar: 2, baz: 3], 3)
     to_btree = Enum.reduce([qux: 4, quux: 5], from_btree, fn {key, val}, btree ->
       Btree.insert(btree, key, val)

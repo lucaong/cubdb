@@ -13,19 +13,19 @@ defmodule CubDB.BtreeTest do
   @branch Btree.__branch__
 
   def btree() do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     {root_loc, root} = Utils.load(store, {:Btree, 0, Btree.leaf()})
     %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0}
   end
 
   def btree(root = {@leaf, cs}) do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     {root_loc, root} = Utils.load(store, {:Btree, length(cs), root})
     %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: length(cs)}
   end
 
   def btree(root = {@branch, _}, size \\ 0) do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     {root_loc, root} = Utils.load(store, {:Btree, size, root})
     %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size}
   end
@@ -212,7 +212,7 @@ defmodule CubDB.BtreeTest do
   end
 
   test "delete/2 decrements the size of the tree only when necessary" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
     assert %Btree{size: 4} = tree
     tree = Btree.delete(tree, :bar)
@@ -222,14 +222,14 @@ defmodule CubDB.BtreeTest do
   end
 
   test "mark_deleted/2 removes an entry" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     btree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3) |> Btree.mark_deleted(:bar)
     assert Btree.has_key?(btree, :bar) == {false, nil}
     assert Btree.lookup(btree, :bar) == nil
   end
 
   test "mark_deleted/2 decrements the size of the tree only when necessary" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
     assert %Btree{size: 4} = tree
     tree = Btree.mark_deleted(tree, :bar)
@@ -243,21 +243,21 @@ defmodule CubDB.BtreeTest do
   end
 
   test "load/3 creates a Btree from a sorted enumerable of key/values" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     key_vals = Stream.map((0..20), &({&1, &1}))
     tree = key_vals |> Btree.load(store, 4)
     assert key_vals |> Enum.to_list == tree |> Enum.to_list
   end
 
   test "load/3 creates a Btree from a single item sorted Enumerable" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     key_vals = [foo: 123]
     tree = key_vals |> Btree.load(store, 4)
     assert key_vals |> Enum.to_list == tree |> Enum.to_list
   end
 
   test "load/3 raises ArgumentError if the given store is not empty" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     key_vals = Stream.map((0..20), &({&1, &1}))
     key_vals |> Btree.load(store, 4)
     assert_raise ArgumentError, fn ->
@@ -266,7 +266,7 @@ defmodule CubDB.BtreeTest do
   end
 
   test "key_range/3 returns a KeyRange" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     btree = make_btree(store, [a: 1, b: 2, c: 3, d: 4, e: 5])
     from = :b
     to = :e
@@ -285,7 +285,7 @@ defmodule CubDB.BtreeTest do
     for elems <- [empty_list, tiny_list, larger_list] do
       sorted_elems = elems |> List.keysort(0)
 
-      store = Store.MemMap.new
+      store = Store.TestStore.new
       tree = make_btree(store, elems, 3)
 
       assert Enum.count(tree) == length(elems)
@@ -303,7 +303,7 @@ defmodule CubDB.BtreeTest do
   end
 
   test "Enumerable.Btree.reduce/3 skips nodes marked as deleted" do
-    store = Store.MemMap.new
+    store = Store.TestStore.new
     tree = make_btree(store, [a: 1, b: 2, c: 3, d: 4], 3) |> Btree.mark_deleted(:b)
     assert Enum.to_list(tree) == [a: 1, c: 3, d: 4]
   end
