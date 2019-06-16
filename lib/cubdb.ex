@@ -28,10 +28,6 @@ defmodule CubDB do
     GenServer.start_link(__MODULE__, data_dir, options)
   end
 
-  def inspect(pid) do
-    GenServer.call(pid, :inspect)
-  end
-
   @spec get(GenServer.server, any) :: any
   def get(pid, key) do
     GenServer.call(pid, {:get, key})
@@ -97,10 +93,6 @@ defmodule CubDB do
 
       {:error, reason} -> {:stop, reason}
     end
-  end
-
-  def handle_call(:inspect, _, state) do
-    {:reply, state, state}
   end
 
   def handle_call(operation = {:get, _}, from, state = %State{btree: btree}) do
