@@ -1,6 +1,14 @@
 defmodule CubDB do
   @moduledoc """
   Top-level module providing the database public API.
+
+  `CubDB` is a pure Elixir embedded key-value database, designed to be simple to
+  use. It runs locally, and is backed by a file.
+
+  `CubDB` uses an immutable data structure robust to data corruption. Read and
+  select operations are performed on immutable "snapshots", so they are always
+  consistent, run concurrently, and do not block nor are blocked by write
+  operations.
   """
 
   use GenServer
