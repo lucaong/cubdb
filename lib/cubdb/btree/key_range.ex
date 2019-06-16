@@ -1,11 +1,13 @@
 defmodule CubDB.Btree.KeyRange do
-  @enforce_keys [:btree]
-  defstruct btree: nil, from: nil, to: nil
-
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
 
-  @spec new(%Btree{}, Btree.key, Btree.key) :: %KeyRange{}
+  @type t :: %KeyRange{btree: Btree.t, from: Btree.key | nil, to: Btree.key | nil}
+
+  @enforce_keys [:btree]
+  defstruct btree: nil, from: nil, to: nil
+
+  @spec new(Btree.t, Btree.key, Btree.key) :: KeyRange.t
   def new(btree, from \\ nil, to \\ nil) do
     %KeyRange{btree: btree, from: from, to: to}
   end

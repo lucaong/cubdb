@@ -3,12 +3,16 @@ defmodule CubDB.Store.File do
   Append-only file-based store implementation
   """
 
+  alias CubDB.Store
+
+  @type t :: %Store.File{pid: pid, file_path: binary}
+
+  @enforce_keys [:pid, :file_path]
   defstruct [:pid, :file_path]
-  alias CubDB.Store.File
 
   def new(file_path) do
     with {:ok, pid} <- Agent.start_link(fn -> start(file_path) end) do
-      %File{pid: pid, file_path: file_path}
+      %Store.File{pid: pid, file_path: file_path}
     end
   end
 
@@ -21,10 +25,10 @@ defmodule CubDB.Store.File do
 end
 
 defimpl CubDB.Store, for: CubDB.Store.File do
-  alias CubDB.Store.File
+  alias CubDB.Store
   alias CubDB.Store.File.Blocks
 
-  def put_node(%File{pid: pid}, node) do
+  def put_node(%Store.File{pid: pid}, node) do
     Agent.get_and_update(pid, fn {file, pos} ->
       bytes = serialize(node)
 
@@ -39,7 +43,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end)
   end
 
-  def put_header(%File{pid: pid}, header) do
+  def put_header(%Store.File{pid: pid}, header) do
     Agent.get_and_update(pid, fn {file, pos} ->
       header_bytes = serialize(header)
 
@@ -54,19 +58,19 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end)
   end
 
-  def commit(%File{pid: pid}) do
+  def commit(%Store.File{pid: pid}) do
     Agent.get(pid, fn {file, _} ->
       :file.sync(file)
     end)
   end
 
-  def get_node(%File{pid: pid}, location) do
+  def get_node(%Store.File{pid: pid}, location) do
     Agent.get(pid, fn {file, _} ->
       read_term(file, location)
     end)
   end
 
-  def get_latest_header(%File{pid: pid}) do
+  def get_latest_header(%Store.File{pid: pid}) do
     Agent.get(pid, fn {file, pos} ->
       case locate_latest_header(file, pos) do
         nil -> nil
@@ -75,7 +79,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end)
   end
 
-  def close(%File{pid: pid}) do
+  def close(%Store.File{pid: pid}) do
     with :ok <-
            Agent.update(pid, fn {file, pos} ->
              :file.sync(file)
@@ -85,8 +89,8 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end
   end
 
-  def blank?(%File{file_path: path}) do
-    case :"Elixir.File".stat!(path) do
+  def blank?(%Store.File{file_path: path}) do
+    case File.stat!(path) do
       %{size: 0} -> true
       _ -> false
     end

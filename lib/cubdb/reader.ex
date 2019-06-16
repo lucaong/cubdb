@@ -3,36 +3,42 @@ defmodule CubDB.Reader do
 
   alias CubDB.Btree
 
-  @spec start_link(GenServer.from, %Btree{}, {atom, any} | atom) :: {:ok, pid}
+  @spec start_link(GenServer.from, GenServer.server, %Btree{}, {atom, any} | atom) :: {:ok, pid}
 
-  def start_link(caller, btree, read_operation) do
-    Task.start_link(__MODULE__, :run, [caller, btree, read_operation])
+  def start_link(caller, db, btree, read_operation) do
+    Task.start_link(__MODULE__, :run, [caller, db, btree, read_operation])
   end
 
-  @spec run(GenServer.from, %Btree{}, {atom, any} | atom) :: :ok
+  @spec run(GenServer.from, GenServer.server, %Btree{}, {atom, any} | atom) :: :ok
 
-  def run(caller, btree, {:get, key}) do
+  def run(caller, db, btree, {:get, key}) do
     value = Btree.lookup(btree, key)
     GenServer.reply(caller, value)
+  after
+    send(db, {:check_out_reader, btree})
   end
 
-  def run(caller, btree, {:has_key?, key}) do
+  def run(caller, db, btree, {:has_key?, key}) do
     reply = Btree.has_key?(btree, key)
     GenServer.reply(caller, reply)
+  after
+    send(db, {:check_out_reader, btree})
   end
 
-  def run(caller, btree, {:select, options}) do
-    try do
-      reply = select(btree, options)
-      GenServer.reply(caller, {:ok, reply})
-    rescue
-      error -> GenServer.reply(caller, {:error, error})
-    end
+  def run(caller, db, btree, {:select, options}) do
+    reply = select(btree, options)
+    GenServer.reply(caller, {:ok, reply})
+  rescue
+    error -> GenServer.reply(caller, {:error, error})
+  after
+    send(db, {:check_out_reader, btree})
   end
 
-  def run(caller, btree, :size) do
+  def run(caller, db, btree, :size) do
     size = Enum.count(btree)
     GenServer.reply(caller, size)
+  after
+    send(db, {:check_out_reader, btree})
   end
 
   defp select(btree, options) when is_list(options) do
@@ -53,7 +59,7 @@ defmodule CubDB.Reader do
       op, _ -> raise(ArgumentError, message: "invalid pipe operation #{inspect(op)}")
     end)
 
-    reply = case reduce do
+    case reduce do
       fun when is_function(fun) -> Enum.reduce(stream, fun)
       {acc, fun} when is_function(fun) -> Enum.reduce(stream, acc, fun)
       nil -> Enum.to_list(stream)

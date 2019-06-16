@@ -24,11 +24,15 @@ defmodule CubDB.Btree do
   alias CubDB.Store
   alias CubDB.Btree
 
+  @type t :: %Btree{root: branch_node | leaf_node, root_loc: location, size:
+    btree_size, store: Store.t, capacity: non_neg_integer}
+
   @default_capacity 32
-  @enforce_keys [:root, :root_loc, :size, :store]
+  @enforce_keys [:root, :root_loc, :size, :store, :capacity]
   defstruct root: nil, root_loc: nil, size: 0, store: nil, capacity: @default_capacity
 
-  @spec new(Store.t(), pos_integer) :: %Btree{}
+  @spec new(Store.t, pos_integer) :: Btree.t
+
   def new(store, cap \\ @default_capacity) do
     case Store.get_latest_header(store) do
       {_, {s, loc}} ->
@@ -43,7 +47,8 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec load(Enumerable.t(), Store.t(), pos_integer) :: %Btree{}
+  @spec load(Enumerable.t, Store.t, pos_integer) :: Btree.t
+
   def load(enum, store, cap \\ @default_capacity) do
     unless Store.blank?(store),
       do: raise(ArgumentError, message: "cannot load into non-empty store")
@@ -62,7 +67,8 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec lookup(%Btree{}, key) :: val | nil
+  @spec lookup(Btree.t, key) :: val | nil
+
   def lookup(tree = %Btree{}, key) do
     case has_key?(tree, key) do
       {true, value} -> value
@@ -70,7 +76,8 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec has_key?(%Btree{}, key) :: {true, val} | {false, nil}
+  @spec has_key?(Btree.t, key) :: {true, val} | {false, nil}
+
   def has_key?(%Btree{root: root, store: store}, key) do
     {{@leaf, children}, _} = lookup_leaf(root, store, key, [])
 
@@ -86,12 +93,13 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec insert(%Btree{}, key, val) :: %Btree{}
+  @spec insert(Btree.t, key, val) :: Btree.t
+
   def insert(btree, key, value) do
     insert_terminal_node(btree, key, {@value, value})
   end
 
-  @spec delete(%Btree{}, key) :: %Btree{}
+  @spec delete(Btree.t, key) :: Btree.t
   def delete(btree = %Btree{root: root, store: store, capacity: cap, size: s}, key) do
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
 
@@ -109,7 +117,8 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec mark_deleted(%Btree{}, key) :: %Btree{}
+  @spec mark_deleted(Btree.t, key) :: Btree.t
+
   def mark_deleted(btree, key) do
     case has_key?(btree, key) do
       {true, _} -> insert_terminal_node(btree, key, @deleted)
@@ -117,13 +126,15 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec commit(%Btree{}) :: %Btree{}
+  @spec commit(Btree.t) :: Btree.t
+
   def commit(tree = %Btree{store: store}) do
     Store.commit(store)
     tree
   end
 
-  @spec key_range(%Btree{}, key, key) :: %Btree.KeyRange{}
+  @spec key_range(Btree.t, key, key) :: Btree.KeyRange.t
+
   def key_range(tree, from \\ nil, to \\ nil) do
     Btree.KeyRange.new(tree, from, to)
   end
@@ -133,7 +144,8 @@ defmodule CubDB.Btree do
   def __value__, do: @value
   def __deleted__, do: @deleted
 
-  @spec insert_terminal_node(%Btree{}, key, terminal_node) :: %Btree{}
+  @spec insert_terminal_node(Btree.t, key, terminal_node) :: Btree.t
+
   defp insert_terminal_node(%Btree{root: root, store: store, capacity: cap, size: s}, key, terminal_node) do
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
     {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
