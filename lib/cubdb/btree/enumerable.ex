@@ -8,7 +8,7 @@ defmodule CubDB.Btree.Enumerable do
   @deleted Btree.__deleted__()
 
   @spec reduce(
-          %Btree{},
+          Btree.t(),
           Enumerable.acc(),
           Enumerable.reducer(),
           (Btree.btree_node(), Store.t() -> any)

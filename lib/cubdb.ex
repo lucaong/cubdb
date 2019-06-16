@@ -1,6 +1,6 @@
 defmodule CubDB do
   @moduledoc """
-  Documentation for CubDB.
+  Top-level module providing the database public API.
   """
 
   use GenServer

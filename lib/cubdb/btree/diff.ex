@@ -5,7 +5,10 @@ defmodule CubDB.Btree.Diff do
   alias CubDB.Btree
   alias CubDB.Btree.Diff
 
-  @spec new(%Btree{}, %Btree{}) :: %Diff{}
+  @type t :: %Diff{from_btree: Btree.t(), to_btree: Btree.t()}
+
+  @spec new(Btree.t(), Btree.t()) :: t
+
   def new(from_btree, to_btree) do
     %Diff{from_btree: from_btree, to_btree: to_btree}
   end

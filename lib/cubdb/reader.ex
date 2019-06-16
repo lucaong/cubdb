@@ -5,13 +5,13 @@ defmodule CubDB.Reader do
 
   @type operation :: {:get, any} | {:has_key?, any} | {:select, Keyword.t()} | :size
 
-  @spec start_link(GenServer.from(), GenServer.server(), %Btree{}, operation) :: {:ok, pid}
+  @spec start_link(GenServer.from(), GenServer.server(), Btree.t(), operation) :: {:ok, pid}
 
   def start_link(caller, db, btree, read_operation) do
     Task.start_link(__MODULE__, :run, [caller, db, btree, read_operation])
   end
 
-  @spec run(GenServer.from(), GenServer.server(), %Btree{}, {atom, any} | atom) :: :ok
+  @spec run(GenServer.from(), GenServer.server(), Btree.t(), operation) :: :ok
 
   def run(caller, db, btree, {:get, key}) do
     value = Btree.lookup(btree, key)
