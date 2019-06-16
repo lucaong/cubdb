@@ -52,9 +52,16 @@ defmodule CubDB.Store.ReaderTest do
     assert_receive {:check_out_reader, ^btree}
 
     {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:select, [
-      from_key: :b,
-      to_key: :f,
-      reduce: fn value, sum -> sum + value end
+      pipe: [
+        map: fn {_, value} -> value end
+      ],
+      reduce: {100, fn value, sum -> sum + value end}
+    ]})
+    assert_receive {:test_tag, {:ok, 128}}
+    assert_receive {:check_out_reader, ^btree}
+
+    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:select, [
+      reduce: fn _, _ -> raise(ArithmeticError, message: "boom") end
     ]})
     assert_receive {:test_tag, {:error, %ArithmeticError{}}}
     assert_receive {:check_out_reader, ^btree}
