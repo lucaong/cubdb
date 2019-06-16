@@ -1,19 +1,19 @@
 defprotocol CubDB.Store do
   alias CubDB.Btree
 
-  @spec put_node(t, Btree.btree_node) :: Btree.location
+  @spec put_node(t, Btree.btree_node()) :: Btree.location()
   def put_node(store, node)
 
-  @spec put_header(t, Btree.btree_header) :: Btree.location
+  @spec put_header(t, Btree.btree_header()) :: Btree.location()
   def put_header(store, header)
 
   @spec commit(t) :: :ok | {:error, String.t()}
   def commit(store)
 
-  @spec get_node(t, Btree.location) :: Btree.btree_node | {:error, String.t()}
+  @spec get_node(t, Btree.location()) :: Btree.btree_node() | {:error, String.t()}
   def get_node(store, location)
 
-  @spec get_latest_header(t) :: {Btree.location, Btree.btree_header} | nil
+  @spec get_latest_header(t) :: {Btree.location(), Btree.btree_header()} | nil
   def get_latest_header(store)
 
   @spec close(t) :: :ok | {:error, String.t()}

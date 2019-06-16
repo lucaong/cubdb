@@ -2,12 +2,12 @@ defmodule CubDB.Btree.KeyRange do
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
 
-  @type t :: %KeyRange{btree: Btree.t, from: Btree.key | nil, to: Btree.key | nil}
+  @type t :: %KeyRange{btree: Btree.t(), from: Btree.key() | nil, to: Btree.key() | nil}
 
   @enforce_keys [:btree]
   defstruct btree: nil, from: nil, to: nil
 
-  @spec new(Btree.t, Btree.key, Btree.key) :: KeyRange.t
+  @spec new(Btree.t(), Btree.key(), Btree.key()) :: KeyRange.t()
   def new(btree, from \\ nil, to \\ nil) do
     %KeyRange{btree: btree, from: from, to: to}
   end
@@ -18,10 +18,10 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
   alias CubDB.Store
   alias CubDB.Btree.KeyRange
 
-  @leaf Btree.__leaf__
-  @branch Btree.__branch__
-  @value Btree.__value__
-  @deleted Btree.__deleted__
+  @leaf Btree.__leaf__()
+  @branch Btree.__branch__()
+  @value Btree.__value__()
+  @deleted Btree.__deleted__()
 
   def reduce(%KeyRange{btree: btree, from: from, to: to}, cmd_acc, fun) do
     Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children(from, to, &1, &2))
@@ -30,7 +30,7 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
   def count(_), do: {:error, __MODULE__}
 
   def member?(%KeyRange{from: from, to: to}, {key, _})
-  when (is_nil(from) == false and key < from) or (is_nil(to) == false and key > to) do
+      when (is_nil(from) == false and key < from) or (is_nil(to) == false and key > to) do
     {:ok, false}
   end
 
@@ -50,7 +50,7 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
     |> Enum.chunk_every(2, 1)
     |> Enum.filter(fn
       [{key, _}, {next_key, _}] -> (to == nil or key <= to) and (from == nil or next_key > from)
-      [{key, _}] -> (to == nil or key <= to)
+      [{key, _}] -> to == nil or key <= to
     end)
     |> Enum.map(fn [{k, loc} | _] ->
       {k, Store.get_node(store, loc)}

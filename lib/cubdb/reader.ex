@@ -3,13 +3,14 @@ defmodule CubDB.Reader do
 
   alias CubDB.Btree
 
-  @spec start_link(GenServer.from, GenServer.server, %Btree{}, {atom, any} | atom) :: {:ok, pid}
+  @spec start_link(GenServer.from(), GenServer.server(), %Btree{}, {atom, any} | atom) ::
+          {:ok, pid}
 
   def start_link(caller, db, btree, read_operation) do
     Task.start_link(__MODULE__, :run, [caller, db, btree, read_operation])
   end
 
-  @spec run(GenServer.from, GenServer.server, %Btree{}, {atom, any} | atom) :: :ok
+  @spec run(GenServer.from(), GenServer.server(), %Btree{}, {atom, any} | atom) :: :ok
 
   def run(caller, db, btree, {:get, key}) do
     value = Btree.lookup(btree, key)
@@ -49,15 +50,13 @@ defmodule CubDB.Reader do
 
     key_range = Btree.key_range(btree, from_key, to_key)
 
-    stream = Enum.reduce(pipe, key_range, fn
-      {:filter, fun}, stream when is_function(fun) -> Stream.filter(stream, fun)
-
-      {:map, fun}, stream when is_function(fun) -> Stream.map(stream, fun)
-
-      {:take, n}, stream when is_integer(n) -> Stream.take(stream, n)
-
-      op, _ -> raise(ArgumentError, message: "invalid pipe operation #{inspect(op)}")
-    end)
+    stream =
+      Enum.reduce(pipe, key_range, fn
+        {:filter, fun}, stream when is_function(fun) -> Stream.filter(stream, fun)
+        {:map, fun}, stream when is_function(fun) -> Stream.map(stream, fun)
+        {:take, n}, stream when is_integer(n) -> Stream.take(stream, n)
+        op, _ -> raise(ArgumentError, message: "invalid pipe operation #{inspect(op)}")
+      end)
 
     case reduce do
       fun when is_function(fun) -> Enum.reduce(stream, fun)

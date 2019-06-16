@@ -16,49 +16,66 @@ defmodule CubDB do
   @compaction_file_extension ".compact"
 
   defmodule State do
-    @type t :: %CubDB.State{btree: Btree.t, data_dir: binary, compactor: pid | nil,
-      clean_up: pid, clean_up_pending: boolean, busy_files: %{required(binary) => pos_integer}}
+    @type t :: %CubDB.State{
+            btree: Btree.t(),
+            data_dir: binary,
+            compactor: pid | nil,
+            clean_up: pid,
+            clean_up_pending: boolean,
+            busy_files: %{required(binary) => pos_integer}
+          }
 
     @enforce_keys [:btree, :data_dir, :clean_up]
-    defstruct btree: nil, data_dir: nil, compactor: nil, clean_up: nil,
-      clean_up_pending: false, busy_files: %{}
+    defstruct btree: nil,
+              data_dir: nil,
+              compactor: nil,
+              clean_up: nil,
+              clean_up_pending: false,
+              busy_files: %{}
   end
 
   def start_link(data_dir, options \\ []) do
     GenServer.start_link(__MODULE__, data_dir, options)
   end
 
-  @spec get(GenServer.server, any) :: any
+  @spec get(GenServer.server(), any) :: any
+
   def get(pid, key) do
     GenServer.call(pid, {:get, key})
   end
 
-  @spec has_key?(GenServer.server, any) :: {boolean, any}
+  @spec has_key?(GenServer.server(), any) :: {boolean, any}
+
   def has_key?(pid, key) do
     GenServer.call(pid, {:has_key?, key})
   end
 
-  @spec select(GenServer.server, Keyword.t) :: {:ok, any} | {:error, Exception.t}
+  @spec select(GenServer.server(), Keyword.t()) :: {:ok, any} | {:error, Exception.t()}
+
   def select(pid, options \\ []) when is_list(options) do
     GenServer.call(pid, {:select, options})
   end
 
-  @spec size(GenServer.server) :: pos_integer
+  @spec size(GenServer.server()) :: pos_integer
+
   def size(pid) do
     GenServer.call(pid, :size)
   end
 
-  @spec put(GenServer.server, any, any) :: :ok
+  @spec put(GenServer.server(), any, any) :: :ok
+
   def put(pid, key, value) do
     GenServer.call(pid, {:put, key, value})
   end
 
-  @spec delete(GenServer.server, any) :: :ok
+  @spec delete(GenServer.server(), any) :: :ok
+
   def delete(pid, key) do
     GenServer.call(pid, {:delete, key})
   end
 
-  @spec compact(GenServer.server) :: :ok | {:error, binary}
+  @spec compact(GenServer.server()) :: :ok | {:error, binary}
+
   def compact(pid) do
     GenServer.call(pid, :compact)
   end
@@ -91,7 +108,8 @@ defmodule CubDB do
         {:ok, clean_up} = CleanUp.start_link(data_dir)
         {:ok, %State{btree: Btree.new(store), data_dir: data_dir, clean_up: clean_up}}
 
-      {:error, reason} -> {:stop, reason}
+      {:error, reason} ->
+        {:stop, reason}
     end
   end
 
@@ -121,23 +139,28 @@ defmodule CubDB do
   end
 
   def handle_call({:delete, key}, _, state = %State{btree: btree, compactor: compactor}) do
-    btree = case compactor do
-      nil -> Btree.delete(btree, key)
-      _ -> Btree.mark_deleted(btree, key)
-    end
+    btree =
+      case compactor do
+        nil -> Btree.delete(btree, key)
+        _ -> Btree.mark_deleted(btree, key)
+      end
+
     {:reply, :ok, %State{state | btree: btree}}
   end
 
-  def handle_call(:compact, _, state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
-    reply = case can_compact?(state) do
-      true ->
-        {:ok, store} = new_compaction_store(data_dir)
-        CleanUp.clean_up_old_compaction_files(clean_up, store)
-        Compactor.start_link(self(), btree, store)
+  def handle_call(:compact, _, state) do
+    %State{btree: btree, data_dir: data_dir, clean_up: clean_up} = state
 
-      {false, reason} ->
-        {:error, reason}
-    end
+    reply =
+      case can_compact?(state) do
+        true ->
+          {:ok, store} = new_compaction_store(data_dir)
+          CleanUp.clean_up_old_compaction_files(clean_up, store)
+          Compactor.start_link(self(), btree, store)
+
+        {false, reason} ->
+          {:error, reason}
+      end
 
     case reply do
       {:ok, compactor} -> {:reply, :ok, %State{state | compactor: compactor}}
@@ -150,7 +173,9 @@ defmodule CubDB do
     {:noreply, state}
   end
 
-  def handle_info({:catch_up, compacted_btree, original_btree}, state = %State{btree: latest_btree}) do
+  def handle_info({:catch_up, compacted_btree, original_btree}, state) do
+    %State{btree: latest_btree} = state
+
     if latest_btree == original_btree do
       compacted_btree = finalize_compaction(compacted_btree)
       state = %State{state | btree: compacted_btree, compactor: nil}
@@ -168,9 +193,10 @@ defmodule CubDB do
   def handle_info({:check_out_reader, btree}, state = %State{clean_up_pending: clean_up_pending}) do
     state = check_out_reader(btree, state)
 
-    state = if clean_up_pending == true,
-      do: trigger_clean_up(state),
-      else: state
+    state =
+      if clean_up_pending == true,
+        do: trigger_clean_up(state),
+        else: state
 
     {:noreply, state}
   end
@@ -185,8 +211,8 @@ defmodule CubDB do
          {:ok, files} <- File.ls(data_dir) do
       files
       |> Enum.filter(&String.ends_with?(&1, @db_file_extension))
-      |> Enum.sort
-      |> List.last
+      |> Enum.sort()
+      |> List.last()
     end
   end
 
@@ -200,15 +226,16 @@ defmodule CubDB do
 
   defp new_compaction_store(data_dir) do
     with {:ok, file_names} <- File.ls(data_dir) do
-      new_filename = file_names
-      |> Enum.filter(&cubdb_file?/1)
-      |> Enum.map(fn file_name -> Path.basename(file_name, Path.extname(file_name)) end)
-      |> Enum.sort
-      |> List.last
-      |> String.to_integer(16)
-      |> (&(&1 + 1)).()
-      |> Integer.to_string(16)
-      |> (&(&1 <> @compaction_file_extension)).()
+      new_filename =
+        file_names
+        |> Enum.filter(&cubdb_file?/1)
+        |> Enum.map(fn file_name -> Path.basename(file_name, Path.extname(file_name)) end)
+        |> Enum.sort()
+        |> List.last()
+        |> String.to_integer(16)
+        |> (&(&1 + 1)).()
+        |> Integer.to_string(16)
+        |> (&(&1 <> @compaction_file_extension)).()
 
       store = Store.File.new(Path.join(data_dir, new_filename))
       {:ok, store}
@@ -231,10 +258,11 @@ defmodule CubDB do
   defp check_out_reader(%Btree{store: store}, state = %State{busy_files: busy_files}) do
     %Store.File{file_path: file_path} = store
 
-    busy_files = case Map.get(busy_files, file_path) do
-      n when n > 1 -> Map.update!(busy_files, file_path, &(&1 - 1))
-      _ -> Map.delete(busy_files, file_path)
-    end
+    busy_files =
+      case Map.get(busy_files, file_path) do
+        n when n > 1 -> Map.update!(busy_files, file_path, &(&1 - 1))
+        _ -> Map.delete(busy_files, file_path)
+      end
 
     %State{state | busy_files: busy_files}
   end

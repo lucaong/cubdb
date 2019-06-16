@@ -2,12 +2,17 @@ defmodule CubDB.Btree.Enumerable do
   alias CubDB.Btree
   alias CubDB.Store
 
-  @leaf Btree.__leaf__
-  @branch Btree.__branch__
-  @value Btree.__value__
-  @deleted Btree.__deleted__
+  @leaf Btree.__leaf__()
+  @branch Btree.__branch__()
+  @value Btree.__value__()
+  @deleted Btree.__deleted__()
 
-  @spec reduce(%Btree{}, Enumerable.acc, Enumerable.reducer, (Btree.btree_node, Store.t -> any)) :: Enumerable.result
+  @spec reduce(
+          %Btree{},
+          Enumerable.acc(),
+          Enumerable.reducer(),
+          (Btree.btree_node(), Store.t() -> any)
+        ) :: Enumerable.result()
   def reduce(%Btree{root: root, store: store}, cmd_acc, fun, get_children) do
     do_reduce({[], [[{nil, root}]]}, cmd_acc, fun, get_children, store)
   end

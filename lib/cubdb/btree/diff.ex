@@ -16,8 +16,8 @@ defimpl Enumerable, for: CubDB.Btree.Diff do
   alias CubDB.Store
   alias CubDB.Btree.Diff
 
-  @value Btree.__value__
-  @deleted Btree.__deleted__
+  @value Btree.__value__()
+  @deleted Btree.__deleted__()
 
   def reduce(%Diff{from_btree: %Btree{root_loc: root_loc}, to_btree: to_btree}, cmd_acc, fun) do
     Btree.Enumerable.reduce(to_btree, cmd_acc, fun, &get_children(root_loc, &1, &2))

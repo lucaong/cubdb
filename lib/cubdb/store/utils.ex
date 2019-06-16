@@ -2,8 +2,8 @@ defmodule CubDB.Store.Utils do
   alias CubDB.Store
   alias CubDB.Btree
 
-  @value Btree.__value__
-  @deleted Btree.__deleted__
+  @value Btree.__value__()
+  @deleted Btree.__deleted__()
 
   def debug(store) do
     {_, {size, root_loc}} = Store.get_latest_header(store)

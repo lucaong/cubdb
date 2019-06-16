@@ -3,8 +3,8 @@ defmodule CubDB.CatchUp do
 
   alias CubDB.Btree
 
-  @value Btree.__value__
-  @deleted Btree.__deleted__
+  @value Btree.__value__()
+  @deleted Btree.__deleted__()
 
   @spec start_link(pid, %Btree{}, %Btree{}, %Btree{}) :: {:ok, pid}
 
@@ -21,6 +21,7 @@ defmodule CubDB.CatchUp do
 
   defp catch_up(compacted_btree, original_btree, latest_btree) do
     diff = Btree.Diff.new(original_btree, latest_btree)
+
     Enum.reduce(diff, compacted_btree, fn
       {key, {@value, value}}, compacted_btree -> Btree.insert(compacted_btree, key, value)
       {key, @deleted}, compacted_btree -> Btree.delete(compacted_btree, key)
