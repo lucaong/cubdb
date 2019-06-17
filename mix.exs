@@ -13,8 +13,7 @@ defmodule CubDB.Mixfile do
       package: package(),
       source_url: "https://github.com/lucaong/cubdb",
       docs: [
-        main: "CubDB",
-        extras: ["README.md"]
+        main: "CubDB"
       ],
       dialyzer: [ignore_warnings: "dialyzer_ignore.exs"]
     ]
