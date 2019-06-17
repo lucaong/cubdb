@@ -142,10 +142,10 @@ defmodule CubDB.Btree do
     tree
   end
 
-  @spec key_range(Btree.t(), key, key) :: Btree.KeyRange.t()
+  @spec key_range(Btree.t(), key, key, boolean) :: Btree.KeyRange.t()
 
-  def key_range(tree, from \\ nil, to \\ nil) do
-    Btree.KeyRange.new(tree, from, to)
+  def key_range(tree, from \\ nil, to \\ nil, reverse \\ false) do
+    Btree.KeyRange.new(tree, from, to, reverse)
   end
 
   def __leaf__, do: @leaf

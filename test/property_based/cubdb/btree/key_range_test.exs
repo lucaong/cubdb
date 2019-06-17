@@ -22,6 +22,7 @@ defmodule PropertyBased.Btree.KeyRangeTest do
       store = Store.TestStore.new
       btree = make_btree(store, key_values, cap)
       key_range = KeyRange.new(btree, from, to)
+      reverse_key_range = KeyRange.new(btree, from, to, true)
 
       expected_key_values =
         key_values
@@ -32,7 +33,8 @@ defmodule PropertyBased.Btree.KeyRangeTest do
         end)
         |> List.keysort(0)
 
-      assert Enum.into(key_range, []) == expected_key_values
+      assert Enum.to_list(key_range) == expected_key_values
+      assert Enum.to_list(reverse_key_range) == expected_key_values |> Enum.reverse()
     end
   end
 end

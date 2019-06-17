@@ -65,5 +65,10 @@ defmodule CubDB.Store.ReaderTest do
     ]})
     assert_receive {:test_tag, {:error, %ArithmeticError{}}}
     assert_receive {:check_out_reader, ^btree}
+
+    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:select, [reverse: true]})
+    reverse_entries = Enum.reverse(entries)
+    assert_receive {:test_tag, {:ok, ^reverse_entries}}
+    assert_receive {:check_out_reader, ^btree}
   end
 end

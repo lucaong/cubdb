@@ -122,6 +122,9 @@ defmodule CubDB do
   tuple, the first element is the starting value of the reduction, and the
   second is the reducing function.
 
+  The `reverse` option, when set to true, causes the entries to be selected in
+  reverse order.
+
   ## Examples
 
   To select all entries with keys between `:a` and `:c` as a list of `{key,
@@ -129,8 +132,12 @@ defmodule CubDB do
 
       {:ok, entries} = CubDB.select(db, from_key: :a, to_key: :c)
 
-  Assuming that we want to obtain the sum of the first 10 positive numeric
-  values associated to keys from `:a` to `:f`, we can do:
+  To select the last 3 entries, we can do:
+
+      {:ok, entries} = CubDB.select(db, reverse: true, pipe: [take: 3])
+
+  If we want to obtain the sum of the first 10 positive numeric values
+  associated to keys from `:a` to `:f`, we can do:
 
       {:ok, sum} = CubDB.select(db,
         from_key: :a,

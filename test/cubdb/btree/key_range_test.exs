@@ -13,7 +13,7 @@ defmodule CubDB.Btree.KeyRangeTest do
     Protocol.assert_impl!(Enumerable, KeyRange)
   end
 
-  test "iterates values with keys between from and to" do
+  test "Enumerable.KeyRange.reduce/3 iterates entries with keys between from and to" do
     entries = [
       foo: 1,
       bar: 2,
@@ -43,6 +43,26 @@ defmodule CubDB.Btree.KeyRangeTest do
       assert Stream.zip(key_range, entries) |> Enum.to_list ==
         Enum.zip(expected_entries, entries)
     end
+  end
+
+  test "Enumerable.KeyRange.reduce/3 iterates entries in reverse order if reverse is true" do
+    entries = [
+      a: 1,
+      b: 2,
+      c: 3,
+      d: 4,
+      e: 5,
+      f: 6,
+      g: 7,
+      h: 8
+    ]
+
+    store = Store.TestStore.new
+    btree = make_btree(store, entries, 3)
+
+    key_range = KeyRange.new(btree, :b, :g, true)
+
+    assert Enum.to_list(key_range) == [g: 7, f: 6, e: 5, d: 4, c: 3, b: 2]
   end
 
   test "Enum.member/2 returns false if key is outside of range, or not in the btree, and true otherwise" do

@@ -48,8 +48,9 @@ defmodule CubDB.Reader do
     to_key = Keyword.get(options, :to_key)
     pipe = Keyword.get(options, :pipe, [])
     reduce = Keyword.get(options, :reduce)
+    reverse = Keyword.get(options, :reverse, false)
 
-    key_range = Btree.key_range(btree, from_key, to_key)
+    key_range = Btree.key_range(btree, from_key, to_key, reverse)
 
     stream =
       Enum.reduce(pipe, key_range, fn
