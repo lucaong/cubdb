@@ -74,10 +74,10 @@ defmodule CubDB do
       )
       #=> {:ok, 18}
 
-  As `CubDB` uses an immutable data structure, the data file will grow with each
-  write operation. Occasionally, it is adviseable to run a compaction to
-  optimize the file size and re-claim disk space. Compaction is started manually
-  by calling `compact/1`, and runs in the background, without blocking other
+  As `CubDB` uses an immutable data structure, write operations cause the data
+  file to grow. Occasionally, it is adviseable to run a compaction to optimize
+  the file size and reclaim disk space. Compaction is started manually by
+  calling `compact/1`, and runs in the background, without blocking other
   operations:
 
       CubDB.compact(db)
@@ -275,8 +275,8 @@ defmodule CubDB do
   Runs a database compaction.
 
   As write operations are performed on a database, its file grows. Occasionally,
-  a compaction operation can be ran to shrink the file to its optimal size.
-  Compaction is ran in the background and does not block operations.
+  a compaction operation can be run to shrink the file to its optimal size.
+  Compaction runs in the background and does not block operations.
 
   Only one compaction operation can run at any time, therefore if this function
   is called when a compaction is already running, it returns `{:error,
