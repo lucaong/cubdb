@@ -10,6 +10,12 @@ defmodule CubDB.Mixfile do
       start_permanent: Mix.env == :prod,
       elixirc_paths: elixirc_paths(Mix.env),
       deps: deps(),
+      package: package(),
+      source_url: "https://github.com/lucaong/cubdb",
+      docs: [
+        main: "CubDB",
+        extras: ["README.md"]
+      ],
       dialyzer: [ignore_warnings: "dialyzer_ignore.exs"]
     ]
   end
@@ -34,7 +40,18 @@ defmodule CubDB.Mixfile do
   defp deps do
     [
       {:quixir, "~> 0.9", only: :test},
-      {:dialyxir, "~> 1.0.0-rc.6", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.0.0-rc.6", only: [:dev], runtime: false},
+      {:ex_doc, "~> 0.20", only: :dev, runtime: false}
+    ]
+  end
+
+  defp package() do
+    [
+      description: "A pure-Elixir embedded key-value database",
+      files: ["lib", "LICENSE", "mix.exs", "README.md"],
+      maintainers: ["Luca Ongaro"],
+      licenses: ["Apache-2.0"],
+      links: %{}
     ]
   end
 
