@@ -14,9 +14,10 @@ Read operations are performed on immutable "snapshots", so they are always
 consistent, run concurrently, and do not block write operations, nor are blocked
 by them.
 
-## Examples
+## Usage
 
-Start `CubDB` by specifying a data directory for its file:
+Start `CubDB` by specifying a directory for its database file (if not existing,
+it will be created):
 
 ```elixir
 {:ok, db} = CubDB.start_link("my/data/directory")
@@ -45,7 +46,7 @@ for {key, value} <- [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8] do
   CubDB.put(db, key, value)
 end
 
-CubDB.select(db, from_key: :b, to_key: :e)
+CubDB.select(db, min_key: :b, max_key: :e)
 #=> {:ok, [b: 2, c: 3, d: 4, e: 5]}
 ```
 
@@ -69,13 +70,15 @@ CubDB.select(db,
 #=> {:ok, 18}
 ```
 
+For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.html).
+
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `cubdb` to your list of dependencies in `mix.exs`:
+`CubDB` can be installed by adding `cubdb` to your list of dependencies in
+`mix.exs`:
 
 ```elixir
 def deps do
-  [{:cubdb, "~> 0.1.0"}]
+  [{:cubdb, "~> 0.1.1"}]
 end
 ```
