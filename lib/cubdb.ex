@@ -27,7 +27,7 @@ defmodule CubDB do
   consistent, run concurrently, and do not block write operations, nor are blocked
   by them.
 
-  ## Examples
+  ## Usage
 
   Start `CubDB` by specifying a directory for its database file (if not existing,
   it will be created):
@@ -63,7 +63,6 @@ defmodule CubDB do
   using an arbitrary function:
 
       # Take the sum of the last 3 even values:
-
       CubDB.select(db,
         reverse: true,
         pipe: [
@@ -74,6 +73,15 @@ defmodule CubDB do
         reduce: fn n, sum -> sum + n end
       )
       #=> {:ok, 18}
+
+  As `CubDB` uses an immutable data structure, the data file will grow with each
+  write operation. Occasionally, it is adviseable to run a compaction to
+  optimize the file size and re-claim disk space. Compaction is started manually
+  by calling `compact/1`, and runs in the background, without blocking other
+  operations:
+
+      CubDB.compact(db)
+      #=> :ok
   """
 
   use GenServer
@@ -114,9 +122,10 @@ defmodule CubDB do
   @doc """
   Starts the `CubDB` database process linked to the current process.
 
-  The `data_dir` argument is a directory name where the database files will be
-  stored. Only one `CubDB` instance can run per directory, so if you run several
-  databases, they should each use their own data directory.
+  The `data_dir` argument is the directory path where the database files will be
+  stored. If it does not exist, it will be created. Only one `CubDB` instance
+  can run per directory, so if you run several databases, they should each use
+  their own separate data directory.
 
   The `options` are passed to `GenServer.start_link/3`.
   """
