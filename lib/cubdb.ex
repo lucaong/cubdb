@@ -408,7 +408,7 @@ defmodule CubDB do
     %State{state | busy_files: busy_files}
   end
 
-  def trigger_clean_up(state) do
+  defp trigger_clean_up(state) do
     if can_clean_up?(state),
       do: clean_up_now(state),
       else: clean_up_when_possible(state)
