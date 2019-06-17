@@ -50,13 +50,15 @@ CubDB.select(db, from_key: :b, to_key: :e)
 ```
 
 But `select` can do much more than that. It can apply a pipeline of operations
-like `map`, `filter`, and `take` to the selected entries, and it can `reduce`
-the result using arbitrary functions:
+like `map`, `filter`, and `take` to the selected entries, it can select the
+entries in normal or reverse order, and it can `reduce` the result using
+arbitrary functions:
 
 ```elixir
-# Take the sum of the first 3 even values:
+# Take the sum of the last 3 even values:
 
 CubDB.select(db,
+  reverse: true,
   pipe: [
     map: fn {_key, value} -> value end,
     filter: &Integer.is_even/1,
@@ -64,7 +66,7 @@ CubDB.select(db,
   ],
   reduce: fn n, sum -> sum + n end
 )
-#=> {:ok, 12}
+#=> {:ok, 18}
 ```
 
 ## Installation
