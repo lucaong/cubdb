@@ -106,15 +106,29 @@ defmodule CubDB do
 
   ## Options
 
-  The `from_key` and `to_key` options specify an optional start and end of the
-  range of entries. All entries that have a key greater or equal than `from_key`
-  and lower or equal then `to_key` are selected. If one or both of `from_key`
-  and `to_key` are omitted, the range is open-ended.
+  The `min_key` and `max_key` the range of entriethat is selected. All entries
+  that have a key greater or equal than `min_key` and less or equal then
+  `max_key` are selected. One or both of `min_key` and `max_key` can be omitted
+  or set to `nil`, in which case the range is open-ended.
+
+  The `reverse` option, when set to true, causes the entries to be selected and
+  traversed in reverse order.
 
   The `pipe` option specifies an optional list of operations performed
-  sequentially on the selected entries. The available operations are `:filter`,
-  `:take`, and `:map`, and are specified by tuples. The given order of
-  operations is respected.
+  sequentially on the selected entries. The given order of operations is
+  respected. The available operations, specified as tuples, are:
+
+    - `{:filter, fun}` filters entries for which `fun` returns a truthy value
+
+    - `{:map, fun}` maps each entry to the value returned by the function `fun`
+
+    - `{:take, n}` takes the first `n` entries
+
+    - `{:drop, n}` skips the first `n` entries
+
+    - `{:take_while, fun}` takes entries while `fun` returns a truthy value
+ 
+    - `{:drop_while, fun}` skips entries while `fun` returns a truthy value
 
   The `reduce` option specifies how the selected entries are aggregated. If
   `reduce` is omitted, the entries are returned as a list. If `reduce` is a
@@ -122,15 +136,12 @@ defmodule CubDB do
   tuple, the first element is the starting value of the reduction, and the
   second is the reducing function.
 
-  The `reverse` option, when set to true, causes the entries to be selected in
-  reverse order.
-
   ## Examples
 
   To select all entries with keys between `:a` and `:c` as a list of `{key,
   value}` we can do:
 
-      {:ok, entries} = CubDB.select(db, from_key: :a, to_key: :c)
+      {:ok, entries} = CubDB.select(db, min_key: :a, max_key: :c)
 
   To select the last 3 entries, we can do:
 
@@ -140,8 +151,8 @@ defmodule CubDB do
   associated to keys from `:a` to `:f`, we can do:
 
       {:ok, sum} = CubDB.select(db,
-        from_key: :a,
-        to_key: :f,
+        min_key: :a,
+        max_key: :f,
         pipe: [
           map: fn {_key, value} -> value end, # map values
           filter: fn n -> is_number(n) and n > 0 end # only positive numbers

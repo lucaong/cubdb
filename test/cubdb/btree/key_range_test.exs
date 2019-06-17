@@ -13,7 +13,7 @@ defmodule CubDB.Btree.KeyRangeTest do
     Protocol.assert_impl!(Enumerable, KeyRange)
   end
 
-  test "Enumerable.KeyRange.reduce/3 iterates entries with keys between from and to" do
+  test "Enumerable.KeyRange.reduce/3 iterates entries with keys between min_key and max_key" do
     entries = [
       foo: 1,
       bar: 2,
@@ -28,12 +28,12 @@ defmodule CubDB.Btree.KeyRangeTest do
     store = Store.TestStore.new
     btree = make_btree(store, entries, 3)
 
-    for {from, to} <- [{nil, nil}, {:bar, :qux}, {:ba, :zz}, {nil, :qux}, {:yy, :zz}, {:baz, nil}, {:c, :a}] do
-      key_range = KeyRange.new(btree, from, to)
+    for {min_key, max_key} <- [{nil, nil}, {:bar, :qux}, {:ba, :zz}, {nil, :qux}, {:yy, :zz}, {:baz, nil}, {:c, :a}] do
+      key_range = KeyRange.new(btree, min_key, max_key)
       expected_entries =
         entries
         |> Enum.filter(fn {key, _} ->
-          (from == nil or key >= from) and (to == nil or key <= to)
+          (min_key == nil or key >= min_key) and (max_key == nil or key <= max_key)
         end)
         |> List.keysort(0)
 

@@ -268,11 +268,12 @@ defmodule CubDB.BtreeTest do
   test "key_range/3 returns a KeyRange" do
     store = Store.TestStore.new
     btree = make_btree(store, [a: 1, b: 2, c: 3, d: 4, e: 5])
-    from = :b
-    to = :e
+    min_key = :b
+    max_key = :e
     reverse = true
 
-    assert %Btree.KeyRange{btree: ^btree, from: ^from, to: ^to, reverse: ^reverse} = Btree.key_range(btree, from, to, reverse)
+    assert %Btree.KeyRange{btree: ^btree, min_key: ^min_key, max_key: ^max_key, reverse: ^reverse}
+      = Btree.key_range(btree, min_key, max_key, reverse)
   end
 
   test "Btree implements Enumerable" do

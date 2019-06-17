@@ -2,14 +2,14 @@ defmodule CubDB.Btree.KeyRange do
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
 
-  @type t :: %KeyRange{btree: Btree.t(), from: Btree.key() | nil, to: Btree.key() | nil, reverse: boolean}
+  @type t :: %KeyRange{btree: Btree.t(), min_key: Btree.key() | nil, max_key: Btree.key() | nil, reverse: boolean}
 
   @enforce_keys [:btree]
-  defstruct btree: nil, from: nil, to: nil, reverse: false
+  defstruct btree: nil, min_key: nil, max_key: nil, reverse: false
 
   @spec new(Btree.t(), Btree.key(), Btree.key(), boolean) :: KeyRange.t()
-  def new(btree, from \\ nil, to \\ nil, reverse \\ false) do
-    %KeyRange{btree: btree, from: from, to: to, reverse: reverse}
+  def new(btree, min_key \\ nil, max_key \\ nil, reverse \\ false) do
+    %KeyRange{btree: btree, min_key: min_key, max_key: max_key, reverse: reverse}
   end
 end
 
@@ -23,14 +23,14 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
   @value Btree.__value__()
   @deleted Btree.__deleted__()
 
-  def reduce(%KeyRange{btree: btree, from: from, to: to, reverse: reverse}, cmd_acc, fun) do
-    Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children(from, to, reverse, &1, &2))
+  def reduce(%KeyRange{btree: btree, min_key: min_key, max_key: max_key, reverse: reverse}, cmd_acc, fun) do
+    Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children(min_key, max_key, reverse, &1, &2))
   end
 
   def count(_), do: {:error, __MODULE__}
 
-  def member?(%KeyRange{from: from, to: to}, {key, _})
-      when (is_nil(from) == false and key < from) or (is_nil(to) == false and key > to) do
+  def member?(%KeyRange{min_key: min_key, max_key: max_key}, {key, _})
+      when (is_nil(min_key) == false and key < min_key) or (is_nil(max_key) == false and key > max_key) do
     {:ok, false}
   end
 
@@ -45,13 +45,13 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
 
   def slice(_), do: {:error, __MODULE__}
 
-  defp get_children(from, to, reverse, {@branch, locs}, store) do
+  defp get_children(min_key, max_key, reverse, {@branch, locs}, store) do
     children =
       locs
       |> Enum.chunk_every(2, 1)
       |> Enum.filter(fn
-        [{key, _}, {next_key, _}] -> (to == nil or key <= to) and (from == nil or next_key > from)
-        [{key, _}] -> to == nil or key <= to
+        [{key, _}, {next_key, _}] -> (max_key == nil or key <= max_key) and (min_key == nil or next_key > min_key)
+        [{key, _}] -> max_key == nil or key <= max_key
       end)
       |> Enum.map(fn [{k, loc} | _] ->
         {k, Store.get_node(store, loc)}
@@ -59,11 +59,11 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
     if reverse, do: Enum.reverse(children), else: children
   end
 
-  defp get_children(from, to, reverse, {@leaf, locs}, store) do
+  defp get_children(min_key, max_key, reverse, {@leaf, locs}, store) do
     children =
       locs
       |> Enum.filter(fn {key, _} ->
-        (from == nil or key >= from) and (to == nil or key <= to)
+        (min_key == nil or key >= min_key) and (max_key == nil or key <= max_key)
       end)
       |> Enum.map(fn {k, loc} ->
         {k, Store.get_node(store, loc)}

@@ -44,19 +44,22 @@ defmodule CubDB.Reader do
   end
 
   defp select(btree, options) when is_list(options) do
-    from_key = Keyword.get(options, :from_key)
-    to_key = Keyword.get(options, :to_key)
+    min_key = Keyword.get(options, :min_key)
+    max_key = Keyword.get(options, :max_key)
     pipe = Keyword.get(options, :pipe, [])
     reduce = Keyword.get(options, :reduce)
     reverse = Keyword.get(options, :reverse, false)
 
-    key_range = Btree.key_range(btree, from_key, to_key, reverse)
+    key_range = Btree.key_range(btree, min_key, max_key, reverse)
 
     stream =
       Enum.reduce(pipe, key_range, fn
         {:filter, fun}, stream when is_function(fun) -> Stream.filter(stream, fun)
         {:map, fun}, stream when is_function(fun) -> Stream.map(stream, fun)
         {:take, n}, stream when is_integer(n) -> Stream.take(stream, n)
+        {:drop, n}, stream when is_integer(n) -> Stream.drop(stream, n)
+        {:take_while, fun}, stream when is_function(fun) -> Stream.take_while(stream, fun)
+        {:drop_while, fun}, stream when is_function(fun) -> Stream.drop_while(stream, fun)
         op, _ -> raise(ArgumentError, message: "invalid pipe operation #{inspect(op)}")
       end)
 
