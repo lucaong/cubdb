@@ -1,15 +1,18 @@
 # CubDB
 
-`CubDB` is a pure-Elixir embedded key-value database, designed to be simple to
-use. It runs locally, and is backed by a file.
+`CubDB` is a pure-Elixir embedded key-value database, designed for simplicity.
+It runs locally, and is backed by a single file.
 
 Both keys and values can be any Elixir (or Erlang) term, so no serialization
 and de-serialization is necessary.
 
-`CubDB` uses an immutable data structure that ensures robustness to data
-corruption. Read and select operations are performed on immutable "snapshots",
-so they are always consistent, run concurrently, and do not block write
-operations, nor are blocked by them.
+The `CubDB` database file uses an immutable data structure that ensures
+robustness to data corruption: entries are never changed in-place, and writes
+are atomic.
+
+Read operations are performed on immutable "snapshots", so they are always
+consistent, run concurrently, and do not block write operations, nor are blocked
+by them.
 
 ## Examples
 
@@ -38,7 +41,7 @@ CubDB.get(db, :foo)
 Range of keys are retrieved using `select`:
 
 ```elixir
-for {key, value} <- [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, e: 8] do
+for {key, value} <- [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8] do
   CubDB.put(db, key, value)
 end
 
@@ -46,7 +49,9 @@ CubDB.select(db, from_key: :b, to_key: :e)
 #=> {:ok, [b: 2, c: 3, d: 4, e: 5]}
 ```
 
-But `select` can much more than that:
+But `select` can do much more than that. It can apply a pipeline of operations
+like `map`, `filter`, and `take`, and it can `reduce` the result using arbitrary
+functions:
 
 ```elixir
 CubDB.select(db,
