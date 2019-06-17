@@ -35,7 +35,7 @@ CubDB.get(db, :foo)
 #=> nil
 ```
 
-But the real power is unleashed by `select`:
+Range of keys are retrieved using `select`:
 
 ```elixir
 for {key, value} <- [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, e: 8] do
@@ -44,7 +44,11 @@ end
 
 CubDB.select(db, from_key: :b, to_key: :e)
 #=> {:ok, [b: 2, c: 3, d: 4, e: 5]}
+```
 
+But `select` can much more than that:
+
+```elixir
 CubDB.select(db,
   from_key: :b,
   pipe: [
