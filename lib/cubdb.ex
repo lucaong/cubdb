@@ -237,7 +237,7 @@ defmodule CubDB do
   def init(data_dir) do
     case find_db_file(data_dir) do
       file_name when is_binary(file_name) or is_nil(file_name) ->
-        store = Store.File.new(Path.join(data_dir, file_name || "0.#{@db_file_extension}"))
+        store = Store.File.new(Path.join(data_dir, file_name || "0#{@db_file_extension}"))
         {:ok, clean_up} = CleanUp.start_link(data_dir)
         {:ok, %State{btree: Btree.new(store), data_dir: data_dir, clean_up: clean_up}}
 
