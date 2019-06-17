@@ -2,16 +2,18 @@ defmodule CubDB do
   @moduledoc """
   Top-level module providing the database public API.
 
-  `CubDB` is a pure-Elixir embedded key-value database, designed to be simple to
-  use. It runs locally, and is backed by a file.
+  `CubDB` is a pure-Elixir embedded key-value database, designed for simplicity.
+  It runs locally, and is backed by a single file.
 
-  Both keys and values can be any Elixir (or Erlang) term, so no serialization
-  and de-serialization is necessary.
+  Both keys and values can be any Elixir (or Erlang) term.
 
-  `CubDB` uses an immutable data structure that ensures robustness to data
-  corruption. Read and select operations are performed on immutable "snapshots",
-  so they are always consistent, run concurrently, and do not block write
-  operations, nor are blocked by them.
+  The `CubDB` database file uses an immutable data structure that ensures
+  robustness to data corruption: entries are never changed in-place, and writes
+  are atomic.
+
+  Read operations are performed on immutable "snapshots", so they are always
+  consistent, run concurrently, and do not block write operations, nor are blocked
+  by them.
   """
 
   use GenServer
@@ -127,7 +129,7 @@ defmodule CubDB do
     - `{:drop, n}` skips the first `n` entries
 
     - `{:take_while, fun}` takes entries while `fun` returns a truthy value
- 
+
     - `{:drop_while, fun}` skips entries while `fun` returns a truthy value
 
   The `reduce` option specifies how the selected entries are aggregated. If
