@@ -1,4 +1,6 @@
 defmodule CubDB.CatchUp do
+  @moduledoc false
+
   use Task
 
   alias CubDB.Btree

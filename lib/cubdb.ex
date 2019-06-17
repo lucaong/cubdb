@@ -215,6 +215,7 @@ defmodule CubDB do
 
   @spec cubdb_file?(binary) :: boolean
 
+  @doc false
   def cubdb_file?(file_name) do
     file_extensions = [@db_file_extension, @compaction_file_extension]
     Enum.member?(file_extensions, Path.extname(file_name))
@@ -222,18 +223,21 @@ defmodule CubDB do
 
   @spec db_file?(binary) :: boolean
 
+  @doc false
   def db_file?(file_name) do
     Path.extname(file_name) == @db_file_extension
   end
 
   @spec compaction_file?(binary) :: boolean
 
+  @doc false
   def compaction_file?(file_name) do
     Path.extname(file_name) == @compaction_file_extension
   end
 
   # OTP callbacks
 
+  @doc false
   def init(data_dir) do
     case find_db_file(data_dir) do
       file_name when is_binary(file_name) or is_nil(file_name) ->

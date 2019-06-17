@@ -1,4 +1,6 @@
 defmodule CubDB.Btree.Diff do
+  @moduledoc false
+
   @enforce_keys [:from_btree, :to_btree]
   defstruct from_btree: nil, to_btree: nil
 

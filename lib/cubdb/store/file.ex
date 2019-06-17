@@ -1,7 +1,5 @@
 defmodule CubDB.Store.File do
-  @moduledoc """
-  Append-only file-based store implementation
-  """
+  @moduledoc false
 
   alias CubDB.Store
 

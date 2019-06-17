@@ -1,4 +1,6 @@
 defmodule CubDB.Btree do
+  @moduledoc false
+
   @leaf :l
   @branch :b
   @value :v

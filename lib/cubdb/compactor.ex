@@ -1,4 +1,6 @@
 defmodule CubDB.Compactor do
+  @moduledoc false
+
   use Task
 
   alias CubDB.Btree

@@ -1,4 +1,6 @@
 defmodule CubDB.Reader do
+  @moduledoc false
+
   use Task
 
   alias CubDB.Btree

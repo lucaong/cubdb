@@ -1,4 +1,6 @@
 defmodule CubDB.CleanUp do
+  @moduledoc false
+
   use GenServer
 
   alias CubDB.Btree

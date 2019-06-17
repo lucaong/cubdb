@@ -1,4 +1,6 @@
 defprotocol CubDB.Store do
+  @moduledoc false
+
   alias CubDB.Btree
 
   @spec put_node(t, Btree.btree_node()) :: Btree.location()

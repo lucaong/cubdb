@@ -1,4 +1,6 @@
 defmodule CubDB.Btree.Enumerable do
+  @moduledoc false
+
   alias CubDB.Btree
   alias CubDB.Store
 

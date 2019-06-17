@@ -1,4 +1,6 @@
 defmodule CubDB.Store.File.Blocks do
+  @moduledoc false
+
   @block_size 1024
   @data_marker 0
   @header_marker 42

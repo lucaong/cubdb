@@ -1,4 +1,6 @@
 defmodule CubDB.Btree.KeyRange do
+  @moduledoc false
+
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
 

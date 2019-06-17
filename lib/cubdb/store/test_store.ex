@@ -1,8 +1,5 @@
 defmodule CubDB.Store.TestStore do
-  @moduledoc """
-  Dummy implementation of Store based on an in-memory map, only meant for
-  testing purposes
-  """
+  @moduledoc false
 
   defstruct agent: nil
   alias CubDB.Store.TestStore
