@@ -29,6 +29,8 @@ defmodule CubDB do
   @compaction_file_extension ".compact"
 
   defmodule State do
+    @moduledoc false
+
     @type t :: %CubDB.State{
             btree: Btree.t(),
             data_dir: binary,
