@@ -34,7 +34,7 @@ defmodule CubDB do
 
       {:ok, db} = CubDB.start_link("my/data/directory")
 
-  `get`, `put`, and `delete` operations work as you expect:
+  The `get/2`, `put/3`, and `delete/2` functions work as you probably expect:
 
       CubDB.put(db, :foo, "some value")
       #=> :ok
@@ -48,7 +48,7 @@ defmodule CubDB do
       CubDB.get(db, :foo)
       #=> nil
 
-  Range of keys are retrieved using `select`:
+  Range of keys are retrieved using `select/3`:
 
       for {key, value} <- [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8] do
         CubDB.put(db, key, value)
@@ -57,7 +57,7 @@ defmodule CubDB do
       CubDB.select(db, min_key: :b, max_key: :e)
       #=> {:ok, [b: 2, c: 3, d: 4, e: 5]}
 
-  But `select` can do much more than that. It can apply a pipeline of operations
+  But `select/3` can do much more than that. It can apply a pipeline of operations
   (`map`, `filter`, `take`, `drop` and more) to the selected entries, it can
   select the entries in normal or reverse order, and it can `reduce` the result
   using an arbitrary function:

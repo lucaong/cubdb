@@ -23,7 +23,7 @@ it will be created):
 {:ok, db} = CubDB.start_link("my/data/directory")
 ```
 
-`get`, `put`, and `delete` operations work as you expect:
+`get`, `put`, and `delete` operations work as you probably expect:
 
 ```elixir
 CubDB.put(db, :foo, "some value")
