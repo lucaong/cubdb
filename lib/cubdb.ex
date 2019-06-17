@@ -2,13 +2,16 @@ defmodule CubDB do
   @moduledoc """
   Top-level module providing the database public API.
 
-  `CubDB` is a pure Elixir embedded key-value database, designed to be simple to
+  `CubDB` is a pure-Elixir embedded key-value database, designed to be simple to
   use. It runs locally, and is backed by a file.
 
-  `CubDB` uses an immutable data structure robust to data corruption. Read and
-  select operations are performed on immutable "snapshots", so they are always
-  consistent, run concurrently, and do not block nor are blocked by write
-  operations.
+  Both keys and values can be any Elixir (or Erlang) term, so no serialization
+  and de-serialization is necessary.
+
+  `CubDB` uses an immutable data structure that ensures robustness to data
+  corruption. Read and select operations are performed on immutable "snapshots",
+  so they are always consistent, run concurrently, and do not block write
+  operations, nor are blocked by them.
   """
 
   use GenServer
@@ -119,7 +122,7 @@ defmodule CubDB do
   tuple, the first element is the starting value of the reduction, and the
   second is the reducing function.
 
-  # Example
+  ## Examples
 
   To select all entries with keys between `:a` and `:c` as a list of `{key,
   value}` we can do:
@@ -129,7 +132,7 @@ defmodule CubDB do
   Assuming that we want to obtain the sum of the first 10 positive numeric
   values associated to keys from `:a` to `:f`, we can do:
 
-      {:ok, sum} = CubDB.select(db, [
+      {:ok, sum} = CubDB.select(db,
         from_key: :a,
         to_key: :f,
         pipe: [
@@ -138,7 +141,7 @@ defmodule CubDB do
           take: 10, # take only the first 10 entries in the range
         ],
         reduce: fn n, sum -> sum + n end # reduce to the sum of selected values
-      ])
+      )
   """
   def select(db, options \\ [], timeout \\ 5000) when is_list(options) do
     GenServer.call(db, {:select, options}, timeout)
