@@ -9,23 +9,8 @@ defmodule CubDB do
   robustness to data corruption: entries are never changed in-place, and writes
   are atomic.
 
-  Read operations are performed on immutable "snapshots", so they are always
-  consistent, run concurrently, and do not block write operations, nor are blocked
-  by them.
-
-  `CubDB` is a pure-Elixir embedded key-value database, designed for simplicity.
-  It runs locally, and is backed by a single file.
-
-  Both keys and values can be any Elixir (or Erlang) term, so no serialization
-  and de-serialization is necessary.
-
-  The `CubDB` database file uses an immutable data structure that ensures
-  robustness to data corruption: entries are never changed in-place, and writes
-  are atomic.
-
-  Read operations are performed on immutable "snapshots", so they are always
-  consistent, run concurrently, and do not block write operations, nor are blocked
-  by them.
+  Read operations are performed on immutable views, so they are always
+  consistent, run concurrently, and do not block write operations.
 
   ## Usage
 
@@ -179,10 +164,10 @@ defmodule CubDB do
 
   ## Options
 
-  The `min_key` and `max_key` the range of entriethat is selected. All entries
-  that have a key greater or equal than `min_key` and less or equal then
-  `max_key` are selected. One or both of `min_key` and `max_key` can be omitted
-  or set to `nil`, in which case the range is open-ended.
+  The `min_key` and `max_key` specify the range of entries that are selected.
+  All entries that have a key greater or equal than `min_key` and less or equal
+  then `max_key` are selected. One or both of `min_key` and `max_key` can be
+  omitted or set to `nil`, in which case the range is open-ended.
 
   The `reverse` option, when set to true, causes the entries to be selected and
   traversed in reverse order.
