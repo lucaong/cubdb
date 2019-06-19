@@ -272,8 +272,19 @@ defmodule CubDB.BtreeTest do
     max_key = :e
     reverse = true
 
-    assert %Btree.KeyRange{btree: ^btree, min_key: ^min_key, max_key: ^max_key, reverse: ^reverse}
-      = Btree.key_range(btree, min_key, max_key, reverse)
+    assert %Btree.KeyRange{
+      btree: ^btree,
+      min_key: {^min_key, :included},
+      max_key: {^max_key, :included},
+      reverse: ^reverse
+    } = Btree.key_range(btree, min_key, max_key, reverse)
+
+    assert %Btree.KeyRange{
+      btree: ^btree,
+      min_key: nil,
+      max_key: {^max_key, :excluded},
+      reverse: ^reverse
+    } = Btree.key_range(btree, nil, {max_key, :excluded}, reverse)
   end
 
   test "Btree implements Enumerable" do

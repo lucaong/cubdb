@@ -164,10 +164,32 @@ defmodule CubDB do
 
   ## Options
 
-  The `min_key` and `max_key` specify the range of entries that are selected.
-  All entries that have a key greater or equal than `min_key` and less or equal
-  then `max_key` are selected. One or both of `min_key` and `max_key` can be
-  omitted or set to `nil`, in which case the range is open-ended.
+  The `min_key` and `max_key` specify the range of entries that are selected. By
+  default, the range is inclusive, so All entries that have a key greater or
+  equal than `min_key` and less or equal then `max_key` are selected:
+
+      # Select all entries where `"a" <= key <= "d"`
+      CubDB.select(db, min_key: "b", max_key: "d")
+
+  The range boundaries can be excluded by setting `:min_key` or `:max_key` to
+  `{key, :excluded}`:
+
+      # Select all entries where `"a" <= key < "d"`
+      CubDB.select(db, min_key: "b", max_key: {"d", :excluded})
+
+  Any of `:min_key` and `:max_key` can be omitted or set to `nil`, to leave the
+  range open-ended.
+
+      # Select entries where `key <= "a"
+      CubDB.select(db, max_key: "a")
+
+      # Or, equivalently:
+      CubDB.select(db, min_key: nil, max_key: "a")
+
+  In case the key boundary is the literal value `nil`, the longer form must be used:
+
+      # Select entries where `nil <= key <= "a"`
+      CubDB.select(db, min_key: {nil, :included}, max_key: "a")
 
   The `reverse` option, when set to true, causes the entries to be selected and
   traversed in reverse order.
@@ -187,6 +209,11 @@ defmodule CubDB do
     - `{:take_while, fun}` takes entries while `fun` returns a truthy value
 
     - `{:drop_while, fun}` skips entries while `fun` returns a truthy value
+
+  Note that, when selecting a key range, specifying `:min_key` and/or `:max_key`
+  is more performant than using `{:filter, fun}` or `{:take_while | :drop_while,
+  fun}`, because `:min_key` and `:max_key` avoid loading unnecessary entries
+  from disk entirely.
 
   The `reduce` option specifies how the selected entries are aggregated. If
   `reduce` is omitted, the entries are returned as a list. If `reduce` is a

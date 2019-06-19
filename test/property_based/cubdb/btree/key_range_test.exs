@@ -16,11 +16,17 @@ defmodule PropertyBased.Btree.KeyRangeTest do
                                string(max: 8, chars: :printable),
                                string(max: 10, chars: :printable)
                              })),
-      min_key: string(max: 8, chars: :printable),
-      max_key: string(max: 8, chars: :printable)
+      min: string(max: 8, chars: :printable),
+      max: string(max: 8, chars: :printable),
+      min_included: bool(),
+      max_included: bool(),
     ], repeat_for: 50 do
       store = Store.TestStore.new
       btree = make_btree(store, key_values, cap)
+      min_incl = if min_included, do: :included, else: :excluded
+      max_incl = if max_included, do: :included, else: :excluded
+      min_key = {min, min_incl}
+      max_key = {max, max_incl}
       key_range = KeyRange.new(btree, min_key, max_key)
       reverse_key_range = KeyRange.new(btree, min_key, max_key, true)
 
@@ -29,7 +35,8 @@ defmodule PropertyBased.Btree.KeyRangeTest do
         |> Enum.reverse
         |> Enum.uniq_by(&(elem(&1, 0)))
         |> Enum.filter(fn {key, _} ->
-          (min_key == nil or key >= min_key) and (max_key == nil or key <= max_key)
+          (min_key == nil || (min_included && key >= min) || key > min)
+            && (max_key == nil || (max_included && key <= max) || key < max)
         end)
         |> List.keysort(0)
 
