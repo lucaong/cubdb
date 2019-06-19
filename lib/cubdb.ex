@@ -52,7 +52,7 @@ defmodule CubDB do
         reverse: true,
         pipe: [
           map: fn {_key, value} -> value end,
-          filter: &Integer.is_even/1,
+          filter: fn value -> Integer.is_even(value) end,
           take: 3
         ],
         reduce: fn n, sum -> sum + n end
@@ -165,13 +165,13 @@ defmodule CubDB do
   ## Options
 
   The `min_key` and `max_key` specify the range of entries that are selected. By
-  default, the range is inclusive, so All entries that have a key greater or
+  default, the range is inclusive, so all entries that have a key greater or
   equal than `min_key` and less or equal then `max_key` are selected:
 
       # Select all entries where `"a" <= key <= "d"`
       CubDB.select(db, min_key: "b", max_key: "d")
 
-  The range boundaries can be excluded by setting `:min_key` or `:max_key` to
+  The range boundaries can be excluded by setting `min_key` or `max_key` to
   `{key, :excluded}`:
 
       # Select all entries where `"a" <= key < "d"`
@@ -210,10 +210,10 @@ defmodule CubDB do
 
     - `{:drop_while, fun}` skips entries while `fun` returns a truthy value
 
-  Note that, when selecting a key range, specifying `:min_key` and/or `:max_key`
+  Note that, when selecting a key range, specifying `min_key` and/or `max_key`
   is more performant than using `{:filter, fun}` or `{:take_while | :drop_while,
-  fun}`, because `:min_key` and `:max_key` avoid loading unnecessary entries
-  from disk entirely.
+  fun}`, because `min_key` and `max_key` avoid loading unnecessary entries from
+  disk entirely.
 
   The `reduce` option specifies how the selected entries are aggregated. If
   `reduce` is omitted, the entries are returned as a list. If `reduce` is a
@@ -224,9 +224,14 @@ defmodule CubDB do
   ## Examples
 
   To select all entries with keys between `:a` and `:c` as a list of `{key,
-  value}` we can do:
+  value}` entries we can do:
 
       {:ok, entries} = CubDB.select(db, min_key: :a, max_key: :c)
+
+  If we want to get all entries with keys between `:a` and `:c`, with `:c`
+  exluded, we can do:
+
+      {:ok, entries} = CubDB.select(db, min_key: :a, max_key: {:c, :excluded})
 
   To select the last 3 entries, we can do:
 
