@@ -5,7 +5,7 @@ defmodule CubDB.Reader do
 
   alias CubDB.Btree
 
-  @type operation :: {:get, any, any} | {:fetch, any} | {:select, Keyword.t()} | :size
+  @type operation :: {:get, any, any} | {:fetch, any} | {:has_key?, any} | {:select, Keyword.t()}
 
   @spec start_link(GenServer.from(), GenServer.server(), Btree.t(), operation) :: {:ok, pid}
 
@@ -44,13 +44,6 @@ defmodule CubDB.Reader do
     GenServer.reply(caller, {:ok, reply})
   rescue
     error -> GenServer.reply(caller, {:error, error})
-  after
-    send(db, {:check_out_reader, btree})
-  end
-
-  def run(caller, db, btree, :size) do
-    size = Enum.count(btree)
-    GenServer.reply(caller, size)
   after
     send(db, {:check_out_reader, btree})
   end

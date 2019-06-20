@@ -52,12 +52,6 @@ defmodule CubDB.Store.ReaderTest do
     assert_receive {:check_out_reader, ^btree}
   end
 
-  test "start_link/4 performs :size, and checks out", %{btree: btree} do
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, :size)
-    assert_receive {:test_tag, 7}
-    assert_receive {:check_out_reader, ^btree}
-  end
-
   test "start_link/4 performs :select, and checks out", %{btree: btree, entries: entries} do
     {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:select, []})
     assert_receive {:test_tag, {:ok, ^entries}}

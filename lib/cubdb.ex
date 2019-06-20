@@ -385,9 +385,8 @@ defmodule CubDB do
     {:noreply, state}
   end
 
-  def handle_call(operation = :size, from, state = %State{btree: btree}) do
-    state = read(from, btree, operation, state)
-    {:noreply, state}
+  def handle_call(:size, _, state = %State{btree: btree}) do
+    {:reply, Enum.count(btree), state}
   end
 
   def handle_call(:dirt_factor, _, state = %State{btree: btree}) do
