@@ -79,6 +79,6 @@ For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.ht
 
 ```elixir
 def deps do
-  [{:cubdb, "~> 0.1.4"}]
+  [{:cubdb, "~> 0.2.0"}]
 end
 ```
