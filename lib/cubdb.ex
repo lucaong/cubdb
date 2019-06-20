@@ -349,7 +349,8 @@ defmodule CubDB do
     GenServer.call(db, :compact)
   end
 
-  @spec set_auto_compact(GenServer.server(), boolean | {integer, integer | float}) :: :ok | {:error, binary}
+  @spec set_auto_compact(GenServer.server(), boolean | {integer, integer | float}) ::
+          :ok | {:error, binary}
 
   @doc """
   Set whether to perform automatic compaction, and how.
@@ -635,7 +636,8 @@ defmodule CubDB do
           do: {:ok, {min_writes, min_dirt_factor}},
           else: {:error, "invalid auto compact setting"}
 
-      _ -> {:error, "invalid auto compact setting"}
+      _ ->
+        {:error, "invalid auto compact setting"}
     end
   end
 
