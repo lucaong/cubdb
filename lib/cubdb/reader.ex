@@ -31,6 +31,12 @@ defmodule CubDB.Reader do
     send(db, {:check_out_reader, btree})
   end
 
+  def run(caller, db, btree, {:has_key?, key}) do
+    reply = elem(Btree.has_key?(btree, key), 0)
+    GenServer.reply(caller, reply)
+    send(db, {:check_out_reader, btree})
+  end
+
   def run(caller, db, btree, {:select, options}) do
     reply = select(btree, options)
     GenServer.reply(caller, {:ok, reply})

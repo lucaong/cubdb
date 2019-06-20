@@ -152,6 +152,15 @@ defmodule CubDB do
     GenServer.call(db, {:fetch, key})
   end
 
+  @spec has_key?(GenServer.server(), any) :: boolean
+
+  @doc """
+  Returns whether an entry with the given `key` exists in the database.
+  """
+  def has_key?(db, key) do
+    GenServer.call(db, {:has_key?, key})
+  end
+
   @spec select(GenServer.server(), Keyword.t(), timeout) ::
           {:ok, any} | {:error, Exception.t()}
 
@@ -361,6 +370,11 @@ defmodule CubDB do
   end
 
   def handle_call(operation = {:fetch, _}, from, state = %State{btree: btree}) do
+    state = read(from, btree, operation, state)
+    {:noreply, state}
+  end
+
+  def handle_call(operation = {:has_key?, _}, from, state = %State{btree: btree}) do
     state = read(from, btree, operation, state)
     {:noreply, state}
   end
