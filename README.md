@@ -61,8 +61,12 @@ using an arbitrary function:
 CubDB.select(db,
   reverse: true,
   pipe: [
-    map: fn {_key, value} -> value end,
-    filter: &Integer.is_even/1,
+    map: fn {_key, value} ->
+      value
+    end,
+    filter: fn value ->
+      is_integer(value) && Integer.is_even(value)
+    end,
     take: 3
   ],
   reduce: fn n, sum -> sum + n end

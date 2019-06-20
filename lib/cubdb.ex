@@ -51,8 +51,12 @@ defmodule CubDB do
       CubDB.select(db,
         reverse: true,
         pipe: [
-          map: fn {_key, value} -> value end,
-          filter: fn value -> Integer.is_even(value) end,
+          map: fn {_key, value} ->
+            value
+          end,
+          filter: fn value ->
+            is_integer(value) && Integer.is_even(value)
+          end,
           take: 3
         ],
         reduce: fn n, sum -> sum + n end
