@@ -360,7 +360,7 @@ defmodule CubDB do
     {:noreply, state}
   end
 
-  def handle_call(operation = {:has_key?, _}, from, state = %State{btree: btree}) do
+  def handle_call(operation = {:fetch, _}, from, state = %State{btree: btree}) do
     state = read(from, btree, operation, state)
     {:noreply, state}
   end
