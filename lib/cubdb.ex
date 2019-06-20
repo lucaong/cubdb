@@ -140,16 +140,16 @@ defmodule CubDB do
     GenServer.call(db, {:get, key})
   end
 
-  @spec has_key?(GenServer.server(), any) :: {boolean, any}
+  @spec fetch(GenServer.server(), any) :: {:ok, any} | :error
 
   @doc """
-  Returns a tuple indicating if `key` is associated to a value in the database.
+  Fetches the value for a key in the database, or return `:error` if the key is not present.
 
-  If `key` is associated to a value, it returns `{true, value}`. Otherwise, it
-  returns `{false, nil}`
+  If the database contains an entry with the given `key` and value `value`, it
+  returns `{:ok, value}`. If `key` is not found, it returns `:error`.
   """
-  def has_key?(db, key) do
-    GenServer.call(db, {:has_key?, key})
+  def fetch(db, key) do
+    GenServer.call(db, {:fetch, key})
   end
 
   @spec select(GenServer.server(), Keyword.t(), timeout) ::

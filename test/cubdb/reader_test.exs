@@ -23,9 +23,13 @@ defmodule CubDB.Store.ReaderTest do
     assert_receive {:check_out_reader, ^btree}
   end
 
-  test "start_link/4 performs :has_key?, and checks out", %{btree: btree} do
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:has_key?, :c})
-    assert_receive {:test_tag, {true, 3}}
+  test "start_link/4 performs :fetch, and checks out", %{btree: btree} do
+    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:fetch, :c})
+    assert_receive {:test_tag, {:ok, 3}}
+    assert_receive {:check_out_reader, ^btree}
+
+    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:fetch, :z})
+    assert_receive {:test_tag, :error}
     assert_receive {:check_out_reader, ^btree}
   end
 
