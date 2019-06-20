@@ -264,6 +264,21 @@ defmodule CubDB do
     GenServer.call(db, :size)
   end
 
+  @spec dirt_factor(GenServer.server()) :: float
+
+  @doc """
+  Returns the dirt factor.
+
+  The dirt factor is a number, ranging from 0 to 1, giving an indication about
+  the amount of overhead storage (or "dirt") that can be cleaned up with a
+  compaction operation. A value of 0 means that there is no overhead, so a
+  compaction would have no benefit. The closer to 1 the dirt factor is, the more
+  can be cleaned up in a compaction operation.
+  """
+  def dirt_factor(db) do
+    GenServer.call(db, :dirt_factor)
+  end
+
   @spec put(GenServer.server(), any, any) :: :ok
 
   @doc """
@@ -358,6 +373,10 @@ defmodule CubDB do
   def handle_call(operation = :size, from, state = %State{btree: btree}) do
     state = read(from, btree, operation, state)
     {:noreply, state}
+  end
+
+  def handle_call(:dirt_factor, from, state = %State{btree: btree}) do
+    {:reply, Btree.dirt_factor(btree), state}
   end
 
   def handle_call({:put, key, value}, _, state = %State{btree: btree}) do

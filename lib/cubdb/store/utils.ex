@@ -8,7 +8,7 @@ defmodule CubDB.Store.Utils do
   @deleted Btree.__deleted__()
 
   def debug(store) do
-    {_, {size, root_loc}} = Store.get_latest_header(store)
+    {_, {size, root_loc, _}} = Store.get_latest_header(store)
     {:Btree, size, debug_node(store, root_loc)}
   end
 

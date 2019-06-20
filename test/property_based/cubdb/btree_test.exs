@@ -21,11 +21,11 @@ defmodule PropertyBased.BtreeTest do
       store = Store.TestStore.new
       tree = Btree.new(store, cap)
       tree = Enum.reduce(tuples, tree, fn {key, value}, t ->
-        previous_count = Enum.count(t)
-        t = Btree.insert(t, key, value)
-        assert Enum.count(t) >= previous_count
-        assert Btree.lookup(t, key) == value
-        t
+        new_tree = Btree.insert(t, key, value)
+        assert Enum.count(new_tree) >= Enum.count(t)
+        assert new_tree.dirt > t.dirt
+        assert Btree.lookup(new_tree, key) == value
+        new_tree
       end)
 
       a = Enum.into(tree, [])
@@ -37,12 +37,14 @@ defmodule PropertyBased.BtreeTest do
 
       tree = Enum.reduce(tuples, tree, fn {key, _}, t ->
         previous_count = Enum.count(t)
+        previous_dirt_factor = Btree.dirt_factor(t)
 
         t = if rem(previous_count, 2) == 0,
           do: Btree.delete(t, key),
           else: Btree.mark_deleted(t, key)
 
         assert Enum.count(t) <= previous_count
+        assert Btree.dirt_factor(t) >= previous_dirt_factor
 
         e = Enum.into(t, [])
         assert e == e |> List.keysort(0)
@@ -52,7 +54,6 @@ defmodule PropertyBased.BtreeTest do
       end)
 
       compacted = Btree.load(tree, Store.TestStore.new, cap)
-      Btree.commit(compacted)
 
       assert Enum.to_list(tree) == Enum.to_list(compacted)
       assert {:Btree, 0, {@leaf, []}} = Utils.debug(compacted.store)

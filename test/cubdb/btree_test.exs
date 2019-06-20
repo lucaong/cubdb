@@ -115,6 +115,15 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 1} = tree
   end
 
+  test "insert/3 increases dirt by one" do
+    tree = btree()
+    assert %Btree{dirt: 0} = tree
+    tree = Btree.insert(tree, :foo, 1)
+    assert %Btree{dirt: 1} = tree
+    tree = Btree.insert(tree, :foo, 2)
+    assert %Btree{dirt: 2} = tree
+  end
+
   test "lookup/2 finds key and returns its value" do
     tiny_tree = btree({@leaf, [bar: 2, foo: 1]})
     assert 1 = Btree.lookup(tiny_tree, :foo)
@@ -221,6 +230,16 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 3} = tree
   end
 
+  test "delete/2 increases dirt by one when removing an entry" do
+    store = Store.TestStore.new
+    tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
+    assert %Btree{dirt: 4} = tree
+    tree = Btree.delete(tree, :foo)
+    assert %Btree{dirt: 5} = tree
+    tree = Btree.delete(tree, :foo)
+    assert %Btree{dirt: 5} = tree
+  end
+
   test "mark_deleted/2 removes an entry" do
     store = Store.TestStore.new
     btree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3) |> Btree.mark_deleted(:bar)
@@ -240,6 +259,16 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 3} = tree
     tree = Btree.mark_deleted(tree, :bar)
     assert %Btree{size: 3} = tree
+  end
+
+  test "mark_deleted/2 increases dirt by one only when necessary" do
+    store = Store.TestStore.new
+    tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
+    assert %Btree{dirt: 4} = tree
+    tree = Btree.mark_deleted(tree, :bar)
+    assert %Btree{dirt: 5} = tree
+    tree = Btree.mark_deleted(tree, :bar)
+    assert %Btree{dirt: 5} = tree
   end
 
   test "load/3 creates a Btree from a sorted enumerable of key/values" do
@@ -265,6 +294,18 @@ defmodule CubDB.BtreeTest do
     end
   end
 
+  test "load/3 sets dirt to 0" do
+    store = Store.TestStore.new
+    key_vals = Stream.map((0..20), &({&1, &1}))
+    tree = key_vals |> Btree.load(store, 4)
+    assert %Btree{dirt: 0} = tree
+
+    store = Store.TestStore.new
+    key_vals = [foo: 123]
+    tree = key_vals |> Btree.load(store, 4)
+    assert %Btree{dirt: 0} = tree
+  end
+
   test "key_range/3 returns a KeyRange" do
     store = Store.TestStore.new
     btree = make_btree(store, [a: 1, b: 2, c: 3, d: 4, e: 5])
@@ -285,6 +326,19 @@ defmodule CubDB.BtreeTest do
       max_key: {^max_key, :excluded},
       reverse: ^reverse
     } = Btree.key_range(btree, nil, {max_key, :excluded}, reverse)
+  end
+
+  test "dirt_factor/1 returns a numeric dirt factor" do
+    store = Store.TestStore.new
+    btree = Btree.new(store)
+
+    assert Btree.dirt_factor(btree) == 0
+
+    btree = Btree.insert(btree, :foo, 1)
+    assert Btree.dirt_factor(btree) == 1 / 3
+
+    btree = Btree.delete(btree, :foo)
+    assert Btree.dirt_factor(btree) == 2 / 3
   end
 
   test "Btree implements Enumerable" do

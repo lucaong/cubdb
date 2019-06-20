@@ -14,6 +14,7 @@ defmodule CubDB.Btree do
   @type key :: any
   @type val :: any
   @type btree_size :: non_neg_integer
+  @type dirt :: non_neg_integer
   @type location :: non_neg_integer
   @type leaf_node :: record(:leaf, children: list({key, location}))
   @type branch_node :: record(:branch, children: list({key, location}))
@@ -21,7 +22,7 @@ defmodule CubDB.Btree do
   @type deleted_node :: :d
   @type terminal_node :: value_node | deleted_node
   @type btree_node :: leaf_node | branch_node | value_node | deleted_node
-  @type btree_header :: {btree_size, location}
+  @type btree_header :: {btree_size, location, dirt}
 
   alias CubDB.Store
   alias CubDB.Btree
@@ -36,20 +37,20 @@ defmodule CubDB.Btree do
 
   @default_capacity 32
   @enforce_keys [:root, :root_loc, :size, :store, :capacity]
-  defstruct root: nil, root_loc: nil, size: 0, store: nil, capacity: @default_capacity
+  defstruct root: nil, root_loc: nil, size: 0, dirt: 0, store: nil, capacity: @default_capacity
 
   @spec new(Store.t(), pos_integer) :: Btree.t()
 
   def new(store, cap \\ @default_capacity) do
     case Store.get_latest_header(store) do
-      {_, {s, loc}} ->
+      {_, {s, loc, dirt}} ->
         root = Store.get_node(store, loc)
-        %Btree{root: root, root_loc: loc, size: s, capacity: cap, store: store}
+        %Btree{root: root, root_loc: loc, dirt: dirt, size: s, capacity: cap, store: store}
 
       nil ->
         root = leaf()
         loc = Store.put_node(store, root)
-        Store.put_header(store, {0, loc})
+        Store.put_header(store, {0, loc, 0})
         %Btree{root: root, root_loc: loc, size: 0, capacity: cap, store: store}
     end
   end
@@ -69,7 +70,7 @@ defmodule CubDB.Btree do
       new(store, cap)
     else
       {root, root_loc} = finalize_load(store, st, 1, cap)
-      Store.put_header(store, {count, root_loc})
+      Store.put_header(store, {count, root_loc, 0})
       %Btree{root: root, root_loc: root_loc, capacity: cap, store: store, size: count}
     end
   end
@@ -108,7 +109,8 @@ defmodule CubDB.Btree do
 
   @spec delete(Btree.t(), key) :: Btree.t()
 
-  def delete(btree = %Btree{root: root, store: store, capacity: cap, size: s}, key) do
+  def delete(btree, key) do
+    %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
 
     case List.keyfind(children, key, 0) do
@@ -120,8 +122,8 @@ defmodule CubDB.Btree do
           end
 
         {root_loc, new_root} = build_up(store, leaf, [], [key], path, cap)
-        Store.put_header(store, {size, root_loc})
-        %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: size}
+        Store.put_header(store, {size, root_loc, dirt + 1})
+        %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: size, dirt: dirt + 1}
 
       nil ->
         btree
@@ -160,6 +162,12 @@ defmodule CubDB.Btree do
     Btree.KeyRange.new(tree, min_key, max_key, reverse)
   end
 
+  @spec dirt_factor(Btree.t()) :: float
+
+  def dirt_factor(%Btree{size: size, dirt: dirt}) do
+    dirt / (1 + size + dirt)
+  end
+
   def __leaf__, do: @leaf
   def __branch__, do: @branch
   def __value__, do: @value
@@ -168,7 +176,7 @@ defmodule CubDB.Btree do
   @spec insert_terminal_node(Btree.t(), key, terminal_node) :: Btree.t()
 
   defp insert_terminal_node(btree, key, terminal_node) do
-    %Btree{root: root, store: store, capacity: cap, size: s} = btree
+    %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
 
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
     {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
@@ -179,8 +187,8 @@ defmodule CubDB.Btree do
         @deleted -> if List.keymember?(children, key, 0), do: s - 1, else: s
       end
 
-    Store.put_header(store, {s, root_loc})
-    %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: s}
+    Store.put_header(store, {s, root_loc, dirt + 1})
+    %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: s, dirt: dirt + 1}
   end
 
   defp load_node(store, key, node, [], _, _) do
