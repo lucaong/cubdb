@@ -69,6 +69,11 @@ defmodule CubDB do
       #=> :ok
   """
 
+  @doc """
+  Returns a specification to start this module under a supervisor.
+
+  The default options listed in `Supervisor` are used.
+  """
   use GenServer
 
   alias CubDB.Btree
