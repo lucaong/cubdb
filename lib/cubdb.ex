@@ -129,15 +129,16 @@ defmodule CubDB do
     GenServer.start(__MODULE__, data_dir, options)
   end
 
-  @spec get(GenServer.server(), any) :: any
+  @spec get(GenServer.server(), any, any) :: any
 
   @doc """
-  Get the value associated to `key` from the database.
+  Gets the value associated to `key` from the database.
 
-  If no value is associated with `key`, `nil` is returned.
+  If no value is associated with `key`, `default` is returned (which is `nil`,
+  unless specified otherwise).
   """
-  def get(db, key) do
-    GenServer.call(db, {:get, key})
+  def get(db, key, default \\ nil) do
+    GenServer.call(db, {:get, key, default})
   end
 
   @spec fetch(GenServer.server(), any) :: {:ok, any} | :error
@@ -364,7 +365,7 @@ defmodule CubDB do
     end
   end
 
-  def handle_call(operation = {:get, _}, from, state = %State{btree: btree}) do
+  def handle_call(operation = {:get, _, _}, from, state = %State{btree: btree}) do
     state = read(from, btree, operation, state)
     {:noreply, state}
   end
