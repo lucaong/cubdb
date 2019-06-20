@@ -26,7 +26,8 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
   @value Btree.__value__()
   @deleted Btree.__deleted__()
 
-  def reduce(%KeyRange{btree: btree, min_key: min_key, max_key: max_key, reverse: reverse}, cmd_acc, fun) do
+  def reduce(key_range, cmd_acc, fun) do
+    %KeyRange{btree: btree, min_key: min_key, max_key: max_key, reverse: reverse} = key_range
     Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children(min_key, max_key, reverse, &1, &2))
   end
 
@@ -70,6 +71,7 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
       |> Enum.map(fn [{k, loc} | _] ->
         {k, Store.get_node(store, loc)}
       end)
+
     if reverse, do: Enum.reverse(children), else: children
   end
 

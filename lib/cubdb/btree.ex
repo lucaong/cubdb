@@ -123,7 +123,15 @@ defmodule CubDB.Btree do
 
         {root_loc, new_root} = build_up(store, leaf, [], [key], path, cap)
         Store.put_header(store, {size, root_loc, dirt + 1})
-        %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: size, dirt: dirt + 1}
+
+        %Btree{
+          root: new_root,
+          root_loc: root_loc,
+          capacity: cap,
+          store: store,
+          size: size,
+          dirt: dirt + 1
+        }
 
       nil ->
         btree
@@ -146,19 +154,24 @@ defmodule CubDB.Btree do
     tree
   end
 
-  @spec key_range(Btree.t(), key | Btree.KeyRange.bound, key | Btree.KeyRange.bound(), boolean) :: Btree.KeyRange.t()
+  @spec key_range(Btree.t(), key | Btree.KeyRange.bound(), key | Btree.KeyRange.bound(), boolean) ::
+          Btree.KeyRange.t()
 
   def key_range(tree, min_key \\ nil, max_key \\ nil, reverse \\ false) do
-    min_key = case min_key do
-      {_, x} when x == :included or x == :excluded -> min_key
-      nil -> nil
-      _ -> {min_key, :included}
-    end
-    max_key = case max_key do
-      {_, x} when x == :included or x == :excluded -> max_key
-      nil -> nil
-      _ -> {max_key, :included}
-    end
+    min_key =
+      case min_key do
+        {_, x} when x == :included or x == :excluded -> min_key
+        nil -> nil
+        _ -> {min_key, :included}
+      end
+
+    max_key =
+      case max_key do
+        {_, x} when x == :included or x == :excluded -> max_key
+        nil -> nil
+        _ -> {max_key, :included}
+      end
+
     Btree.KeyRange.new(tree, min_key, max_key, reverse)
   end
 
@@ -188,7 +201,15 @@ defmodule CubDB.Btree do
       end
 
     Store.put_header(store, {s, root_loc, dirt + 1})
-    %Btree{root: new_root, root_loc: root_loc, capacity: cap, store: store, size: s, dirt: dirt + 1}
+
+    %Btree{
+      root: new_root,
+      root_loc: root_loc,
+      capacity: cap,
+      store: store,
+      size: s,
+      dirt: dirt + 1
+    }
   end
 
   defp load_node(store, key, node, [], _, _) do
