@@ -143,7 +143,7 @@ defmodule CubDB do
   @spec fetch(GenServer.server(), any) :: {:ok, any} | :error
 
   @doc """
-  Fetches the value for a key in the database, or return `:error` if the key is not present.
+  Fetches the value for the given `key` in the database, or return `:error` if `key` is not present.
 
   If the database contains an entry with the given `key` and value `value`, it
   returns `{:ok, value}`. If `key` is not found, it returns `:error`.
@@ -389,7 +389,7 @@ defmodule CubDB do
     {:noreply, state}
   end
 
-  def handle_call(:dirt_factor, from, state = %State{btree: btree}) do
+  def handle_call(:dirt_factor, _, state = %State{btree: btree}) do
     {:reply, Btree.dirt_factor(btree), state}
   end
 
