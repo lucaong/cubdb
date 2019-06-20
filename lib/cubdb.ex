@@ -89,6 +89,7 @@ defmodule CubDB do
 
   @db_file_extension ".cub"
   @compaction_file_extension ".compact"
+  @auto_compact_defaults {100, 0.25}
 
   @type key :: any
   @type value :: any
@@ -102,7 +103,8 @@ defmodule CubDB do
             compactor: pid | nil,
             clean_up: pid,
             clean_up_pending: boolean,
-            busy_files: %{required(binary) => pos_integer}
+            busy_files: %{required(binary) => pos_integer},
+            auto_compact: {pos_integer, pos_integer} | false
           }
 
     @enforce_keys [:btree, :data_dir, :clean_up]
@@ -111,7 +113,8 @@ defmodule CubDB do
               compactor: nil,
               clean_up: nil,
               clean_up_pending: false,
-              busy_files: %{}
+              busy_files: %{},
+              auto_compact: false
   end
 
   @spec start_link(binary, GenServer.options()) :: GenServer.on_start()
@@ -124,10 +127,16 @@ defmodule CubDB do
   can run per directory, so if you run several databases, they should each use
   their own separate data directory.
 
-  The `options` are passed to `GenServer.start_link/3`.
+  The optional `options` argument is a keywork list that specifies configuration
+  options. The valid options are:
+
+    - `auto_compact`: whether to perform auto-compaction. It defaults to false.
+    See `set_auto_compact/2` for the possible values
+
+  The `gen_server_options` are passed to `GenServer.start_link/3`.
   """
-  def start_link(data_dir, options \\ []) do
-    GenServer.start_link(__MODULE__, data_dir, options)
+  def start_link(data_dir, options \\ [], gen_server_options \\ []) do
+    GenServer.start_link(__MODULE__, [data_dir, options], gen_server_options)
   end
 
   @spec start(binary, GenServer.options()) :: GenServer.on_start()
@@ -137,8 +146,8 @@ defmodule CubDB do
 
   See `start_link/2` for more informations.
   """
-  def start(data_dir, options \\ []) do
-    GenServer.start(__MODULE__, data_dir, options)
+  def start(data_dir, options \\ [], gen_server_options \\ []) do
+    GenServer.start(__MODULE__, [data_dir, options], gen_server_options)
   end
 
   @spec get(GenServer.server(), key, value) :: value
@@ -340,6 +349,23 @@ defmodule CubDB do
     GenServer.call(db, :compact)
   end
 
+  @spec set_auto_compact(GenServer.server(), boolean | {integer, integer | float}) :: :ok | {:error, binary}
+
+  @doc """
+  Set whether to perform automatic compaction, and how.
+
+  If set to `false`, no automatic compaction is performed. If set to `true`,
+  auto-compaction is performed, following a write operation, if at least 100
+  write operations occurred after the last compaction, and the dirt factor is at
+  least 0.2. These values can be customized by setting the `auto_compact` option
+  to `{min_writes, min_dirt_factor}`.
+
+  It returns `:ok`, or `{:error, reason}` if `setting` is invalid.
+  """
+  def set_auto_compact(db, setting) do
+    GenServer.call(db, {:set_auto_compact, setting})
+  end
+
   @spec cubdb_file?(binary) :: boolean
 
   @doc false
@@ -365,12 +391,21 @@ defmodule CubDB do
   # OTP callbacks
 
   @doc false
-  def init(data_dir) do
+  def init([data_dir, options]) do
+    auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, false))
+
     case find_db_file(data_dir) do
       file_name when is_binary(file_name) or is_nil(file_name) ->
         store = Store.File.new(Path.join(data_dir, file_name || "0#{@db_file_extension}"))
         {:ok, clean_up} = CleanUp.start_link(data_dir)
-        {:ok, %State{btree: Btree.new(store), data_dir: data_dir, clean_up: clean_up}}
+
+        {:ok,
+         %State{
+           btree: Btree.new(store),
+           data_dir: data_dir,
+           clean_up: clean_up,
+           auto_compact: auto_compact
+         }}
 
       {:error, reason} ->
         {:stop, reason}
@@ -407,7 +442,7 @@ defmodule CubDB do
 
   def handle_call({:put, key, value}, _, state = %State{btree: btree}) do
     btree = Btree.insert(btree, key, value)
-    {:reply, :ok, %State{state | btree: btree}}
+    {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
 
   def handle_call({:delete, key}, _, state = %State{btree: btree, compactor: compactor}) do
@@ -417,26 +452,22 @@ defmodule CubDB do
         _ -> Btree.mark_deleted(btree, key)
       end
 
-    {:reply, :ok, %State{state | btree: btree}}
+    {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
 
   def handle_call(:compact, _, state) do
-    %State{btree: btree, data_dir: data_dir, clean_up: clean_up} = state
-
-    reply =
-      case can_compact?(state) do
-        true ->
-          {:ok, store} = new_compaction_store(data_dir)
-          CleanUp.clean_up_old_compaction_files(clean_up, store)
-          Compactor.start_link(self(), btree, store)
-
-        {false, reason} ->
-          {:error, reason}
-      end
+    reply = trigger_compaction(state)
 
     case reply do
       {:ok, compactor} -> {:reply, :ok, %State{state | compactor: compactor}}
       error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:set_auto_compact, setting}, _, state) do
+    case parse_auto_compact(setting) do
+      {:ok, setting} -> {:reply, :ok, %State{state | auto_compact: setting}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
 
@@ -485,6 +516,18 @@ defmodule CubDB do
       |> Enum.filter(&String.ends_with?(&1, @db_file_extension))
       |> Enum.sort()
       |> List.last()
+    end
+  end
+
+  defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
+    case can_compact?(state) do
+      true ->
+        {:ok, store} = new_compaction_store(data_dir)
+        CleanUp.clean_up_old_compaction_files(clean_up, store)
+        Compactor.start_link(self(), btree, store)
+
+      {false, reason} ->
+        {:error, reason}
     end
   end
 
@@ -557,5 +600,49 @@ defmodule CubDB do
 
   defp clean_up_when_possible(state) do
     %State{state | clean_up_pending: true}
+  end
+
+  defp maybe_auto_compact(state) do
+    if should_auto_compact?(state) do
+      case trigger_compaction(state) do
+        {:ok, compactor} -> %State{state | compactor: compactor}
+        {:error, _} -> state
+      end
+    else
+      state
+    end
+  end
+
+  defp should_auto_compact?(%State{auto_compact: false}), do: false
+
+  defp should_auto_compact?(%State{btree: btree, auto_compact: auto_compact}) do
+    {min_writes, min_dirt_factor} = auto_compact
+    %Btree{dirt: dirt} = btree
+    dirt_factor = Btree.dirt_factor(btree)
+    dirt >= min_writes and dirt_factor >= min_dirt_factor
+  end
+
+  defp parse_auto_compact(setting) do
+    case setting do
+      false ->
+        {:ok, false}
+
+      true ->
+        {:ok, @auto_compact_defaults}
+
+      {min_writes, min_dirt_factor} when is_integer(min_writes) and is_number(min_dirt_factor) ->
+        if min_writes >= 0 and min_dirt_factor >= 0 and min_dirt_factor <= 1,
+          do: {:ok, {min_writes, min_dirt_factor}},
+          else: {:error, "invalid auto compact setting"}
+
+      _ -> {:error, "invalid auto compact setting"}
+    end
+  end
+
+  defp parse_auto_compact!(setting) do
+    case parse_auto_compact(setting) do
+      {:ok, setting} -> setting
+      {:error, reason} -> raise(ArgumentError, message: reason)
+    end
   end
 end
