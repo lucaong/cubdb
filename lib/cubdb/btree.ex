@@ -11,8 +11,8 @@ defmodule CubDB.Btree do
   Record.defrecord(:branch, @branch, children: [])
   Record.defrecord(:value, @value, val: nil)
 
-  @type key :: any
-  @type val :: any
+  @type key :: CubDB.key()
+  @type val :: CubDB.value()
   @type btree_size :: non_neg_integer
   @type dirt :: non_neg_integer
   @type location :: non_neg_integer

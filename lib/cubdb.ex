@@ -81,6 +81,9 @@ defmodule CubDB do
   @db_file_extension ".cub"
   @compaction_file_extension ".compact"
 
+  @type key :: any
+  @type value :: any
+
   defmodule State do
     @moduledoc false
 
@@ -129,7 +132,7 @@ defmodule CubDB do
     GenServer.start(__MODULE__, data_dir, options)
   end
 
-  @spec get(GenServer.server(), any, any) :: any
+  @spec get(GenServer.server(), key, value) :: value
 
   @doc """
   Gets the value associated to `key` from the database.
@@ -141,7 +144,7 @@ defmodule CubDB do
     GenServer.call(db, {:get, key, default})
   end
 
-  @spec fetch(GenServer.server(), any) :: {:ok, any} | :error
+  @spec fetch(GenServer.server(), key) :: {:ok, value} | :error
 
   @doc """
   Fetches the value for the given `key` in the database, or return `:error` if `key` is not present.
@@ -153,7 +156,7 @@ defmodule CubDB do
     GenServer.call(db, {:fetch, key})
   end
 
-  @spec has_key?(GenServer.server(), any) :: boolean
+  @spec has_key?(GenServer.server(), key) :: boolean
 
   @doc """
   Returns whether an entry with the given `key` exists in the database.
@@ -289,7 +292,7 @@ defmodule CubDB do
     GenServer.call(db, :dirt_factor)
   end
 
-  @spec put(GenServer.server(), any, any) :: :ok
+  @spec put(GenServer.server(), key, value) :: :ok
 
   @doc """
   Writes an entry in the database, associating `key` to `value`.
@@ -300,7 +303,7 @@ defmodule CubDB do
     GenServer.call(db, {:put, key, value})
   end
 
-  @spec delete(GenServer.server(), any) :: :ok
+  @spec delete(GenServer.server(), key) :: :ok
 
   @doc """
   Deletes the entry associated to `key` from the database.
