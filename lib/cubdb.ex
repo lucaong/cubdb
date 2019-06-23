@@ -101,6 +101,7 @@ defmodule CubDB do
 
   @type key :: any
   @type value :: any
+  @type entry :: {key, value}
 
   defmodule State do
     @moduledoc false
@@ -340,6 +341,52 @@ defmodule CubDB do
     GenServer.call(db, {:delete, key})
   end
 
+  @spec update_multi(
+          GenServer.server(),
+          list(key),
+          (%{optional(key) => value} -> {list(entry) | nil, list(key) | nil}),
+          timeout
+        ) :: :ok | {:error, any}
+
+  @doc """
+  Updates or deletes multiple keys in an atomic transaction.
+
+  Gets all values associated with keys in `keys_to_get`, and passes them as a
+  map of `%{key -> value}` entries to `fun`. If a key is not found, it won't be
+  added to the map. Updates the database using the return value of `fun`.
+  Returns `:ok` in case of success, `{:error, reason}` otherwise.
+
+  The function `fun` should return a tuple of two elements: `{entries_to_put,
+  keys_to_delete}`, where `entries_to_put` is a list of `{key, value}` entries
+  that will be written to the database, and `keys_to_delete` is a list of keys
+  that will be deleted.
+
+  The operations are executed as an atomic transaction, so they will either all
+  succeed, or all fail. Note that `update_multi/4` blocks other write operations
+  until it completes.
+
+  ## Example
+
+  Assuming a database of names as keys, and integer balances as values, and we
+  want to transfer 10 units from `"Anna"` to `"Joy"`:
+
+      :ok = CubDB.update_multi(db, ["Anna", "Joy"], fn %{"Anna" => anna, "Joy" => joy} ->
+        if anna < 10, do: raise(RuntimeError, message: "Anna does not have enough balance")
+
+        {[{"Anna", anna - 10}, {"Joy", joy + 10}], nil}
+      end)
+
+  Or, if we want to transfer all of the balance from `"Anna"` to `"Joy"`,
+  deleting `"Anna"`'s entry:
+
+      :ok = CubDB.update_multi(db, ["Anna", "Joy"], fn %{"Anna" => anna, "Joy" => joy} ->
+        {[{"Joy", joy + anna}], ["Anna"]}
+      end)
+  """
+  def update_multi(db, keys_to_get, fun, timeout \\ 5000) do
+    GenServer.call(db, {:update_multi, keys_to_get, fun}, timeout)
+  end
+
   @spec compact(GenServer.server()) :: :ok | {:error, binary}
 
   @doc """
@@ -473,6 +520,32 @@ defmodule CubDB do
       end
 
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
+  end
+
+  def handle_call({:update_multi, keys_to_get, fun}, _, state = %State{btree: btree}) do
+    key_values =
+      Enum.reduce(keys_to_get, %{}, fn key, map ->
+        case Btree.has_key?(btree, key) do
+          {true, value} -> Map.put(map, key, value)
+          {false, _} -> map
+        end
+      end)
+
+    {entries_to_put, keys_to_delete} = fun.(key_values)
+
+    btree =
+      Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
+        Btree.insert(btree, key, value, false)
+      end)
+
+    btree =
+      Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
+        Btree.delete(btree, key, false)
+      end)
+
+    {:reply, :ok, %State{state | btree: Btree.commit(btree)}}
+  rescue
+    error -> {:reply, {:error, error}, state}
   end
 
   def handle_call(:compact, _, state) do
