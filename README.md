@@ -1,18 +1,23 @@
 # CubDB
 
-`CubDB` is a pure-Elixir embedded key-value database, designed for simplicity.
-It runs locally, and is backed by a single file.
+`CubDB` is an embedded key-value database written in the Elixir language. It
+runs locally, and is backed by a single file.
 
 Both keys and values can be any Elixir (or Erlang) term, so no serialization
 and de-serialization is necessary.
 
-The `CubDB` database file uses an immutable data structure that ensures
-robustness to data corruption: entries are never changed in-place, and writes
-are atomic.
+The `CubDB` database file uses an immutable data structure that provides several
+guarantees:
 
-Read operations are performed on immutable "snapshots", so they are always
-consistent, run concurrently, and do not block write operations, nor are blocked
-by them.
+  - Robustness to data corruption, as entries are never changed in-place
+
+  - Atomic writes: write operations either entirely succeed or entirely fail
+
+  - Read operations run concurrently, and do not block nor are blocked by writes
+
+  - Ranges of entries are selected on immutable snapshots, giving always a
+    consistent view, even while write operations are being performed
+
 
 ## Usage
 
@@ -86,3 +91,9 @@ def deps do
   [{:cubdb, "~> 0.2.0"}]
 end
 ```
+
+## Acknowledgement
+
+The file data structure used by `CubDB` is partly inspired by
+[CouchDB](http://couchdb.apache.org). A big thanks goes to the CouchDB
+maintainers for several articles on the web explaining its design.

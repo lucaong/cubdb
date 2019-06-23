@@ -1,16 +1,21 @@
 defmodule CubDB do
   @moduledoc """
-  `CubDB` is a pure-Elixir embedded key-value database, designed for simplicity.
-  It runs locally, and is backed by a single file.
+  `CubDB` is an embedded key-value database written in the Elixir language. It
+  runs locally, and is backed by a single file.
 
   Both keys and values can be any Elixir (or Erlang) term.
 
-  The `CubDB` database file uses an immutable data structure that ensures
-  robustness to data corruption: entries are never changed in-place, and writes
-  are atomic.
+  The `CubDB` database file uses an immutable data structure that provides several
+  guarantees:
 
-  Read operations are performed on immutable views, so they are always
-  consistent, run concurrently, and do not block write operations.
+    - Robustness to data corruption, as entries are never changed in-place
+
+    - Atomic writes: write operations either entirely succeed or entirely fail
+
+    - Read operations run concurrently, and do not block nor are blocked by writes
+
+    - Ranges of entries are selected on immutable snapshots, giving always a
+    consistent view, even while write operations are being done concurrently
 
   ## Usage
 
@@ -65,12 +70,15 @@ defmodule CubDB do
 
   As `CubDB` uses an immutable data structure, write operations cause the data
   file to grow. Occasionally, it is adviseable to run a compaction to optimize
-  the file size and reclaim disk space. Compaction is started manually by
+  the file size and reclaim disk space. Compaction can be started manually by
   calling `compact/1`, and runs in the background, without blocking other
   operations:
 
       CubDB.compact(db)
       #=> :ok
+
+  Alternatively, automatic compaction can be enabled, either passing an option
+  to `start_link/3`, or by calling `set_auto_compact/2`.
   """
 
   @doc """
@@ -344,6 +352,11 @@ defmodule CubDB do
   Only one compaction operation can run at any time, therefore if this function
   is called when a compaction is already running, it returns `{:error,
   :pending_compaction}`.
+
+  When compacting, `CubDB` will create a new data file, and eventually switch to
+  it and remove the old one as the compaction succeeds. For this reason, during
+  a compaction, there should be enough disk space for a second copy of the
+  database file.
   """
   def compact(db) do
     GenServer.call(db, :compact)
@@ -357,11 +370,17 @@ defmodule CubDB do
 
   If set to `false`, no automatic compaction is performed. If set to `true`,
   auto-compaction is performed, following a write operation, if at least 100
-  write operations occurred after the last compaction, and the dirt factor is at
+  write operations occurred since the last compaction, and the dirt factor is at
   least 0.2. These values can be customized by setting the `auto_compact` option
   to `{min_writes, min_dirt_factor}`.
 
   It returns `:ok`, or `{:error, reason}` if `setting` is invalid.
+
+  Compaction is done in the background and does not block other operations, but
+  can create disk contention, so it should not be performed too often. When
+  writing a lot into the database, such as when importing data from an external
+  source, it is adviseable to turn off auto compaction, and manually run
+  compaction at the end of the import.
   """
   def set_auto_compact(db, setting) do
     GenServer.call(db, {:set_auto_compact, setting})
