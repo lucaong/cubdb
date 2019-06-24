@@ -3,19 +3,23 @@ defmodule CubDB do
   `CubDB` is an embedded key-value database written in the Elixir language. It
   runs locally, and is backed by a single file.
 
-  Both keys and values can be any Elixir (or Erlang) term.
+  Both keys and values can be any arbitrary Elixir (or Erlang) term.
 
-  The `CubDB` database file uses an immutable data structure that provides several
-  guarantees:
+  The most relevant features offered by `CubDB` are:
 
-    - Robustness to data corruption, as entries are never changed in-place
+    - Simple `get/3`, `put/3`, and `delete/2` operations
 
-    - Atomic writes: write operations either entirely succeed or entirely fail
+    - Arbitrary selection of entries and transformation of the result with `select/3`
 
-    - Read operations run concurrently, and do not block nor are blocked by writes
+    - Atomic multiple updates with `get_and_update_multi/4`
 
-    - Ranges of entries are selected on immutable snapshots, giving always a
-    consistent view, even while write operations are being done concurrently
+    - Concurrent read operations, that do not block nor are blocked by writes
+
+  The `CubDB` database file uses an immutable data structure that guaratees
+  robustness to data corruption, as entries are never changed in-place. It also
+  makes read operations consistent, even while write operations are being
+  performed concurrently, as ranges of entries are selected on immutable
+  snapshots.
 
   ## Usage
 
@@ -341,50 +345,66 @@ defmodule CubDB do
     GenServer.call(db, {:delete, key})
   end
 
-  @spec update_multi(
+  @spec get_and_update_multi(
           GenServer.server(),
           list(key),
-          (%{optional(key) => value} -> {list(entry) | nil, list(key) | nil}),
+          (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, list(key) | nil}),
           timeout
-        ) :: :ok | {:error, any}
+        ) :: {:ok, any} | {:error, any}
 
   @doc """
-  Updates or deletes multiple keys in an atomic transaction.
+  Gets and updates or deletes multiple entries in an atomic transaction.
 
   Gets all values associated with keys in `keys_to_get`, and passes them as a
-  map of `%{key -> value}` entries to `fun`. If a key is not found, it won't be
-  added to the map. Updates the database using the return value of `fun`.
-  Returns `:ok` in case of success, `{:error, reason}` otherwise.
+  map of `%{key => value}` entries to `fun`. If a key is not found, it won't be
+  added to the map passed to `fun`. Updates the database and returns a result
+  according to the return value of `fun`. Returns {`:ok`, return_value} in case
+  of success, `{:error, reason}` otherwise.
 
-  The function `fun` should return a tuple of two elements: `{entries_to_put,
-  keys_to_delete}`, where `entries_to_put` is a list of `{key, value}` entries
-  that will be written to the database, and `keys_to_delete` is a list of keys
-  that will be deleted.
+  The function `fun` should return a tuple of three elements: `{return_value,
+  entries_to_put, keys_to_delete}`, where `return_value` is an arbitrary value
+  to be returned, `entries_to_put` is a map of `%{key => value}` entries to be
+  written to the database, and `keys_to_delete` is a list of keys to be deleted.
 
-  The operations are executed as an atomic transaction, so they will either all
-  succeed, or all fail. Note that `update_multi/4` blocks other write operations
-  until it completes.
+  The optional `timeout` argument specifies a timeout in milliseconds, which is
+  `5000` (5 seconds) by default.
+
+  The read and write operations are executed as an atomic transaction, so they
+  will either all succeed, or all fail. Note that `get_and_update_multi/4`
+  blocks other write operations until it completes.
 
   ## Example
 
-  Assuming a database of names as keys, and integer balances as values, and we
-  want to transfer 10 units from `"Anna"` to `"Joy"`:
+  Assuming a database of names as keys, and integer monetary balances as values,
+  and we want to transfer 10 units from `"Anna"` to `"Joy"`, returning their
+  updated balance:
 
-      :ok = CubDB.update_multi(db, ["Anna", "Joy"], fn %{"Anna" => anna, "Joy" => joy} ->
-        if anna < 10, do: raise(RuntimeError, message: "Anna does not have enough balance")
+      {:ok, {anna, joy}} = CubDB.get_and_update_multi(db, ["Anna", "Joy"], fn entries ->
+        anna = Map.get(entries, "Anna", 0)
+        joy = Map.get(entries, "Joy", 0)
 
-        {[{"Anna", anna - 10}, {"Joy", joy + 10}], nil}
+        if anna < 10, do: raise(RuntimeError, message: "Anna's balance is too low")
+
+        anna = anna - 10
+        joy = joy + 10
+
+        {{anna, joy}, %{"Anna" => anna, "Joy" => joy}, []}
       end)
 
   Or, if we want to transfer all of the balance from `"Anna"` to `"Joy"`,
-  deleting `"Anna"`'s entry:
+  deleting `"Anna"`'s entry, and returning `"Joy"`'s resulting balance:
 
-      :ok = CubDB.update_multi(db, ["Anna", "Joy"], fn %{"Anna" => anna, "Joy" => joy} ->
-        {[{"Joy", joy + anna}], ["Anna"]}
+      {:ok, joy} = CubDB.get_and_update_multi(db, ["Anna", "Joy"], fn entries ->
+        anna = Map.get(entries, "Anna", 0)
+        joy = Map.get(entries, "Joy", 0)
+
+        joy = joy + anna
+
+        {joy, %{"Joy" => joy}, ["Anna"]}
       end)
   """
-  def update_multi(db, keys_to_get, fun, timeout \\ 5000) do
-    GenServer.call(db, {:update_multi, keys_to_get, fun}, timeout)
+  def get_and_update_multi(db, keys_to_get, fun, timeout \\ 5000) do
+    GenServer.call(db, {:get_and_update_multi, keys_to_get, fun}, timeout)
   end
 
   @spec compact(GenServer.server()) :: :ok | {:error, binary}
@@ -522,7 +542,7 @@ defmodule CubDB do
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
 
-  def handle_call({:update_multi, keys_to_get, fun}, _, state = %State{btree: btree}) do
+  def handle_call({:get_and_update_multi, keys_to_get, fun}, _, state = %State{btree: btree}) do
     key_values =
       Enum.reduce(keys_to_get, %{}, fn key, map ->
         case Btree.has_key?(btree, key) do
@@ -531,7 +551,7 @@ defmodule CubDB do
         end
       end)
 
-    {entries_to_put, keys_to_delete} = fun.(key_values)
+    {result, entries_to_put, keys_to_delete} = fun.(key_values)
 
     btree =
       Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
@@ -543,7 +563,9 @@ defmodule CubDB do
         Btree.delete(btree, key, false)
       end)
 
-    {:reply, :ok, %State{state | btree: Btree.commit(btree)}}
+    state = %State{state | btree: Btree.commit(btree)}
+
+    {:reply, {:ok, result}, maybe_auto_compact(state)}
   rescue
     error -> {:reply, {:error, error}, state}
   end
