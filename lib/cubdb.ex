@@ -359,14 +359,17 @@ defmodule CubDB do
   The return value is `:ok`, or `{:error, reason}` in case an error occurs.
   """
   def update(db, key, initial, fun) do
-    with {:ok, nil} <- get_and_update_multi(db, [key], fn entries ->
-      case Map.fetch(entries, key) do
-        :error ->
-          {nil, %{key => initial}, []}
-        {:ok, value} ->
-          {nil, %{key => fun.(value)}, []}
-      end
-    end), do: :ok
+    with {:ok, nil} <-
+           get_and_update_multi(db, [key], fn entries ->
+             case Map.fetch(entries, key) do
+               :error ->
+                 {nil, %{key => initial}, []}
+
+               {:ok, value} ->
+                 {nil, %{key => fun.(value)}, []}
+             end
+           end),
+         do: :ok
   end
 
   @spec get_and_update(GenServer.server(), key, (value -> {any, value} | :pop)) :: {:ok, any}
@@ -382,13 +385,16 @@ defmodule CubDB do
   The return value is `{:ok, result}`, or `{:error, reason}` in case an error occurs.
   """
   def get_and_update(db, key, fun) do
-    with {:ok, result} <- get_and_update_multi(db, [key], fn entries ->
-      value = Map.get(entries, key, nil)
-      case fun.(value) do
-        {result, new_value} -> {result, %{key => new_value}, []}
-        :pop -> {value, %{}, [key]}
-      end
-    end), do: {:ok, result}
+    with {:ok, result} <-
+           get_and_update_multi(db, [key], fn entries ->
+             value = Map.get(entries, key, nil)
+
+             case fun.(value) do
+               {result, new_value} -> {result, %{key => new_value}, []}
+               :pop -> {value, %{}, [key]}
+             end
+           end),
+         do: {:ok, result}
   end
 
   @spec get_and_update_multi(
@@ -644,19 +650,19 @@ defmodule CubDB do
     {:reply, :ok, %State{state | subs: [pid | subs]}}
   end
 
-  def handle_info({:compaction_completed, original_btree, compacted_btree}, state = %State{subs: subs}) do
-    for pid <- subs, do: send(pid, :compaction_completed)
+  def handle_info({:compaction_completed, original_btree, compacted_btree}, state) do
+    for pid <- state.subs, do: send(pid, :compaction_completed)
     send(self(), {:catch_up, compacted_btree, original_btree})
     {:noreply, state}
   end
 
   def handle_info({:catch_up, compacted_btree, original_btree}, state) do
-    %State{btree: latest_btree, subs: subs} = state
+    %State{btree: latest_btree} = state
 
     if latest_btree == original_btree do
       compacted_btree = finalize_compaction(compacted_btree)
       state = %State{state | btree: compacted_btree, compactor: nil}
-      for pid <- subs, do: send(pid, :catch_up_completed)
+      for pid <- state.subs, do: send(pid, :catch_up_completed)
       {:noreply, trigger_clean_up(state)}
     else
       CatchUp.start_link(self(), compacted_btree, original_btree, latest_btree)
@@ -690,10 +696,10 @@ defmodule CubDB do
     end
   end
 
-  defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up, subs: subs}) do
+  defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
     case can_compact?(state) do
       true ->
-        for pid <- subs, do: send(pid, :compaction_started)
+        for pid <- state.subs, do: send(pid, :compaction_started)
         {:ok, store} = new_compaction_store(data_dir)
         CleanUp.clean_up_old_compaction_files(clean_up, store)
         Compactor.start_link(self(), btree, store)
