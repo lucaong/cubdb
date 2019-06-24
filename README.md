@@ -1,7 +1,7 @@
 # CubDB
 
 `CubDB` is an embedded key-value database written in the Elixir language. It
-runs locally, and is backed by a single file.
+runs locally, is schema-less, and is backed by a single file.
 
 Both keys and values can be any arbitrary Elixir (or Erlang) term.
 
@@ -97,6 +97,6 @@ end
 
 ## Acknowledgement
 
-The file data structure used by `CubDB` is partly inspired by
+The file data structure used by `CubDB` is inspired by
 [CouchDB](http://couchdb.apache.org). A big thanks goes to the CouchDB
-maintainers for several articles on the web explaining its design.
+maintainers for the readable codebase and extensive documentation.

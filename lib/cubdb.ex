@@ -1,7 +1,7 @@
 defmodule CubDB do
   @moduledoc """
   `CubDB` is an embedded key-value database written in the Elixir language. It
-  runs locally, and is backed by a single file.
+  runs locally, is schema-less, and is backed by a single file.
 
   Both keys and values can be any arbitrary Elixir (or Erlang) term.
 
