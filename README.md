@@ -1,5 +1,7 @@
 # CubDB
 
+[![Build Status](https://travis-ci.org/lucaong/cubdb.svg?branch=master)](https://travis-ci.org/lucaong/cubdb)
+
 `CubDB` is an embedded key-value database written in the Elixir language. It
 runs locally, is schema-less, and is backed by a single file.
 
