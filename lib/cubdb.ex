@@ -470,6 +470,9 @@ defmodule CubDB do
   it and remove the old one as the compaction succeeds. For this reason, during
   a compaction, there should be enough disk space for a second copy of the
   database file.
+
+  Compaction can create disk contention, so it should not be performed
+  unnecessarily often.
   """
   def compact(db) do
     GenServer.call(db, :compact)
@@ -489,11 +492,11 @@ defmodule CubDB do
 
   It returns `:ok`, or `{:error, reason}` if `setting` is invalid.
 
-  Compaction is done in the background and does not block other operations, but
-  can create disk contention, so it should not be performed too often. When
-  writing a lot into the database, such as when importing data from an external
-  source, it is adviseable to turn off auto compaction, and manually run
-  compaction at the end of the import.
+  Compaction is performed in the background and does not block other operations,
+  but can create disk contention, so it should not be performed unnecessarily
+  often. When writing a lot into the database, such as when importing data from
+  an external source, it is adviseable to turn off auto compaction, and manually
+  run compaction at the end of the import.
   """
   def set_auto_compact(db, setting) do
     GenServer.call(db, {:set_auto_compact, setting})
