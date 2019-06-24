@@ -67,12 +67,7 @@ defmodule CubDBTest do
   test "get_and_update_multi/4, get_and_update/3 and update/3 work as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    entries = [
-      {:a, 1},
-      {:b, 2},
-      {:c, 3},
-      {:d, 4}
-    ]
+    entries = [a: 1, b: 2, c: 3, d: 4]
 
     for {key, value} <- entries, do: CubDB.put(db, key, value)
 
