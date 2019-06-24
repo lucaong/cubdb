@@ -117,7 +117,8 @@ defmodule CubDB do
             clean_up: pid,
             clean_up_pending: boolean,
             busy_files: %{required(binary) => pos_integer},
-            auto_compact: {pos_integer, pos_integer} | false
+            auto_compact: {pos_integer, pos_integer} | false,
+            subs: list(pid)
           }
 
     @enforce_keys [:btree, :data_dir, :clean_up]
@@ -127,7 +128,8 @@ defmodule CubDB do
               clean_up: nil,
               clean_up_pending: false,
               busy_files: %{},
-              auto_compact: false
+              auto_compact: false,
+              subs: []
   end
 
   @spec start_link(binary, Keyword.t(), GenServer.options()) :: GenServer.on_start()
@@ -345,6 +347,50 @@ defmodule CubDB do
     GenServer.call(db, {:delete, key})
   end
 
+  @spec update(GenServer.server(), key, value, (value -> value)) :: :ok
+
+  @doc """
+  Updates the entry corresponding to `key` using the given function.
+
+  If `key` is present in the database, `fun` is invoked with the corresponding
+  `value`, and the result is set as the new value of `key`. If `key` is not
+  found, `initial` is inserted as the value of `key`.
+
+  The return value is `:ok`, or `{:error, reason}` in case an error occurs.
+  """
+  def update(db, key, initial, fun) do
+    with {:ok, nil} <- get_and_update_multi(db, [key], fn entries ->
+      case Map.fetch(entries, key) do
+        :error ->
+          {nil, %{key => initial}, []}
+        {:ok, value} ->
+          {nil, %{key => fun.(value)}, []}
+      end
+    end), do: :ok
+  end
+
+  @spec get_and_update(GenServer.server(), key, (value -> {any, value} | :pop)) :: {:ok, any}
+
+  @doc """
+  Gets the value corresponding to `key` and updates it, in one atomic transaction.
+
+  `fun` is called with the current value associated to `key` (or `nil` if not
+  present), and must return a two element tuple: the result value to be
+  returned, and the new value to be associated to `key`. `fun` mayalso return
+  `:pop`, in which case the current value is deleted and returned.
+
+  The return value is `{:ok, result}`, or `{:error, reason}` in case an error occurs.
+  """
+  def get_and_update(db, key, fun) do
+    with {:ok, result} <- get_and_update_multi(db, [key], fn entries ->
+      value = Map.get(entries, key, nil)
+      case fun.(value) do
+        {result, new_value} -> {result, %{key => new_value}, []}
+        :pop -> {value, %{}, [key]}
+      end
+    end), do: {:ok, result}
+  end
+
   @spec get_and_update_multi(
           GenServer.server(),
           list(key),
@@ -475,6 +521,11 @@ defmodule CubDB do
     Path.extname(file_name) == @compaction_file_extension
   end
 
+  @doc false
+  def subscribe(db) do
+    GenServer.call(db, {:subscribe, self()})
+  end
+
   # OTP callbacks
 
   @doc false
@@ -586,26 +637,28 @@ defmodule CubDB do
     end
   end
 
-  def handle_info({:compaction_completed, original_btree, compacted_btree}, state) do
+  def handle_call({:subscribe, pid}, _, state = %State{subs: subs}) do
+    {:reply, :ok, %State{state | subs: [pid | subs]}}
+  end
+
+  def handle_info({:compaction_completed, original_btree, compacted_btree}, state = %State{subs: subs}) do
+    for pid <- subs, do: send(pid, :compaction_completed)
     send(self(), {:catch_up, compacted_btree, original_btree})
     {:noreply, state}
   end
 
   def handle_info({:catch_up, compacted_btree, original_btree}, state) do
-    %State{btree: latest_btree} = state
+    %State{btree: latest_btree, subs: subs} = state
 
     if latest_btree == original_btree do
       compacted_btree = finalize_compaction(compacted_btree)
       state = %State{state | btree: compacted_btree, compactor: nil}
+      for pid <- subs, do: send(pid, :catch_up_completed)
       {:noreply, trigger_clean_up(state)}
     else
       CatchUp.start_link(self(), compacted_btree, original_btree, latest_btree)
       {:noreply, state}
     end
-  end
-
-  def handle_info(:clean_up_completed, state) do
-    {:noreply, %State{state | clean_up: nil}}
   end
 
   def handle_info({:check_out_reader, btree}, state = %State{clean_up_pending: clean_up_pending}) do
@@ -634,9 +687,10 @@ defmodule CubDB do
     end
   end
 
-  defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
+  defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up, subs: subs}) do
     case can_compact?(state) do
       true ->
+        for pid <- subs, do: send(pid, :compaction_started)
         {:ok, store} = new_compaction_store(data_dir)
         CleanUp.clean_up_old_compaction_files(clean_up, store)
         Compactor.start_link(self(), btree, store)

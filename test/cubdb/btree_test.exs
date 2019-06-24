@@ -1,5 +1,5 @@
 defmodule CubDB.BtreeTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias CubDB.Store
   alias Store.Utils

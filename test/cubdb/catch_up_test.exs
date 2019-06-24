@@ -1,5 +1,5 @@
 defmodule CubDB.Store.CatchUpTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias CubDB.Btree
   alias CubDB.Store
