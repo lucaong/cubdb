@@ -28,7 +28,7 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
     end)
   end
 
-  def commit(%TestStore{}), do: :ok
+  def sync(%TestStore{}), do: :ok
 
   def get_node(%TestStore{agent: agent}, location) do
     Agent.get(agent, fn {map, _} ->

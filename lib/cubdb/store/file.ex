@@ -56,7 +56,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end)
   end
 
-  def commit(%Store.File{pid: pid}) do
+  def sync(%Store.File{pid: pid}) do
     Agent.get(pid, fn {file, _} ->
       :file.sync(file)
     end)

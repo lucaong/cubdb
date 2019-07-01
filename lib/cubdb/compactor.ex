@@ -16,6 +16,7 @@ defmodule CubDB.Compactor do
 
   def run(caller, btree, store) do
     compacted_btree = Btree.load(btree, store)
+    Btree.sync(compacted_btree)
     send(caller, {:compaction_completed, btree, compacted_btree})
   end
 end

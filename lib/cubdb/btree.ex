@@ -182,6 +182,13 @@ defmodule CubDB.Btree do
     dirt / (1 + size + dirt)
   end
 
+  @spec sync(Btree.t()) :: Btree.t()
+
+  def sync(btree = %Btree{store: store}) do
+    :ok = Store.sync(store)
+    btree
+  end
+
   def __leaf__, do: @leaf
   def __branch__, do: @branch
   def __value__, do: @value

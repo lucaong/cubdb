@@ -9,8 +9,8 @@ defprotocol CubDB.Store do
   @spec put_header(t, Btree.btree_header()) :: Btree.location()
   def put_header(store, header)
 
-  @spec commit(t) :: :ok | {:error, String.t()}
-  def commit(store)
+  @spec sync(t) :: :ok | {:error, String.t()}
+  def sync(store)
 
   @spec get_node(t, Btree.location()) :: Btree.btree_node() | {:error, String.t()}
   def get_node(store, location)

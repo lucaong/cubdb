@@ -40,7 +40,7 @@ defmodule CubDB.StoreExamples do
         assert CubDB.Store.blank?(store) == true
         CubDB.Store.put_node(store, {@value, 1})
         CubDB.Store.put_header(store, {0, 0})
-        CubDB.Store.commit(store)
+        CubDB.Store.sync(store)
         assert CubDB.Store.blank?(store) == false
       end
     end
