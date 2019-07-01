@@ -602,7 +602,9 @@ defmodule CubDB do
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
 
-  def handle_call({:get_and_update_multi, keys_to_get, fun}, _, state = %State{btree: btree}) do
+  def handle_call({:get_and_update_multi, keys_to_get, fun}, _, state) do
+    %State{btree: btree, compactor: compactor} = state
+
     key_values =
       Enum.reduce(keys_to_get, %{}, fn key, map ->
         case Btree.has_key?(btree, key) do
@@ -620,7 +622,10 @@ defmodule CubDB do
 
     btree =
       Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
-        Btree.delete(btree, key, false)
+        case compactor do
+          nil -> Btree.delete(btree, key)
+          _ -> Btree.mark_deleted(btree, key)
+        end
       end)
 
     state = %State{state | btree: Btree.commit(btree)}
