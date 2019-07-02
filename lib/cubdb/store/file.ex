@@ -158,7 +158,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   end
 
   defp serialize(node) do
-    node_bytes = :erlang.term_to_binary(node)
+    node_bytes = :erlang.term_to_binary(node, [:compressed])
     size = byte_size(node_bytes)
     <<size::32>> <> node_bytes
   end
