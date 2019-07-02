@@ -11,4 +11,17 @@ defmodule CubDB.Store.FileTest do
 
     {:ok, store: store}
   end
+
+  test "skips corrupted header and locates latest good header", %{store: store} do
+    good_header = {1, 2, 3}
+    CubDB.Store.put_header(store, good_header)
+
+    CubDB.Store.put_header(store, {0, 0, 0})
+
+    with {:ok, file} <- :file.open(store.file_path, [:read, :write, :raw, :binary]),
+         {:ok, pos} <- :file.position(file, :eof),
+         :ok <- :file.pwrite(file, pos - 10, "garbage") do
+      assert {_, ^good_header} = CubDB.Store.get_latest_header(store)
+    end
+  end
 end

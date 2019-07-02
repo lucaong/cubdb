@@ -15,8 +15,10 @@ defmodule CubDB.StoreExamples do
         end)
       end
 
-      test "get_node/2 returns error if no node is found at given location", %{store: store} do
-        assert {:error, _} = CubDB.Store.get_node(store, 42)
+      test "get_node/2 raises an error if no node is found at given location", %{store: store} do
+        assert_raise ArgumentError, fn ->
+          CubDB.Store.get_node(store, 42)
+        end
       end
 
       test "put_header/2 sets a header", %{store: store} do

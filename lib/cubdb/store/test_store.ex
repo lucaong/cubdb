@@ -31,9 +31,12 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
   def sync(%TestStore{}), do: :ok
 
   def get_node(%TestStore{agent: agent}, location) do
-    Agent.get(agent, fn {map, _} ->
-      Map.get(map, location, {:error, "No node found at location #{location}"})
-    end)
+    case Agent.get(agent, fn {map, _} ->
+      Map.fetch(map, location)
+    end) do
+      {:ok, value} -> value
+      :error -> raise(ArgumentError, message: "End of file")
+    end
   end
 
   def get_latest_header(%TestStore{agent: agent}) do

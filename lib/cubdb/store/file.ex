@@ -63,17 +63,17 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   end
 
   def get_node(%Store.File{pid: pid}, location) do
-    Agent.get(pid, fn {file, _} ->
+    case Agent.get(pid, fn {file, _} ->
       read_term(file, location)
-    end)
+    end) do
+      {:ok, term} -> term
+      {:error, error} -> raise(error)
+    end
   end
 
   def get_latest_header(%Store.File{pid: pid}) do
     Agent.get(pid, fn {file, pos} ->
-      case locate_latest_header(file, pos) do
-        nil -> nil
-        location -> {location, read_term(file, location)}
-      end
+      get_latest_good_header(file, pos)
     end)
   end
 
@@ -97,10 +97,12 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   defp read_term(file, location) do
     with {:ok, <<length::32>>, len} <- read_blocks(file, location, 4),
          {:ok, bytes, _} <- read_blocks(file, location + len, length) do
-      deserialize(bytes)
+      {:ok, deserialize(bytes)}
     else
-      :eof -> {:error, "End of file"}
+      :eof -> {:error, %ArgumentError{message: "End of file"}}
     end
+  rescue
+    error -> {:error, error}
   end
 
   defp read_blocks(file, location, length) do
@@ -127,7 +129,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end
   end
 
-  defp locate_latest_header(_, location) when location == 0, do: nil
+  defp locate_latest_header(_, location) when location <= 0, do: nil
 
   defp locate_latest_header(file, location) do
     loc = Blocks.latest_possible_header(location)
@@ -138,6 +140,20 @@ defimpl CubDB.Store, for: CubDB.Store.File do
       else
         locate_latest_header(file, loc)
       end
+    end
+  end
+
+  defp get_latest_good_header(file, pos) do
+    case locate_latest_header(file, pos) do
+      nil -> nil
+      location -> read_header(file, location)
+    end
+  end
+
+  defp read_header(file, location) do
+    case read_term(file, location) do
+      {:ok, term} -> {location, term}
+      {:error, _} -> get_latest_good_header(file, location - 1)
     end
   end
 
