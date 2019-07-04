@@ -47,7 +47,7 @@ defmodule CubDB.Mixfile do
   defp package() do
     [
       description: "A pure-Elixir embedded key-value database",
-      files: ["lib", "LICENSE", "mix.exs", "README.md"],
+      files: ["lib", "LICENSE", "mix.exs"],
       maintainers: ["Luca Ongaro"],
       licenses: ["Apache-2.0"],
       links: %{}
