@@ -9,7 +9,7 @@ defmodule CubDB do
 
     - Simple `get/3`, `put/3`, and `delete/2` operations
 
-    - Arbitrary selection of entries and transformation with `select/3`
+    - Arbitrary selection and transformation of ranges of entries with `select/3`
 
     - Atomic transactions with `get_and_update_multi/4`
 
@@ -227,19 +227,19 @@ defmodule CubDB do
   default, the range is inclusive, so all entries that have a key greater or
   equal than `min_key` and less or equal then `max_key` are selected:
 
-      # Select all entries where `"a" <= key <= "d"`
+      # Select all entries where "a" <= key <= "d"
       CubDB.select(db, min_key: "b", max_key: "d")
 
   The range boundaries can be excluded by setting `min_key` or `max_key` to
   `{key, :excluded}`:
 
-      # Select all entries where `"a" <= key < "d"`
+      # Select all entries where "a" <= key < "d"
       CubDB.select(db, min_key: "b", max_key: {"d", :excluded})
 
   Any of `:min_key` and `:max_key` can be omitted or set to `nil`, to leave the
   range open-ended.
 
-      # Select entries where `key <= "a"
+      # Select entries where key <= "a"
       CubDB.select(db, max_key: "a")
 
       # Or, equivalently:
@@ -247,7 +247,7 @@ defmodule CubDB do
 
   In case the key boundary is the literal value `nil`, the longer form must be used:
 
-      # Select entries where `nil <= key <= "a"`
+      # Select entries where nil <= key <= "a"
       CubDB.select(db, min_key: {nil, :included}, max_key: "a")
 
   The `reverse` option, when set to true, causes the entries to be selected and

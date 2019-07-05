@@ -14,7 +14,7 @@ Head to the [API reference](https://hexdocs.pm/cubdb/CubDB.html) for usage detai
 
   - Simple `get`, `put`, and `delete` operations
 
-  - Arbitrary selection and transformation of entries with `select`
+  - Arbitrary selection and transformation of ranges of entries with `select/3`
 
   - Atomic transactions with `get_and_update_multi`
 
