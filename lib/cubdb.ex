@@ -472,6 +472,56 @@ defmodule CubDB do
     GenServer.call(db, {:get_and_update_multi, keys_to_get, fun}, timeout)
   end
 
+  @spec get_multi(GenServer.server(), [key], value) :: [value]
+
+  @doc """
+  Gets multiple entries corresponding by the given keys all at once, atomically.
+
+  The keys to get are passed as a list. The result is a list of values
+  corresponding to the given keys, or `default` for keys that are not present in
+  the database.
+  """
+  def get_multi(db, keys, default \\ nil) do
+    fun = fn entries ->
+      values = keys |> Enum.map(fn key -> Map.get(entries, key, default) end)
+      {values, %{}, []}
+    end
+    {:ok, result} = GenServer.call(db, {:get_and_update_multi, keys, fun})
+    result
+  end
+
+  @spec put_multi(GenServer.server(), %{key => value} | [entry]) :: :ok
+
+  @doc """
+  Writes multiple entries all at once, atomically.
+
+  Entries are passed as a map of `%{key => value}` or a list of `{key, value}`.
+  """
+  def put_multi(db, entries) when not is_map(entries), do: put_multi(db, entries |> Enum.into(%{}))
+
+  def put_multi(db, entries) do
+    fun = fn _ ->
+      {:ok, entries, []}
+    end
+    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun})
+    result
+  end
+
+  @spec delete_multi(GenServer.server(), [key]) :: :ok
+
+  @doc """
+  Deletes multiple entries corresponding to the given keys all at once, atomically.
+
+  The `keys` to be deleted are passed as a list.
+  """
+  def delete_multi(db, keys) do
+    fun = fn _ ->
+      {:ok, %{}, keys}
+    end
+    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun})
+    result
+  end
+
   @spec compact(GenServer.server()) :: :ok | {:error, binary}
 
   @doc """
