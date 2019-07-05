@@ -11,11 +11,11 @@ defmodule CubDB do
 
     - Arbitrary selection of entries and transformation with `select/3`
 
-    - Atomic multiple updates with `get_and_update_multi/4`
+    - Atomic transactions with `get_and_update_multi/4`
 
     - Concurrent read operations, that do not block nor are blocked by writes
 
-    - Sudden shtdowns won't corrupt the database or break atomicity
+    - Unexpected shutdowns won't corrupt the database or break atomicity
 
     - Manual or automatic compaction to optimize space usage
 

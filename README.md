@@ -16,11 +16,11 @@ Head to the [API reference](https://hexdocs.pm/cubdb/CubDB.html) for usage detai
 
   - Arbitrary selection and transformation of entries with `select`
 
-  - Atomic multiple updates with `get_and_update_multi`
+  - Atomic transactions with `get_and_update_multi`
 
   - Concurrent read operations, that do not block nor are blocked by writes
 
-  - Sudden shtdowns won't corrupt the database or break atomicity
+  - Unexpected shutdowns won't corrupt the database or break atomicity
 
   - Manual or automatic compaction to optimize space usage
 
