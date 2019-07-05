@@ -3,22 +3,25 @@ defmodule CubDB do
   `CubDB` is an embedded key-value database written in the Elixir language. It
   runs locally, it is schema-less, and backed by a single file.
 
-  Both keys and values can be any arbitrary Elixir (or Erlang) term.
+  ## Fetaures
 
-  The most relevant features offered by `CubDB` are:
+    - Both keys and values can be any arbitrary Elixir (or Erlang) term.
 
     - Simple `get/3`, `put/3`, and `delete/2` operations
 
-    - Arbitrary selection of entries and transformation of the result with `select/3`
+    - Arbitrary selection of entries and transformation with `select/3`
 
     - Atomic multiple updates with `get_and_update_multi/4`
 
     - Concurrent read operations, that do not block nor are blocked by writes
 
-  The `CubDB` database file uses an immutable data structure that guaratees
-  robustness to data corruption, as entries are never changed in-place. It also
-  makes read operations consistent, even while write operations are being
-  performed concurrently, as ranges of entries are selected on immutable
+    - Sudden shtdowns won't corrupt the database or break atomicity
+
+    - Manual or automatic compaction to optimize space usage
+
+  To ensure consistency, performance, and robustness to data corruption, `CubDB`
+  database file uses an append-only, immutable B-tree data structure. Entries
+  are never changed in-place, and read operations are performend on immutable
   snapshots.
 
   ## Usage
@@ -27,6 +30,10 @@ defmodule CubDB do
   it will be created):
 
       {:ok, db} = CubDB.start_link("my/data/directory")
+
+  `CubDB` functions can be called concurrently from different processes, but it
+  is important that only one `CubDB` process is started on the same data
+  directory.
 
   The `get/2`, `put/3`, and `delete/2` functions work as you probably expect:
 
@@ -58,25 +65,31 @@ defmodule CubDB do
 
       # Take the sum of the last 3 even values:
       CubDB.select(db,
+        # select entries in reverse order
         reverse: true,
+
+        # apply a pipeline of operations to the entries
         pipe: [
-          map: fn {_key, value} ->
-            value
-          end,
-          filter: fn value ->
-            is_integer(value) && Integer.is_even(value)
-          end,
+          # map each entry discarding the key and keeping only the value
+          map: fn {_key, value} -> value end,
+
+          # filter only even integers
+          filter: fn value -> is_integer(value) && Integer.is_even(value) end,
+
+          # take the first 3 values
           take: 3
         ],
+
+        # reduce the result to a sum
         reduce: fn n, sum -> sum + n end
       )
       #=> {:ok, 18}
 
-  As `CubDB` uses an immutable data structure, write operations cause the data
-  file to grow. Occasionally, it is adviseable to run a compaction to optimize
-  the file size and reclaim disk space. Compaction can be started manually by
-  calling `compact/1`, and runs in the background, without blocking other
-  operations:
+  Because `CubDB` uses an immutable data structure, write operations cause the
+  data file to grow. Occasionally, it is adviseable to run a compaction to
+  optimize the file size and reclaim disk space. Compaction can be started
+  manually by calling `compact/1`, and runs in the background, without blocking
+  other operations:
 
       CubDB.compact(db)
       #=> :ok

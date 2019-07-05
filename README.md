@@ -5,22 +5,28 @@
 `CubDB` is an embedded key-value database written in the Elixir language. It
 runs locally, it is schema-less, and backed by a single file.
 
-Both keys and values can be any arbitrary Elixir (or Erlang) term.
+Head to the [API reference](https://hexdocs.pm/cubdb/CubDB.html) for usage details.
 
-The most relevant features offered by `CubDB` are:
+
+## Features
+
+  - Both keys and values can be any arbitrary Elixir (or Erlang) term.
 
   - Simple `get`, `put`, and `delete` operations
 
-  - Arbitrary selection of entries and transformation of the result with `select`
+  - Arbitrary selection and transformation of entries with `select`
 
   - Atomic multiple updates with `get_and_update_multi`
 
   - Concurrent read operations, that do not block nor are blocked by writes
 
-The `CubDB` database file uses an immutable data structure that guaratees
-robustness to data corruption, as entries are never changed in-place. It also
-makes read operations consistent, even while write operations are being
-performed concurrently, as ranges of entries are selected on immutable
+  - Sudden shtdowns won't corrupt the database or break atomicity
+
+  - Manual or automatic compaction to optimize space usage
+
+To ensure consistency, performance, and robustness to data corruption, `CubDB`
+database file uses an append-only, immutable B-tree data structure. Entries are
+never changed in-place, and read operations are performend on immutable
 snapshots.
 
 
@@ -67,18 +73,23 @@ using an arbitrary function:
 
 ```elixir
 # Take the sum of the last 3 even values:
-
 CubDB.select(db,
+  # select entries in reverse order
   reverse: true,
+
+  # apply a pipeline of operations to the entries
   pipe: [
-    map: fn {_key, value} ->
-      value
-    end,
-    filter: fn value ->
-      is_integer(value) && Integer.is_even(value)
-    end,
+    # map each entry discarding the key and keeping only the value
+    map: fn {_key, value} -> value end,
+
+    # filter only even integers
+    filter: fn value -> is_integer(value) && Integer.is_even(value) end,
+
+    # take the first 3 values
     take: 3
   ],
+
+  # reduce the result to a sum
   reduce: fn n, sum -> sum + n end
 )
 #=> {:ok, 18}
