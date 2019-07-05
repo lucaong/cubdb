@@ -121,6 +121,7 @@ defmodule CubDBTest do
 
     assert ^values = CubDB.get_multi(db, keys)
     assert [3, 2, nil] = CubDB.get_multi(db, [:c, :b, :x])
+    assert [3, 2, :not_found] = CubDB.get_multi(db, [:c, :b, :x], :not_found)
 
     assert :ok = CubDB.delete_multi(db, keys)
     assert [nil, nil, nil, nil] = CubDB.get_multi(db, keys)
