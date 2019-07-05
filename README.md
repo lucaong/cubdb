@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/lucaong/cubdb.svg?branch=master)](https://travis-ci.org/lucaong/cubdb)
+[![Build Status](https://travis-ci.org/lucaong/cubdb.svg?branch=master)](https://travis-ci.org/lucaong/cubdb) [![Hex Version](https://img.shields.io/hexpm/v/statistex.svg)](https://hex.pm/packages/cubdb) [![docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/cubdb/)
 
 <p align="center"><img src="assets/cubdb_banner.png" width="80%"/></p>
 
