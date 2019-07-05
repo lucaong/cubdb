@@ -4,7 +4,7 @@ defmodule PropertyBased.BtreeTest do
 
   alias CubDB.Store
   alias CubDB.Btree
-  alias Store.Utils
+  alias TestHelper.Btree.Utils
 
   @leaf Btree.__leaf__
 
