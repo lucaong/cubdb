@@ -329,7 +329,7 @@ defmodule CubDB do
   Returns the dirt factor.
 
   The dirt factor is a number, ranging from 0 to 1, giving an indication about
-  the amount of overhead storage (or "dirt") that can be cleaned up with a
+  the amount of overhead disk space (or "dirt") that can be cleaned up with a
   compaction operation. A value of 0 means that there is no overhead, so a
   compaction would have no benefit. The closer to 1 the dirt factor is, the more
   can be cleaned up in a compaction operation.
