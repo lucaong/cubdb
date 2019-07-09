@@ -11,7 +11,7 @@ defmodule CubDB do
 
     - Arbitrary selection and transformation of ranges of entries with `select/3`
 
-    - Atomic transactions with `get_and_update_multi/4`
+    - Atomic transactions with `put_multi/2`, `get_and_update_multi/4`, etc.
 
     - Concurrent read operations, that do not block nor are blocked by writes
 
@@ -49,11 +49,13 @@ defmodule CubDB do
       CubDB.get(db, :foo)
       #=> nil
 
-  Range of keys are retrieved using `select/3`:
+  Multiple operations can be performed as an atomic transaction with
+  `put_multi/2`, `delete_multi/2`, and the other `[...]_multi` functions:
 
-      for {key, value} <- [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8] do
-        CubDB.put(db, key, value)
-      end
+      CubDB.put_multi(db, [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8])
+      #=> :ok
+
+  Range of entries sorted by key are retrieved using `select/3`:
 
       CubDB.select(db, min_key: :b, max_key: :e)
       #=> {:ok, [b: 2, c: 3, d: 4, e: 5]}
