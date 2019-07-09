@@ -128,6 +128,102 @@ defmodule CubDBTest do
     assert CubDB.size(db) == 0
   end
 
+  test "put/3 is persisted to disk", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put(db, :a, 1)
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert CubDB.get(db, :a) == 1
+  end
+
+  test "put_multi/2 is persisted to disk", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert {:ok, [a: 1, b: 2, c: 3]} = CubDB.select(db)
+  end
+
+  test "update/4 is persisted to disk", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put(db, :a, 1)
+
+    :ok = CubDB.update(db, :a, 0, fn x -> x + 1 end)
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert CubDB.get(db, :a) == 2
+  end
+
+  test "get_and_update/3 is persisted to disk", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put(db, :a, 1)
+
+    {:ok, 1} = CubDB.get_and_update(db, :a, fn x -> {x, x + 1} end)
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert CubDB.get(db, :a) == 2
+  end
+
+  test "get_and_update_multi/4 is persisted to disk", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+
+    {:ok, %{a: 1, b: 2, c: 3}} = CubDB.get_and_update_multi(db, [:a, :b, :c], fn entries ->
+      entries_incremented = entries |> Enum.map(fn {k, v} -> {k, v + 1} end) |> Enum.into(%{})
+      {entries, entries_incremented, []}
+    end)
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert {:ok, [a: 2, b: 3, c: 4]} = CubDB.select(db)
+  end
+
+  test "delete/2 is persisted to disk", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+
+    :ok = CubDB.delete(db, :a)
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert CubDB.has_key?(db, :a) == false
+  end
+
+  test "delete_multi/2 is persisted to disk", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+
+    :ok = CubDB.delete_multi(db, [:a, :c])
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    assert {:ok, [b: 2]} = CubDB.select(db)
+  end
+
   test "compaction catches up on newer updates", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
