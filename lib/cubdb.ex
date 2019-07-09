@@ -673,6 +673,11 @@ defmodule CubDB do
     end
   end
 
+  @doc false
+  def terminate(_reason, %State{btree: btree}) do
+    Btree.stop(btree)
+  end
+
   def handle_call(operation = {:get, _, _}, from, state = %State{btree: btree}) do
     state = read(from, btree, operation, state)
     {:noreply, state}

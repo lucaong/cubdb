@@ -189,6 +189,12 @@ defmodule CubDB.Btree do
     btree
   end
 
+  @spec stop(Btree.t()) :: :ok
+
+  def stop(%Btree{store: store}) do
+    Store.close(store)
+  end
+
   def __leaf__, do: @leaf
   def __branch__, do: @branch
   def __value__, do: @value

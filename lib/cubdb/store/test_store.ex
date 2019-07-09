@@ -46,7 +46,9 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
     end)
   end
 
-  def close(%TestStore{}), do: :ok
+  def close(%TestStore{agent: agent}) do
+    Agent.stop(agent)
+  end
 
   def blank?(%TestStore{agent: agent}) do
     Agent.get(agent, fn
