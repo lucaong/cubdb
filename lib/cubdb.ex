@@ -686,8 +686,8 @@ defmodule CubDB do
     btree =
       Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
         case compactor do
-          nil -> Btree.delete(btree, key)
-          _ -> Btree.mark_deleted(btree, key)
+          nil -> Btree.delete(btree, key, false)
+          _ -> Btree.mark_deleted(btree, key, false)
         end
       end)
 
