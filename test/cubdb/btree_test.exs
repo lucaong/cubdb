@@ -11,6 +11,7 @@ defmodule CubDB.BtreeTest do
 
   @leaf Btree.__leaf__
   @branch Btree.__branch__
+  @deleted Btree.__deleted__
 
   def btree() do
     store = Store.TestStore.new
@@ -30,7 +31,7 @@ defmodule CubDB.BtreeTest do
     %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size}
   end
 
-  test "insert/3 called on non-full leaf inserts the key/value tuple" do
+  test "insert/4 called on non-full leaf inserts the key/value tuple" do
     tree = Btree.insert(btree(), :foo, 1)
     assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
 
@@ -48,7 +49,7 @@ defmodule CubDB.BtreeTest do
     } = Utils.debug(tree.store)
   end
 
-  test "insert/3 called on full leaf splits it when overflowing" do
+  test "insert/4 called on full leaf splits it when overflowing" do
     tree = btree({@leaf, [bar: 2, baz: 3, foo: 1]})
     tree = Btree.insert(tree, :qux, 4)
     assert {:Btree, 4,
@@ -61,7 +62,7 @@ defmodule CubDB.BtreeTest do
     } = Utils.debug(tree.store)
   end
 
-  test "insert/3 called on a branch inserts the key/value" do
+  test "insert/4 called on a branch inserts the key/value" do
     tree = btree({
       @branch, [
         bar: {@leaf, [bar: 2, baz: 3]},
@@ -78,7 +79,7 @@ defmodule CubDB.BtreeTest do
     } = Utils.debug(Btree.insert(tree, :abc, 5).store)
   end
 
-  test "insert/3 called on a branch splits the branch if necessary" do
+  test "insert/4 called on a branch splits the branch if necessary" do
     tree = btree({
       @branch, [
         bar: {@leaf, [bar: 2, baz: 3]},
@@ -106,7 +107,7 @@ defmodule CubDB.BtreeTest do
     } = Utils.debug(Btree.insert(tree, :quuux, 8).store)
   end
 
-  test "insert/3 increments the size of the tree only when necessary" do
+  test "insert/4 increments the size of the tree only when necessary" do
     tree = btree()
     assert %Btree{size: 0} = tree
     tree = Btree.insert(tree, :foo, 1)
@@ -115,13 +116,23 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 1} = tree
   end
 
-  test "insert/3 increases dirt by one" do
+  test "insert/4 increases dirt by one" do
     tree = btree()
     assert %Btree{dirt: 0} = tree
     tree = Btree.insert(tree, :foo, 1)
     assert %Btree{dirt: 1} = tree
     tree = Btree.insert(tree, :foo, 2)
     assert %Btree{dirt: 2} = tree
+  end
+
+  test "insert/4 with commit_write = false does not write the header" do
+    tree = Btree.insert(btree(), :foo, 1, false)
+
+    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+
+    tree = Btree.commit(tree)
+
+    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
   end
 
   test "lookup/2 finds key and returns its value" do
@@ -149,7 +160,7 @@ defmodule CubDB.BtreeTest do
     assert nil == Btree.lookup(big_tree, :non_existing)
   end
 
-  test "delete/2 removes a key/value" do
+  test "delete/3 removes a key/value" do
     tiny_tree = btree({@leaf, [bar: 2, foo: 1]})
     assert {:Btree, _,
       {@leaf, [bar: 2]}
@@ -173,7 +184,7 @@ defmodule CubDB.BtreeTest do
     assert big_tree == Btree.delete(big_tree, :non_existing)
   end
 
-  test "delete/2 merges nodes if necessary" do
+  test "delete/3 merges nodes if necessary" do
     big_tree = btree({
       @branch, [
         bar: {
@@ -201,7 +212,7 @@ defmodule CubDB.BtreeTest do
     } = Utils.debug(Btree.delete(big_tree, :xxx).store)
   end
 
-  test "delete/2 removes a node when empty" do
+  test "delete/3 removes a node when empty" do
     tree = btree({
       @branch, [
         bar: {@leaf, [bar: 2]},
@@ -220,7 +231,7 @@ defmodule CubDB.BtreeTest do
     } = Utils.debug(tree.store)
   end
 
-  test "delete/2 decrements the size of the tree only when necessary" do
+  test "delete/3 decrements the size of the tree only when necessary" do
     store = Store.TestStore.new
     tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
     assert %Btree{size: 4} = tree
@@ -230,7 +241,7 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 3} = tree
   end
 
-  test "delete/2 increases dirt by one when removing an entry" do
+  test "delete/3 increases dirt by one when removing an entry" do
     store = Store.TestStore.new
     tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
     assert %Btree{dirt: 4} = tree
@@ -238,6 +249,16 @@ defmodule CubDB.BtreeTest do
     assert %Btree{dirt: 5} = tree
     tree = Btree.delete(tree, :foo)
     assert %Btree{dirt: 5} = tree
+  end
+
+  test "delete/3 with commit_write = false does not write the header" do
+    tree = Btree.delete(btree({@leaf, [foo: 1]}), :foo, false)
+
+    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+
+    tree = Btree.commit(tree)
+
+    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
   end
 
   test "mark_deleted/2 removes an entry" do
@@ -269,6 +290,16 @@ defmodule CubDB.BtreeTest do
     assert %Btree{dirt: 5} = tree
     tree = Btree.mark_deleted(tree, :bar)
     assert %Btree{dirt: 5} = tree
+  end
+
+  test "mark_deleted/2 with commit_write = false does not write the header" do
+    tree = Btree.mark_deleted(btree({@leaf, [foo: 1]}), :foo, false)
+
+    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+
+    tree = Btree.commit(tree)
+
+    assert {:Btree, 0, {@leaf, [foo: @deleted]}} = Utils.debug(tree.store)
   end
 
   test "load/3 creates a Btree from a sorted enumerable of key/values" do

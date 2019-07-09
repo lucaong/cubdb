@@ -45,6 +45,10 @@ defmodule CubDB.StoreExamples do
         CubDB.Store.sync(store)
         assert CubDB.Store.blank?(store) == false
       end
+
+      test "close/1 returns :ok", %{store: store} do
+        assert CubDB.Store.close(store) == :ok
+      end
     end
   end
 end
