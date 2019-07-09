@@ -857,7 +857,7 @@ defmodule CubDB do
     :ok = File.rename(file_path, new_path)
 
     store = Store.File.new(new_path)
-    Btree.new(store)
+    Btree.new(store) |> Btree.sync
   end
 
   defp new_compaction_store(data_dir) do
