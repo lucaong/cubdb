@@ -9,7 +9,7 @@ defmodule CubDB do
 
     - Simple `get/3`, `put/3`, and `delete/2` operations
 
-    - Arbitrary selection and transformation of ranges of entries with `select/3`
+    - Arbitrary selection of ranges of entries sorted by key with `select/3`
 
     - Atomic transactions with `put_multi/2`, `get_and_update_multi/4`, etc.
 
