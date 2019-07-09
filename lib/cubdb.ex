@@ -852,12 +852,14 @@ defmodule CubDB do
     end
   end
 
-  defp finalize_compaction(%Btree{store: %Store.File{file_path: file_path}}) do
+  defp finalize_compaction(btree = %Btree{store: %Store.File{file_path: file_path}}) do
+    Btree.sync(btree)
+
     new_path = String.replace_suffix(file_path, @compaction_file_extension, @db_file_extension)
     :ok = File.rename(file_path, new_path)
 
     store = Store.File.new(new_path)
-    Btree.new(store) |> Btree.sync
+    Btree.new(store)
   end
 
   defp new_compaction_store(data_dir) do
