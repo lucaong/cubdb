@@ -168,4 +168,38 @@ defmodule CubDBTest do
     CubDB.put(db, :a, 3)
     assert_received :compaction_started
   end
+
+  test "set_auto_compact/1 configures auto compaction behavior", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: true)
+
+    assert %CubDB.State{auto_compact: {100, 0.25}} = :sys.get_state(db)
+
+    :ok = CubDB.set_auto_compact(db, false)
+
+    assert %CubDB.State{auto_compact: false} = :sys.get_state(db)
+
+    :ok = CubDB.set_auto_compact(db, true)
+
+    assert %CubDB.State{auto_compact: {100, 0.25}} = :sys.get_state(db)
+
+    :ok = CubDB.set_auto_compact(db, {10, 0.5})
+
+    assert %CubDB.State{auto_compact: {10, 0.5}} = :sys.get_state(db)
+
+    assert {:error, _} = CubDB.set_auto_compact(db, {:x, 100})
+  end
+
+  test "set_auto_file_sync/1 configures auto file sync behavior", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_file_sync: true)
+
+    assert %CubDB.State{auto_file_sync: true} = :sys.get_state(db)
+
+    CubDB.set_auto_file_sync(db, false)
+
+    assert %CubDB.State{auto_file_sync: false} = :sys.get_state(db)
+
+    CubDB.set_auto_file_sync(db, true)
+
+    assert %CubDB.State{auto_file_sync: true} = :sys.get_state(db)
+  end
 end

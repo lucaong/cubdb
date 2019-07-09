@@ -131,6 +131,7 @@ defmodule CubDB do
             clean_up_pending: boolean,
             busy_files: %{required(binary) => pos_integer},
             auto_compact: {pos_integer, pos_integer} | false,
+            auto_file_sync: boolean,
             subs: list(pid)
           }
 
@@ -142,6 +143,7 @@ defmodule CubDB do
               clean_up_pending: false,
               busy_files: %{},
               auto_compact: false,
+              auto_file_sync: false,
               subs: []
   end
 
@@ -160,6 +162,10 @@ defmodule CubDB do
 
     - `auto_compact`: whether to perform auto-compaction. It defaults to false.
     See `set_auto_compact/2` for the possible values
+
+    - `auto_file_sync`: whether to force flush the disk buffer on each write. It
+    defaults to `false`. If set to `true`, write performance will be slower, but
+    durability is strictly guaranteed. See `set_auto_file_sync/2` for details.
 
   The `gen_server_options` are passed to `GenServer.start_link/3`.
   """
@@ -571,6 +577,49 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_compact, setting})
   end
 
+  @spec file_sync(GenServer.server()) :: :ok
+
+  @doc """
+  Performs a `fsync`, forcing to flush all data that might be buffered by the OS
+  to disk.
+
+  Calling this function ensures that all writes up to this point are committed
+  to disk, and will be available after a restart.
+
+  If `CubDB` is started with the option `auto_file_sync: true`, calling this
+  function is not necessary, as every write operation will be automatically
+  flushed to the storage device.
+
+  If this function is NOT called, the operative system will control when the
+  file buffer is flushed to the storage device, which leads to better write
+  performance, but might affect durability of recent writes in case of a sudden
+  shutdown.
+  """
+
+  def file_sync(db) do
+    GenServer.call(db, :file_sync)
+  end
+
+  @spec set_auto_file_sync(GenServer.server(), boolean) :: :ok
+
+  @doc """
+  Configure whether to automatically force file sync upon each write operation.
+
+  If set to `false`, no automatic file sync is performed. That improves write
+  performance, but leaves to the operative system the decision of when to flush
+  disk buffers. This means that there is the possibility that recent writes
+  might not be durable in case of a sudden machine shutdown. In any case,
+  atomicity of multi operations is preserved, and partial writes will not
+  corrupt the database.
+
+  If set to `true`, the file buffer will be forced to flush upon every write
+  operation, ensuring durability even in case of sudden machine shutdowns, but
+  decreasing write performance.
+  """
+  def set_auto_file_sync(db, bool) do
+    GenServer.call(db, {:set_auto_file_sync, bool})
+  end
+
   @spec cubdb_file?(binary) :: boolean
 
   @doc false
@@ -603,6 +652,7 @@ defmodule CubDB do
   @doc false
   def init([data_dir, options]) do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, false))
+    auto_file_sync = Keyword.get(options, :auto_file_sync, false)
 
     case find_db_file(data_dir) do
       file_name when is_binary(file_name) or is_nil(file_name) ->
@@ -614,7 +664,8 @@ defmodule CubDB do
            btree: Btree.new(store),
            data_dir: data_dir,
            clean_up: clean_up,
-           auto_compact: auto_compact
+           auto_compact: auto_compact,
+           auto_file_sync: auto_file_sync
          }}
 
       {:error, reason} ->
@@ -650,23 +701,29 @@ defmodule CubDB do
     {:reply, Btree.dirt_factor(btree), state}
   end
 
-  def handle_call({:put, key, value}, _, state = %State{btree: btree}) do
+  def handle_call({:put, key, value}, _, state) do
+    %State{btree: btree, auto_file_sync: auto_file_sync} = state
     btree = Btree.insert(btree, key, value)
+    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
 
-  def handle_call({:delete, key}, _, state = %State{btree: btree, compactor: compactor}) do
+  def handle_call({:delete, key}, _, state) do
+    %State{btree: btree, compactor: compactor, auto_file_sync: auto_file_sync} = state
+
     btree =
       case compactor do
         nil -> Btree.delete(btree, key)
         _ -> Btree.mark_deleted(btree, key)
       end
 
+    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
+
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
 
   def handle_call({:get_and_update_multi, keys_to_get, fun}, _, state) do
-    %State{btree: btree, compactor: compactor} = state
+    %State{btree: btree, compactor: compactor, auto_file_sync: auto_file_sync} = state
 
     key_values =
       Enum.reduce(keys_to_get, %{}, fn key, map ->
@@ -691,7 +748,11 @@ defmodule CubDB do
         end
       end)
 
-    state = %State{state | btree: Btree.commit(btree)}
+    btree = Btree.commit(btree)
+
+    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
+
+    state = %State{state | btree: btree}
 
     {:reply, {:ok, result}, maybe_auto_compact(state)}
   rescue
@@ -714,8 +775,17 @@ defmodule CubDB do
     end
   end
 
+  def handle_call({:set_auto_file_sync, bool}, _, state) do
+    {:reply, :ok, %State{state | auto_file_sync: bool}}
+  end
+
   def handle_call({:subscribe, pid}, _, state = %State{subs: subs}) do
     {:reply, :ok, %State{state | subs: [pid | subs]}}
+  end
+
+  def handle_call(:file_sync, _, state = %State{btree: btree}) do
+    btree = Btree.sync(btree)
+    {:reply, :ok, %State{state | btree: btree}}
   end
 
   def handle_info({:compaction_completed, original_btree, compacted_btree}, state) do
