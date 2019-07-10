@@ -559,7 +559,7 @@ defmodule CubDB do
           :ok | {:error, binary}
 
   @doc """
-  Set whether to perform automatic compaction, and how.
+  Configures whether to perform automatic compaction, and how.
 
   If set to `false`, no automatic compaction is performed. If set to `true`,
   auto-compaction is performed, following a write operation, if at least 100
@@ -605,7 +605,7 @@ defmodule CubDB do
   @spec set_auto_file_sync(GenServer.server(), boolean) :: :ok
 
   @doc """
-  Configure whether to automatically force file sync upon each write operation.
+  Configures whether to automatically force file sync upon each write operation.
 
   If set to `false`, no automatic file sync is performed. That improves write
   performance, but leaves to the operative system the decision of when to flush

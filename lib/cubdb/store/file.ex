@@ -114,10 +114,10 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   end
 
   defp append_blocks(file, bytes, pos) do
-    bytes_with_headers = Blocks.add_markers(bytes, pos)
+    bytes = Blocks.add_markers(bytes, pos)
 
-    with :ok <- :file.write(file, bytes_with_headers) do
-      {:ok, byte_size(bytes_with_headers)}
+    with :ok <- :file.write(file, bytes) do
+      {:ok, byte_size(bytes)}
     end
   end
 
