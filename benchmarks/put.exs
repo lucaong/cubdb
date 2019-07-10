@@ -33,7 +33,7 @@ Benchee.run(
     key = :rand.uniform(10_000)
     {key, input, db}
   end,
-  after_scenario: fn {input, db} ->
+  after_scenario: fn {_input, db} ->
     IO.puts("#{CubDB.size(db)} entries written to database.")
     cleanup.()
   end
