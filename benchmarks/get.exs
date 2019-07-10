@@ -14,8 +14,7 @@ n = 100
 
 Benchee.run(
   %{
-    "CubDB.get/3" => fn db ->
-      key = :rand.uniform(n)
+    "CubDB.get/3" => fn {key, db} ->
       CubDB.get(db, key)
     end
   },
@@ -30,7 +29,11 @@ Benchee.run(
     for key <- (0..n), do: CubDB.put(db, key, input)
     db
   end,
-  after_scenario: fn db ->
+  before_each: fn db ->
+    key = :rand.uniform(n)
+    {key, db}
+  end,
+  after_scenario: fn _db ->
     cleanup.()
   end
 )

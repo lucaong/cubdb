@@ -13,9 +13,8 @@ small = "small value"
 
 Benchee.run(
   %{
-    "CubDB.put/3" => fn {value, db} ->
-      key = :rand.uniform(10_000)
-      :ok = CubDB.put(db, key, value)
+    "CubDB.put/3" => fn {key, value, db} ->
+      CubDB.put(db, key, value)
     end
   },
   inputs: %{
@@ -27,6 +26,10 @@ Benchee.run(
     cleanup.()
     {:ok, db} = CubDB.start_link(data_dir)
     {input, db}
+  end,
+  before_each: fn {input, db} ->
+    key = :rand.uniform(10_000)
+    {key, input, db}
   end,
   after_scenario: fn {input, db} ->
     IO.puts("#{CubDB.size(db)} entries written to database.")
