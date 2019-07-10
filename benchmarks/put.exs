@@ -20,7 +20,7 @@ Benchee.run(
   inputs: %{
     "small value" => small,
     "1MB value" => one_mb,
-    "10MB value" => ten_mb 
+    "10MB value" => ten_mb
   },
   before_scenario: fn input ->
     cleanup.()
