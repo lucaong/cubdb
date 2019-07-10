@@ -8,6 +8,7 @@ cleanup = fn ->
 end
 
 small = "small value"
+{:ok, one_kb} = File.read("benchmarks/data/1kb")
 {:ok, one_mb} = File.read("benchmarks/data/1mb")
 {:ok, ten_mb} = File.read("benchmarks/data/10mb")
 
@@ -19,6 +20,7 @@ Benchee.run(
   },
   inputs: %{
     "small value" => small,
+    "1kb value" => one_kb,
     "1MB value" => one_mb,
     "10MB value" => ten_mb
   },
