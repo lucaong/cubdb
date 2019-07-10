@@ -20,7 +20,7 @@ Benchee.run(
   },
   inputs: %{
     "small value" => small,
-    "1kb value" => one_kb,
+    "1KB value" => one_kb,
     "1MB value" => one_mb,
     "10MB value" => ten_mb
   },
