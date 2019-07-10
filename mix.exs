@@ -40,7 +40,8 @@ defmodule CubDB.Mixfile do
     [
       {:quixir, "~> 0.9", only: :test},
       {:dialyxir, "~> 1.0.0-rc.6", only: [:dev], runtime: false},
-      {:ex_doc, "~> 0.20", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.20", only: :dev, runtime: false},
+      {:benchee, "~> 1.0", only: :dev}
     ]
   end
 
