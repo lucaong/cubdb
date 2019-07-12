@@ -7,7 +7,11 @@ test:
 
 .PHONY: benchmarks
 benchmarks:
+	@echo "\nBenchmark: put/3"
+	@echo "================"
 	mix run benchmarks/put.exs
+	@echo "\nBenchmark: get/3"
+	@echo "================"
 	mix run benchmarks/get.exs
 
 .PHONY: release
