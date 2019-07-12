@@ -5,13 +5,19 @@ defmodule CubDB.Store.File.Blocks do
   @data_marker 0
   @header_marker 42
 
+  @spec add_markers(binary, non_neg_integer, non_neg_integer) :: [binary]
+
   def add_markers(bin, loc, block_size \\ @block_size) do
     at_block_boundary(bin, loc, block_size, &add/3)
   end
 
+  @spec strip_markers(binary, non_neg_integer, non_neg_integer) :: [binary]
+
   def strip_markers(bin, loc, block_size \\ @block_size) do
     at_block_boundary(bin, loc, block_size, &strip/3)
   end
+
+  @spec length_with_headers(non_neg_integer, non_neg_integer, non_neg_integer) :: non_neg_integer
 
   def length_with_headers(loc, length, block_size \\ @block_size) do
     case rem(loc, block_size) do
@@ -24,6 +30,8 @@ defmodule CubDB.Store.File.Blocks do
         trunc(prefix + headers_length(rest, block_size) + rest)
     end
   end
+
+  @spec add_header_marker(binary, non_neg_integer, non_neg_integer) :: {non_neg_integer, [binary]}
 
   def add_header_marker(bin, loc, block_size \\ @block_size) do
     case rem(loc, block_size) do
@@ -38,9 +46,13 @@ defmodule CubDB.Store.File.Blocks do
     end
   end
 
+  @spec latest_possible_header(non_neg_integer, non_neg_integer) :: non_neg_integer
+
   def latest_possible_header(loc, block_size \\ @block_size) do
     div(loc - 1, block_size) * block_size
   end
+
+  @spec header_marker?(byte) :: boolean
 
   def header_marker?(marker), do: @header_marker == marker
 
