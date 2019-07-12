@@ -28,13 +28,13 @@ defmodule CubDB.Store.File.Blocks do
   def add_header_marker(bin, loc, block_size \\ @block_size) do
     case rem(loc, block_size) do
       0 ->
-        {loc, <<@header_marker>> <> add_markers(bin, loc + 1, block_size)}
+        {loc, [<<@header_marker>> | add_markers(bin, loc + 1, block_size)]}
 
       r ->
         block_rest = block_size - r
         padding = String.pad_leading(<<>>, block_rest, <<@data_marker>>)
         header_bytes = add_markers(bin, loc + block_rest + 1, block_size)
-        {loc + block_rest, padding <> <<@header_marker>> <> header_bytes}
+        {loc + block_rest, [padding | [<<@header_marker>> | header_bytes]]}
     end
   end
 
@@ -47,16 +47,16 @@ defmodule CubDB.Store.File.Blocks do
   defp at_block_boundary(bin, loc, block_size, function) do
     case rem(loc, block_size) do
       0 ->
-        function.(bin, <<>>, block_size)
+        function.(bin, [], block_size)
 
       r ->
         block_rest = block_size - r
 
         if byte_size(bin) <= block_rest do
-          bin
+          [bin]
         else
           <<prefix::binary-size(block_rest), rest::binary>> = bin
-          function.(rest, prefix, block_size)
+          function.(rest, [prefix], block_size)
         end
     end
   end
@@ -65,21 +65,21 @@ defmodule CubDB.Store.File.Blocks do
     data_size = block_size - 1
 
     if byte_size(bin) <= data_size do
-      acc <> <<@data_marker>> <> bin
+      [bin | [<<@data_marker>> | acc]] |> Enum.reverse
     else
       <<block::binary-size(data_size), rest::binary>> = bin
-      add(rest, acc <> <<@data_marker>> <> block, block_size)
+      add(rest, [block | [<<@data_marker>> | acc]], block_size)
     end
   end
 
   defp strip(bin, acc, block_size) do
     if byte_size(bin) <= block_size do
       <<_::binary-1, block::binary>> = bin
-      acc <> block
+      [block | acc] |> Enum.reverse
     else
       data_size = block_size - 1
       <<_::binary-1, block::binary-size(data_size), rest::binary>> = bin
-      strip(rest, acc <> block, block_size)
+      strip(rest, [block | acc], block_size)
     end
   end
 

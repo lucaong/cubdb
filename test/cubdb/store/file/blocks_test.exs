@@ -31,45 +31,45 @@ defmodule CubDB.Store.File.BlocksTest do
     assert length_with_headers(0, 10, 4) == 14
   end
 
-  test "strip_markers/3 removes the block headers" do
-    assert <<1, 2, 3>> =
+  test "strip_markers/3 removes the block headers and returns an iolist" do
+    assert [<<1, 2, 3>>] =
       strip_markers(<<0, 1, 2, 3>>, 0, 4)
 
-    assert <<1, 2>> =
+    assert [<<1, 2>>] =
       strip_markers(<<1, 2>>, 2, 4)
 
-    assert <<1, 2, 3, 4, 5, 6, 7, 8>> =
+    assert [<<1, 2, 3>>, <<4, 5, 6>>, <<7, 8>>] =
       strip_markers(<<0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 0, 4)
 
-    assert <<1, 2, 3, 4, 5, 6, 7, 8>> =
+    assert [<<1, 2, 3>>, <<4, 5, 6>>, <<7, 8>>] =
       strip_markers(<<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>>, 1, 4)
   end
 
-  test "add_markers/3 adds the block headers" do
-    assert <<0, 1, 2, 3>> =
+  test "add_markers/3 adds the block headers and returns an iolist" do
+    assert [<<0>>, <<1, 2, 3>>] =
       add_markers(<<1, 2, 3>>, 0, 4)
 
-    assert <<1, 2>> =
+    assert [<<1, 2>>] =
       add_markers(<<1, 2>>, 2, 4)
 
-    assert <<0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8>> =
+    assert [<<0>>, <<1, 2, 3>>, <<0>>, <<4, 5, 6>>, <<0>>, <<7, 8>>] =
       add_markers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 0, 4)
 
-    assert <<1, 2, 3, 0, 4, 5, 6, 0, 7, 8>> =
+    assert [<<1, 2, 3>>, <<0>>, <<4, 5, 6>>, <<0>>, <<7, 8>>] =
       add_markers(<<1, 2, 3, 4, 5, 6, 7, 8>>, 1, 4)
   end
 
-  test "add_header_marker/3 adds padding and header marker" do
-    assert {0, <<42, 1, 2, 3>>} =
+  test "add_header_marker/3 adds padding and header marker and returns an iolist" do
+    assert {0, [<<42>>, <<1, 2, 3>>]} =
       add_header_marker(<<1, 2, 3>>, 0, 4)
 
-    assert {4, <<0, 0, 42, 1, 2, 3>>} =
+    assert {4, [<<0, 0>>, <<42>>, <<1, 2, 3>>]} =
       add_header_marker(<<1, 2, 3>>, 2, 4)
 
-    assert {4, <<0, 0, 0, 42, 1, 2, 3>>} =
+    assert {4, [<<0, 0, 0>>, <<42>>, <<1, 2, 3>>]} =
       add_header_marker(<<1, 2, 3>>, 1, 4)
 
-    assert {4, <<0, 0, 42, 1, 2, 3, 0, 4, 5>>} =
+    assert {4, [<<0, 0>>, <<42>>, <<1, 2, 3>>, <<0>>, <<4, 5>>]} =
       add_header_marker(<<1, 2, 3, 4, 5>>, 2, 4)
   end
 
