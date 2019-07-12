@@ -14,13 +14,13 @@ benchmarks:
 release: test
 	@if [ $(shell git rev-parse --abbrev-ref HEAD) != master ]; then \
 		echo "Error: not on master branch"; exit 1; \
-	fi
-	@if [ $(shell git rev-parse $(VERSION_TAG)) ]; then \
+	else true; fi
+	@if [ $(git rev-parse $(VERSION_TAG)) ]; then \
 		echo "Error: tag $(VERSION_TAG) already exists"; exit 1; \
-	fi
+	else true; fi
 	@if [ -n "$(shell git status --porcelain)" ]; then \
 		echo "Error: there are uncommitted changes"; exit 1; \
-	fi
+	else true; fi
 	git tag $(VERSION_TAG)
 	git push
 	git push --tags
