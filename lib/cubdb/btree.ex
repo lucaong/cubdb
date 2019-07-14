@@ -16,13 +16,17 @@ defmodule CubDB.Btree do
   @type btree_size :: non_neg_integer
   @type dirt :: non_neg_integer
   @type location :: non_neg_integer
-  @type leaf_node :: record(:leaf, children: list({key, location}))
-  @type branch_node :: record(:branch, children: list({key, location}))
+  @type capacity :: pos_integer
+  @type child_pointer :: {key, location}
+  @type leaf_node :: record(:leaf, children: [child_pointer])
+  @type branch_node :: record(:branch, children: [child_pointer])
   @type value_node :: record(:value, val: val)
   @type deleted_node :: :d
+  @type internal_node :: leaf_node | branch_node
   @type terminal_node :: value_node | deleted_node
   @type btree_node :: leaf_node | branch_node | value_node | deleted_node
   @type btree_header :: {btree_size, location, dirt}
+  @type node_type :: :l | :b | :v | :d
 
   alias CubDB.Store
   alias CubDB.Btree
@@ -222,6 +226,8 @@ defmodule CubDB.Btree do
     }
   end
 
+  @spec load_node(Store.t(), key, btree_node, [btree_node], pos_integer, capacity) :: [[child_pointer]]
+
   defp load_node(store, key, node, [], _, _) do
     loc = Store.put_node(store, node)
     [[{key, loc}]]
@@ -239,6 +245,8 @@ defmodule CubDB.Btree do
       [children | rest]
     end
   end
+
+  @spec finalize_load(Store.t(), [[child_pointer]], pos_integer, capacity) :: {btree_node, location}
 
   defp finalize_load(store, [children], level, _) do
     case children do
@@ -264,10 +272,14 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec make_node([child_pointer], pos_integer) :: internal_node
+
   defp make_node(children, level) do
     children = Enum.reverse(children)
     if level == 1, do: {@leaf, children}, else: {@branch, children}
   end
+
+  @spec lookup_leaf(internal_node, Store.t(), key, [internal_node]) :: {leaf_node, [internal_node]}
 
   defp lookup_leaf(branch = {@branch, children}, store, key, path) do
     loc =
@@ -287,6 +299,8 @@ defmodule CubDB.Btree do
   defp lookup_leaf(leaf = {@leaf, _}, _, _, path) do
     {leaf, path}
   end
+
+  @spec build_up(Store.t(), btree_node, [{key, val}], [key], [internal_node], capacity) :: {location, internal_node}
 
   defp build_up(store, node, to_merge, to_delete, [], cap) do
     to_merge_locs = store_nodes(store, to_merge)
@@ -316,11 +330,15 @@ defmodule CubDB.Btree do
     build_up(store, parent, new_nodes, deleted, up, cap)
   end
 
+  @spec store_nodes(Store.t(), [{key, btree_node}]) :: [{key, location}]
+
   defp store_nodes(store, nodes) do
     Enum.map(nodes, fn {k, v} ->
       {k, Store.put_node(store, v)}
     end)
   end
+
+  @spec replace_node(Store.t(), internal_node, [{key, location}], [key], internal_node | nil, capacity) :: [btree_node]
 
   defp replace_node(store, node, merge, delete, parent, cap) do
     {type, children} = node
@@ -330,6 +348,8 @@ defmodule CubDB.Btree do
     |> split_merge(store, node, parent, cap)
     |> wrap_nodes(type)
   end
+
+  @spec update_children([child_pointer], [{key, location}], [key]) :: [child_pointer]
 
   defp update_children(children, merge, delete) do
     merged =
@@ -343,11 +363,15 @@ defmodule CubDB.Btree do
     |> List.keysort(0)
   end
 
+  @spec wrap_nodes([[{key, any}]], node_type) :: [{key, btree_node}]
+
   defp wrap_nodes(chunks, type) do
     for chunk = [{k, _} | _] <- chunks do
       {k, {type, chunk}}
     end
   end
+
+  @spec split_merge([child_pointer], Store.t(), internal_node | nil, internal_node | nil, capacity) :: [[child_pointer]]
 
   defp split_merge(children, store, old_node, parent, cap) do
     size = length(children)
@@ -364,11 +388,15 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec split([child_pointer], capacity) :: [[child_pointer]]
+
   defp split(children, cap) do
     children
     |> Enum.split(div(cap + 1, 2))
     |> Tuple.to_list()
   end
+
+  @spec merge(Store.t(), [child_pointer], internal_node, internal_node, capacity) :: [[child_pointer]]
 
   defp merge(store, children, {_, old_children}, parent, cap) do
     key = min_key(keys(old_children), keys(children))
@@ -376,6 +404,8 @@ defmodule CubDB.Btree do
     (left_sibling(store, parent, key) ++ children)
     |> split_merge(store, nil, parent, cap)
   end
+
+  @spec left_sibling(Store.t(), branch_node, key) :: [child_pointer]
 
   defp left_sibling(store, {@branch, children}, key) do
     left =
@@ -393,9 +423,13 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec keys([{key, any}]) :: [key]
+
   defp keys(tuples) do
     Enum.map(tuples, &elem(&1, 0))
   end
+
+  @spec min_key([key], [key]) :: key
 
   defp min_key([], ks2), do: List.first(ks2)
   defp min_key(ks1, []), do: List.first(ks1)
@@ -425,6 +459,8 @@ defimpl Enumerable, for: CubDB.Btree do
   def member?(_, _), do: {:ok, false}
 
   def slice(_), do: {:error, __MODULE__}
+
+  @spec get_children(Btree.btree_node(), Store.t()) :: any
 
   defp get_children({@value, v}, _), do: v
 
