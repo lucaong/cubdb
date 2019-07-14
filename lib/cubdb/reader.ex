@@ -49,6 +49,8 @@ defmodule CubDB.Reader do
     send(db, {:check_out_reader, btree})
   end
 
+  @spec select(Btree.t(), Keyword.t()) :: any
+
   defp select(btree, options) when is_list(options) do
     min_key = Keyword.get(options, :min_key)
     max_key = Keyword.get(options, :max_key)

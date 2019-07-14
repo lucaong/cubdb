@@ -132,7 +132,7 @@ defmodule CubDB do
             clean_up: pid,
             clean_up_pending: boolean,
             busy_files: %{required(binary) => pos_integer},
-            auto_compact: {pos_integer, pos_integer} | false,
+            auto_compact: {pos_integer, number} | false,
             auto_file_sync: boolean,
             subs: list(pid)
           }
@@ -420,8 +420,8 @@ defmodule CubDB do
 
   @spec get_and_update_multi(
           GenServer.server(),
-          list(key),
-          (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, list(key) | nil}),
+          [key],
+          (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, [key] | nil}),
           timeout
         ) :: {:ok, any} | {:error, any}
 
@@ -767,9 +767,7 @@ defmodule CubDB do
   end
 
   def handle_call(:compact, _, state) do
-    reply = trigger_compaction(state)
-
-    case reply do
+    case trigger_compaction(state) do
       {:ok, compactor} -> {:reply, :ok, %State{state | compactor: compactor}}
       error -> {:reply, error, state}
     end
@@ -826,10 +824,14 @@ defmodule CubDB do
     {:noreply, state}
   end
 
+  @spec read(GenServer.from(), Btree.t(), Reader.operation(), %State{}) :: %State{}
+
   defp read(from, btree, operation, state) do
     Reader.start_link(from, self(), btree, operation)
     check_in_reader(btree, state)
   end
+
+  @spec find_db_file(binary) :: binary | nil | {:error, any}
 
   defp find_db_file(data_dir) do
     with :ok <- File.mkdir_p(data_dir),
@@ -840,6 +842,8 @@ defmodule CubDB do
       |> List.last()
     end
   end
+
+  @spec trigger_compaction(%State{}) :: {:ok, pid} | {:error, any}
 
   defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
     case can_compact?(state) do
@@ -854,6 +858,8 @@ defmodule CubDB do
     end
   end
 
+  @spec finalize_compaction(Btree.t()) :: Btree.t()
+
   defp finalize_compaction(btree = %Btree{store: %Store.File{file_path: file_path}}) do
     Btree.sync(btree)
 
@@ -863,6 +869,8 @@ defmodule CubDB do
     store = Store.File.new(new_path)
     Btree.new(store)
   end
+
+  @spec new_compaction_store(binary) :: {:ok, Store.t()} | {:error, any}
 
   defp new_compaction_store(data_dir) do
     with {:ok, file_names} <- File.ls(data_dir) do
@@ -882,6 +890,8 @@ defmodule CubDB do
     end
   end
 
+  @spec can_compact?(%State{}) :: true | {false, any}
+
   defp can_compact?(%State{compactor: compactor}) do
     case compactor do
       nil -> true
@@ -889,11 +899,15 @@ defmodule CubDB do
     end
   end
 
+  @spec check_in_reader(Btree.t(), %State{}) :: %State{}
+
   defp check_in_reader(%Btree{store: store}, state = %State{busy_files: busy_files}) do
     %Store.File{file_path: file_path} = store
     busy_files = Map.update(busy_files, file_path, 1, &(&1 + 1))
     %State{state | busy_files: busy_files}
   end
+
+  @spec check_out_reader(Btree.t(), %State{}) :: %State{}
 
   defp check_out_reader(%Btree{store: store}, state = %State{busy_files: busy_files}) do
     %Store.File{file_path: file_path} = store
@@ -907,25 +921,35 @@ defmodule CubDB do
     %State{state | busy_files: busy_files}
   end
 
+  @spec trigger_clean_up(%State{}) :: %State{}
+
   defp trigger_clean_up(state) do
     if can_clean_up?(state),
       do: clean_up_now(state),
       else: clean_up_when_possible(state)
   end
 
+  @spec can_clean_up?(%State{}) :: boolean
+
   defp can_clean_up?(%State{btree: %Btree{store: store}, busy_files: busy_files}) do
     %Store.File{file_path: file_path} = store
     Enum.any?(busy_files, fn {file, _} -> file != file_path end) == false
   end
+
+  @spec clean_up_now(%State{}) :: %State{}
 
   defp clean_up_now(state = %State{btree: btree, clean_up: clean_up}) do
     :ok = CleanUp.clean_up(clean_up, btree)
     %State{state | clean_up_pending: false}
   end
 
+  @spec clean_up_when_possible(%State{}) :: %State{}
+
   defp clean_up_when_possible(state) do
     %State{state | clean_up_pending: true}
   end
+
+  @spec maybe_auto_compact(%State{}) :: %State{}
 
   defp maybe_auto_compact(state) do
     if should_auto_compact?(state) do
@@ -938,6 +962,8 @@ defmodule CubDB do
     end
   end
 
+  @spec should_auto_compact?(%State{}) :: boolean
+
   defp should_auto_compact?(%State{auto_compact: false}), do: false
 
   defp should_auto_compact?(%State{btree: btree, auto_compact: auto_compact}) do
@@ -946,6 +972,8 @@ defmodule CubDB do
     dirt_factor = Btree.dirt_factor(btree)
     dirt >= min_writes and dirt_factor >= min_dirt_factor
   end
+
+  @spec parse_auto_compact(any) :: {:ok, false | {pos_integer, number}} | {:error, any}
 
   defp parse_auto_compact(setting) do
     case setting do
@@ -964,6 +992,8 @@ defmodule CubDB do
         {:error, "invalid auto compact setting"}
     end
   end
+
+  @spec parse_auto_compact!(any) :: false | {pos_integer, number}
 
   defp parse_auto_compact!(setting) do
     case parse_auto_compact(setting) do
