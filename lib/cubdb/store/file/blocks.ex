@@ -17,17 +17,17 @@ defmodule CubDB.Store.File.Blocks do
     at_block_boundary(bin, loc, block_size, &strip/3)
   end
 
-  @spec length_with_headers(non_neg_integer, non_neg_integer, non_neg_integer) :: non_neg_integer
+  @spec length_with_markers(non_neg_integer, non_neg_integer, non_neg_integer) :: non_neg_integer
 
-  def length_with_headers(loc, length, block_size \\ @block_size) do
+  def length_with_markers(loc, length, block_size \\ @block_size) do
     case rem(loc, block_size) do
       0 ->
-        trunc(headers_length(length, block_size) + length)
+        trunc(markers_length(length, block_size) + length)
 
       r ->
         prefix = block_size - r
         rest = length - prefix
-        trunc(prefix + headers_length(rest, block_size) + rest)
+        trunc(prefix + markers_length(rest, block_size) + rest)
     end
   end
 
@@ -95,7 +95,7 @@ defmodule CubDB.Store.File.Blocks do
     end
   end
 
-  defp headers_length(length, block_size) do
+  defp markers_length(length, block_size) do
     Float.ceil(length / (block_size - 1))
   end
 end

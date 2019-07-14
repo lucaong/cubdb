@@ -3,32 +3,32 @@ defmodule CubDB.Store.File.BlocksTest do
 
   import CubDB.Store.File.Blocks
 
-  test "length_with_headers/3 returns an integer" do
-    assert is_integer(length_with_headers(0, 1, 4))
+  test "length_with_markers/3 returns an integer" do
+    assert is_integer(length_with_markers(0, 1, 4))
   end
 
-  test "length_with_headers/3 computes length including block headers" do
+  test "length_with_markers/3 computes length including block markers" do
     #  - -
     # |x|.| | |
-    assert length_with_headers(0, 1, 4) == 2
+    assert length_with_markers(0, 1, 4) == 2
     #    - -
     # |x|.|.|.|
-    assert length_with_headers(1, 3, 4) == 3
+    assert length_with_markers(1, 3, 4) == 3
     #  - - - - - - - - - - -
     # |x|.|.|.|x|.|.|.|x|.|.| |
-    assert length_with_headers(0, 8, 4) == 11
+    assert length_with_markers(0, 8, 4) == 11
     #    - - - - - - - - - -
     # |x|.|.|.|x|.|.|.|x|.|.| |
-    assert length_with_headers(1, 8, 4) == 10
+    assert length_with_markers(1, 8, 4) == 10
     #      - - - - - - - - - -
     # |x| |.|.|x|.|.|.|x|.|.|.|
-    assert length_with_headers(2, 8, 4) == 10
+    assert length_with_markers(2, 8, 4) == 10
     #        - - - - - - - - - - -
     # |x| | |.|x|.|.|.|x|.|.|.|x|.|
-    assert length_with_headers(3, 8, 4) == 11
+    assert length_with_markers(3, 8, 4) == 11
     #  - - - - - - - - - - - - - -
     # |x|.|.|.|x|.|.|.|x|.|.|.|x|.|
-    assert length_with_headers(0, 10, 4) == 14
+    assert length_with_markers(0, 10, 4) == 14
   end
 
   test "strip_markers/3 removes the block headers and returns an iolist" do

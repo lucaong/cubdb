@@ -106,11 +106,11 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   end
 
   defp read_blocks(file, location, length) do
-    length_with_headers = Blocks.length_with_headers(location, length)
+    length_with_markers = Blocks.length_with_markers(location, length)
 
-    with {:ok, bin} <- :file.pread(file, location, length_with_headers) do
+    with {:ok, bin} <- :file.pread(file, location, length_with_markers) do
       bytes = Blocks.strip_markers(bin, location) |> Enum.join
-      {:ok, bytes, length_with_headers}
+      {:ok, bytes, length_with_markers}
     end
   end
 
