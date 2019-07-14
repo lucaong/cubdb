@@ -1,4 +1,10 @@
 defmodule CubDB.Btree.Diff do
+  # `Btree.Diff` is a module implementing the `Enumerable` protocol to iterate
+  # over each update operation that occurred between two Btree representing
+  # different snapshots of the same store.  This is used after a compaction
+  # operation to allow the compacted Btree to catch-up with updates performed
+  # after the compaction started.
+
   @moduledoc false
 
   @enforce_keys [:from_btree, :to_btree]

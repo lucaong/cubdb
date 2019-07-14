@@ -1,8 +1,8 @@
 defmodule CubDB.Btree do
   @moduledoc false
 
-  # Btree is the internal module implementing the fundamental data structure for
-  # CubDB: an append-only, copy-on-write B+tree
+  # `Btree` is the internal module implementing the fundamental data structure
+  # for CubDB: an append-only, copy-on-write B+tree
   #
   # Operations on Btree generally return another modified Btree, similarly to
   # immutable data structures like maps. The new Btree points to the updated
@@ -494,6 +494,9 @@ defmodule CubDB.Btree do
 end
 
 defimpl Enumerable, for: CubDB.Btree do
+  # `Btree` implements `Enumerable`, and can be iterated (or streamed) yielding
+  # entries sorted by key.
+
   alias CubDB.Btree
   alias CubDB.Store
 

@@ -1,6 +1,11 @@
 defmodule CubDB.Btree.Enumerable do
   @moduledoc false
 
+  # `Btree.Enumerable` is a module providing a generic `reduce/4` function used
+  # to implement the `Enumerable` protocol on various modules (`Btree`,
+  # `Btree.Diff`, `Btree.KeyRange`). Different implementations differ only by
+  # the `get_children` function argument of `reduce/4`.
+
   alias CubDB.Btree
   alias CubDB.Store
 
@@ -15,6 +20,14 @@ defmodule CubDB.Btree.Enumerable do
           Enumerable.reducer(),
           (Btree.btree_node(), Store.t() -> any)
         ) :: Enumerable.result()
+
+  # `reduce/4` is used by several modules to implement the function `reduce/3`
+  # of the `Enumerable` protocol. The various implementations only differ by the
+  # `get_children` function.
+  # The `get_children` function takes a Btree node of any kind (branch, leaf,
+  # value, or deleted) and should return the children of that node as relevant
+  # for the particular enumerable being implemented. Filtering, sorting, and
+  # transformations can all be done within `get_children`.
   def reduce(%Btree{root: root, store: store}, cmd_acc, fun, get_children) do
     do_reduce({[], [[{nil, root}]]}, cmd_acc, fun, get_children, store)
   end

@@ -1,6 +1,11 @@
 defmodule CubDB.Btree.KeyRange do
   @moduledoc false
 
+  # `Btree.KeyRange` is a module implementing the `Enumerable` protocol to
+  # iterate through a range of entries on a Btree bounded by a minimum and
+  # maximum key. The bounds can be exclusive or inclusive. This is primarily
+  # used for selection operations.
+
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
 
