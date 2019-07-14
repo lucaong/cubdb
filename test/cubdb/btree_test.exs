@@ -162,6 +162,7 @@ defmodule CubDB.BtreeTest do
     })
     assert 1 = Btree.lookup(big_tree, :foo)
     assert nil == Btree.lookup(big_tree, :non_existing)
+    assert 0 == Btree.lookup(big_tree, :non_existing, 0)
   end
 
   test "delete/2 removes a key/value" do

@@ -1,6 +1,21 @@
 defmodule CubDB.Btree do
   @moduledoc false
 
+  # Btree is the internal module implementing the fundamental data structure for
+  # CubDB: an append-only, copy-on-write B+tree
+  #
+  # Operations on Btree generally return another modified Btree, similarly to
+  # immutable data structures like maps. The new Btree points to the updated
+  # root, while the "old" Btree still points to the old one, effectively
+  # maintaining an immutable snapshot.
+  #
+  # Updates are not committed, and will not be visible after a restart, until
+  # `commit/1` is explicitly called. Also, they may not be durable until
+  # `sync/1` is called (although the OS will eventually sync changes to disk
+  # even if `sync/1` is not explicitly called).
+  #
+  # This module is part of the private internal implementation of CubDB.
+
   @leaf :l
   @branch :b
   @value :v
@@ -61,6 +76,11 @@ defmodule CubDB.Btree do
 
   @spec load(Enumerable.t(), Store.t(), pos_integer) :: Btree.t()
 
+  # load/3 takes an enumerable of {key, value} entries that should be strictly
+  # sorted by key, and empty store, and creates a Btree with those entries. It
+  # is used primarily for compaction operations. The enumerable must be sorted
+  # by key, because a specific algorithm is used to compose the Btree in a much
+  # faster way than with normal inserts.
   def load(enum, store, cap \\ @default_capacity) do
     unless Store.blank?(store),
       do: raise(ArgumentError, message: "cannot load into non-empty store")
@@ -79,17 +99,23 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec lookup(Btree.t(), key) :: val | nil
+  @spec lookup(Btree.t(), key, val) :: val
 
-  def lookup(tree = %Btree{}, key) do
+  # `lookup/3` gets an entry from the Btree and returns its value, or `default`
+  # if the entry is not present. To distinguish between an entry that is not
+  # present and an entry that has value `default`, `has_key?/2` can be used
+  # instead.
+  def lookup(tree = %Btree{}, key, default \\ nil) do
     case has_key?(tree, key) do
       {true, value} -> value
-      {false, _} -> nil
+      {false, _} -> default
     end
   end
 
   @spec has_key?(Btree.t(), key) :: {true, val} | {false, nil}
 
+  # `has_key?/2` returns `{true, value}` if an entry with key `key` is present
+  # in the Btree, or `{false, nil}` otherwise.
   def has_key?(%Btree{root: root, store: store}, key) do
     {{@leaf, children}, _} = lookup_leaf(root, store, key, [])
 
@@ -107,12 +133,18 @@ defmodule CubDB.Btree do
 
   @spec insert(Btree.t(), key, val) :: Btree.t()
 
+  # `insert/3` writes an entry in the Btree, updating the previous one with the
+  # same key if existing. It does not commit the operation, so `commit/1` must
+  # be explicitly called to commit the insertion.
   def insert(btree, key, value) do
     insert_terminal_node(btree, key, {@value, value})
   end
 
   @spec delete(Btree.t(), key) :: Btree.t()
 
+  # `delete/2` deletes the entry associated to `key` in the Btree, if existing.
+  # It does not commit the operation, so `commit/1` must be explicitly called to
+  # commit the deletion.
   def delete(btree, key) do
     %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
@@ -143,6 +175,14 @@ defmodule CubDB.Btree do
 
   @spec mark_deleted(Btree.t(), key) :: Btree.t()
 
+  # `mark_deleted/2` deletes an entry by marking it as deleted, as opposed to
+  # `delete/2`, that simply removes it. It is necessary to use `mark_deleted/2`
+  # instead of `delete/2` while a compaction operation is running in the
+  # background. This is so that, after the compaction is done, the compacted
+  # Btree can catch-up with updates performed after compaction started,
+  # including deletions, that would otherwise not be enumerated by Btree.Diff.
+  # Similar to `update/3` and `delete/3`, it does not commit the operation, so
+  # `commit/1` must be explicitly called to commit the deletion.
   def mark_deleted(btree, key) do
     case has_key?(btree, key) do
       {true, _} -> insert_terminal_node(btree, key, @deleted)
@@ -152,6 +192,13 @@ defmodule CubDB.Btree do
 
   @spec commit(Btree.t()) :: Btree.t()
 
+  # `commit/1` writes the header to the store, committing all updates performed
+  # after the previous call to `commit/1`. This is primarily used to control
+  # atomicity of updates: if a batch of updates is to be performed atomically,
+  # `commit/1` must be called once, after all updates.
+  # If one or more updates are performed, but `commit/1` is not called, the
+  # updates won't be committed to the database and will be lost in case of a
+  # restart.
   def commit(tree = %Btree{store: store, size: size, root_loc: root_loc, dirt: dirt}) do
     Store.put_header(store, {size, root_loc, dirt + 1})
     tree
@@ -160,6 +207,8 @@ defmodule CubDB.Btree do
   @spec key_range(Btree.t(), key | Btree.KeyRange.bound(), key | Btree.KeyRange.bound(), boolean) ::
           Btree.KeyRange.t()
 
+  # `key_range/4` returns a `Btree.KeyRange` `Enumerable` that can be used to
+  # iterate through a range of entries with key between `min_key` and `max_key`.
   def key_range(tree, min_key \\ nil, max_key \\ nil, reverse \\ false) do
     min_key =
       case min_key do
@@ -180,12 +229,19 @@ defmodule CubDB.Btree do
 
   @spec dirt_factor(Btree.t()) :: float
 
+  # `dirt_factor/1` returns a flating point number between 0 and 1 giving an
+  # indication of how much overhead due to old entries (that were rewritten or
+  # deleted and are therefore unreachable) and headers is present in the Btree.
+  # The dirt factor is used to estimate when a compaction operation is
+  # necessary.
   def dirt_factor(%Btree{size: size, dirt: dirt}) do
     dirt / (1 + size + dirt)
   end
 
   @spec sync(Btree.t()) :: Btree.t()
 
+  # `sync/1` performs a file sync on the store, and is used to ensure durability
+  # of updates.
   def sync(btree = %Btree{store: store}) do
     :ok = Store.sync(store)
     btree
