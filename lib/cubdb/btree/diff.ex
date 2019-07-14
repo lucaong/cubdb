@@ -18,6 +18,8 @@ defmodule CubDB.Btree.Diff do
   @spec new(Btree.t(), Btree.t()) :: t
 
   def new(from_btree, to_btree) do
+    if from_btree.store != to_btree.store,
+      do: raise(ArgumentError, message: "CubDB.Btree.Diff can only be created from Btree sharing the same store")
     %Diff{from_btree: from_btree, to_btree: to_btree}
   end
 end
