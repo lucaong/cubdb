@@ -16,26 +16,27 @@ defmodule CubDB.Reader do
   @spec run(GenServer.from(), GenServer.server(), Btree.t(), operation) :: :ok
 
   def run(caller, db, btree, {:get, key, default}) do
-    case Btree.has_key?(btree, key) do
-      {true, value} -> GenServer.reply(caller, value)
-      {false, _} -> GenServer.reply(caller, default)
+    case Btree.fetch(btree, key) do
+      {:ok, value} -> GenServer.reply(caller, value)
+      :error -> GenServer.reply(caller, default)
     end
   after
     send(db, {:check_out_reader, btree})
   end
 
   def run(caller, db, btree, {:fetch, key}) do
-    case Btree.has_key?(btree, key) do
-      {true, value} -> GenServer.reply(caller, {:ok, value})
-      {false, _} -> GenServer.reply(caller, :error)
-    end
+    reply = Btree.fetch(btree, key)
+    GenServer.reply(caller, reply)
   after
     send(db, {:check_out_reader, btree})
   end
 
   def run(caller, db, btree, {:has_key?, key}) do
-    reply = elem(Btree.has_key?(btree, key), 0)
-    GenServer.reply(caller, reply)
+    case Btree.fetch(btree, key) do
+      {:ok, _} -> GenServer.reply(caller, true)
+      :error -> GenServer.reply(caller, false)
+    end
+  after
     send(db, {:check_out_reader, btree})
   end
 

@@ -734,9 +734,9 @@ defmodule CubDB do
 
     key_values =
       Enum.reduce(keys_to_get, %{}, fn key, map ->
-        case Btree.has_key?(btree, key) do
-          {true, value} -> Map.put(map, key, value)
-          {false, _} -> map
+        case Btree.fetch(btree, key) do
+          {:ok, value} -> Map.put(map, key, value)
+          :error -> map
         end
       end)
 

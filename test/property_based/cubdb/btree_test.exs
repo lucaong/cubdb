@@ -24,7 +24,7 @@ defmodule PropertyBased.BtreeTest do
         new_tree = Btree.insert(t, key, value) |> Btree.commit
         assert Enum.count(new_tree) >= Enum.count(t)
         assert new_tree.dirt > t.dirt
-        assert Btree.lookup(new_tree, key) == value
+        assert {:ok, ^value} = Btree.fetch(new_tree, key)
         new_tree
       end)
 
@@ -51,7 +51,7 @@ defmodule PropertyBased.BtreeTest do
         e = Enum.into(t, [])
         assert e == e |> List.keysort(0)
 
-        assert Btree.lookup(t, key) == nil
+        assert Btree.fetch(t, key) == :error
         t
       end)
 

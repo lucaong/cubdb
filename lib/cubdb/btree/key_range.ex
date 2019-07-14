@@ -55,8 +55,8 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
   end
 
   def member?(%KeyRange{btree: btree}, {key, value}) do
-    case Btree.has_key?(btree, key) do
-      {true, ^value} -> {:ok, true}
+    case Btree.fetch(btree, key) do
+      {:ok, ^value} -> {:ok, true}
       _ -> {:ok, false}
     end
   end

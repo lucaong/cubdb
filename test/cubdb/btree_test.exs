@@ -139,10 +139,10 @@ defmodule CubDB.BtreeTest do
     assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
   end
 
-  test "lookup/2 finds key and returns its value" do
+  test "fetch/2 finds key and returns {:ok, value} or :error" do
     tiny_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
-    assert 1 = Btree.lookup(tiny_tree, :foo)
-    assert nil == Btree.lookup(tiny_tree, :non_existing)
+    assert {:ok, 1} = Btree.fetch(tiny_tree, :foo)
+    assert :error == Btree.fetch(tiny_tree, :non_existing)
 
     big_tree = compose_btree({
       @branch, [
@@ -160,9 +160,8 @@ defmodule CubDB.BtreeTest do
         }
       ]
     })
-    assert 1 = Btree.lookup(big_tree, :foo)
-    assert nil == Btree.lookup(big_tree, :non_existing)
-    assert 0 == Btree.lookup(big_tree, :non_existing, 0)
+    assert {:ok, 1} = Btree.fetch(big_tree, :foo)
+    assert :error == Btree.fetch(big_tree, :non_existing)
   end
 
   test "delete/2 removes a key/value" do
@@ -275,8 +274,7 @@ defmodule CubDB.BtreeTest do
   test "mark_deleted/2 removes an entry" do
     store = Store.TestStore.new
     btree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3) |> Btree.mark_deleted(:bar) |> Btree.commit
-    assert Btree.has_key?(btree, :bar) == {false, nil}
-    assert Btree.lookup(btree, :bar) == nil
+    assert Btree.fetch(btree, :bar) == :error
   end
 
   test "mark_deleted/2 decrements the size of the tree only when necessary" do

@@ -100,34 +100,21 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec lookup(Btree.t(), key, val) :: val
+  @spec fetch(Btree.t(), key) :: {:ok, val} | :error
 
-  # `lookup/3` gets an entry from the Btree and returns its value, or `default`
-  # if the entry is not present. To distinguish between an entry that is not
-  # present and an entry that has value `default`, `has_key?/2` can be used
-  # instead.
-  def lookup(tree = %Btree{}, key, default \\ nil) do
-    case has_key?(tree, key) do
-      {true, value} -> value
-      {false, _} -> default
-    end
-  end
-
-  @spec has_key?(Btree.t(), key) :: {true, val} | {false, nil}
-
-  # `has_key?/2` returns `{true, value}` if an entry with key `key` is present
-  # in the Btree, or `{false, nil}` otherwise.
-  def has_key?(%Btree{root: root, store: store}, key) do
+  # `fetch/2` returns `{:ok, value}` if an entry with key `key` is present
+  # in the Btree, or `:error` otherwise.
+  def fetch(%Btree{root: root, store: store}, key) do
     {{@leaf, children}, _} = lookup_leaf(root, store, key, [])
 
     case Enum.find(children, &match?({^key, _}, &1)) do
       nil ->
-        {false, nil}
+        :error
 
       {_, loc} ->
         case Store.get_node(store, loc) do
-          {@value, value} -> {true, value}
-          @deleted -> {false, nil}
+          {@value, value} -> {:ok, value}
+          @deleted -> :error
         end
     end
   end
@@ -185,9 +172,9 @@ defmodule CubDB.Btree do
   # Similar to `update/3` and `delete/3`, it does not commit the operation, so
   # `commit/1` must be explicitly called to commit the deletion.
   def mark_deleted(btree, key) do
-    case has_key?(btree, key) do
-      {true, _} -> insert_terminal_node(btree, key, @deleted)
-      {false, _} -> btree
+    case fetch(btree, key) do
+      {:ok, _} -> insert_terminal_node(btree, key, @deleted)
+      :error -> btree
     end
   end
 
@@ -510,8 +497,8 @@ defimpl Enumerable, for: CubDB.Btree do
   def count(%Btree{size: size}), do: {:ok, size}
 
   def member?(btree, {key, value}) do
-    case Btree.has_key?(btree, key) do
-      {true, ^value} -> {:ok, true}
+    case Btree.fetch(btree, key) do
+      {:ok, ^value} -> {:ok, true}
       _ -> {:ok, false}
     end
   end
