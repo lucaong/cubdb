@@ -710,7 +710,7 @@ defmodule CubDB do
 
   def handle_call({:put, key, value}, _, state) do
     %State{btree: btree, auto_file_sync: auto_file_sync} = state
-    btree = Btree.insert(btree, key, value)
+    btree = Btree.insert(btree, key, value) |> Btree.commit
     btree = if auto_file_sync, do: Btree.sync(btree), else: btree
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
@@ -720,8 +720,8 @@ defmodule CubDB do
 
     btree =
       case compactor do
-        nil -> Btree.delete(btree, key)
-        _ -> Btree.mark_deleted(btree, key)
+        nil -> Btree.delete(btree, key) |> Btree.commit
+        _ -> Btree.mark_deleted(btree, key) |> Btree.commit
       end
 
     btree = if auto_file_sync, do: Btree.sync(btree), else: btree
@@ -744,14 +744,14 @@ defmodule CubDB do
 
     btree =
       Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
-        Btree.insert(btree, key, value, false)
+        Btree.insert(btree, key, value)
       end)
 
     btree =
       Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
         case compactor do
-          nil -> Btree.delete(btree, key, false)
-          _ -> Btree.mark_deleted(btree, key, false)
+          nil -> Btree.delete(btree, key)
+          _ -> Btree.mark_deleted(btree, key)
         end
       end)
 

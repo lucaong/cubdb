@@ -21,7 +21,7 @@ defmodule PropertyBased.BtreeTest do
       store = Store.TestStore.new
       tree = Btree.new(store, cap)
       tree = Enum.reduce(tuples, tree, fn {key, value}, t ->
-        new_tree = Btree.insert(t, key, value)
+        new_tree = Btree.insert(t, key, value) |> Btree.commit
         assert Enum.count(new_tree) >= Enum.count(t)
         assert new_tree.dirt > t.dirt
         assert Btree.lookup(new_tree, key) == value
@@ -42,6 +42,8 @@ defmodule PropertyBased.BtreeTest do
         t = if rem(previous_count, 2) == 0,
           do: Btree.delete(t, key),
           else: Btree.mark_deleted(t, key)
+
+        t = Btree.commit(t)
 
         assert Enum.count(t) <= previous_count
         assert Btree.dirt_factor(t) >= previous_dirt_factor

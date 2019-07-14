@@ -101,15 +101,15 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec insert(Btree.t(), key, val, boolean) :: Btree.t()
+  @spec insert(Btree.t(), key, val) :: Btree.t()
 
-  def insert(btree, key, value, commit_write \\ true) do
-    insert_terminal_node(btree, key, {@value, value}, commit_write)
+  def insert(btree, key, value) do
+    insert_terminal_node(btree, key, {@value, value})
   end
 
-  @spec delete(Btree.t(), key, boolean) :: Btree.t()
+  @spec delete(Btree.t(), key) :: Btree.t()
 
-  def delete(btree, key, commit_write \\ true) do
+  def delete(btree, key) do
     %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
 
@@ -123,7 +123,7 @@ defmodule CubDB.Btree do
 
         {root_loc, new_root} = build_up(store, leaf, [], [key], path, cap)
 
-        btree = %Btree{
+        %Btree{
           root: new_root,
           root_loc: root_loc,
           capacity: cap,
@@ -132,18 +132,16 @@ defmodule CubDB.Btree do
           dirt: dirt + 1
         }
 
-        if commit_write, do: commit(btree), else: btree
-
       nil ->
         btree
     end
   end
 
-  @spec mark_deleted(Btree.t(), key, boolean) :: Btree.t()
+  @spec mark_deleted(Btree.t(), key) :: Btree.t()
 
-  def mark_deleted(btree, key, commit_write \\ true) do
+  def mark_deleted(btree, key) do
     case has_key?(btree, key) do
-      {true, _} -> insert_terminal_node(btree, key, @deleted, commit_write)
+      {true, _} -> insert_terminal_node(btree, key, @deleted)
       {false, _} -> btree
     end
   end
@@ -200,9 +198,9 @@ defmodule CubDB.Btree do
   def __value__, do: @value
   def __deleted__, do: @deleted
 
-  @spec insert_terminal_node(Btree.t(), key, terminal_node, boolean) :: Btree.t()
+  @spec insert_terminal_node(Btree.t(), key, terminal_node) :: Btree.t()
 
-  defp insert_terminal_node(btree, key, terminal_node, commit_write) do
+  defp insert_terminal_node(btree, key, terminal_node) do
     %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
 
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
@@ -214,7 +212,7 @@ defmodule CubDB.Btree do
         @deleted -> if List.keymember?(children, key, 0), do: s - 1, else: s
       end
 
-    btree = %Btree{
+    %Btree{
       root: new_root,
       root_loc: root_loc,
       capacity: cap,
@@ -222,8 +220,6 @@ defmodule CubDB.Btree do
       size: s,
       dirt: dirt + 1
     }
-
-    if commit_write, do: commit(btree), else: btree
   end
 
   defp load_node(store, key, node, [], _, _) do
