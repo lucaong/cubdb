@@ -76,11 +76,11 @@ defmodule CubDB.Btree do
 
   @spec load(Enumerable.t(), Store.t(), pos_integer) :: Btree.t()
 
-  # load/3 takes an enumerable of {key, value} entries that should be strictly
-  # sorted by key, and empty store, and creates a Btree with those entries. It
-  # is used primarily for compaction operations. The enumerable must be sorted
-  # by key, because a specific algorithm is used to compose the Btree in a much
-  # faster way than with normal inserts.
+  # `load/3` takes an enumerable of `{key, value}` entries that should be
+  # strictly sorted by key, and empty store, and creates a Btree with those
+  # entries. It is used primarily for compaction operations. The enumerable must
+  # be sorted by key, because a specific algorithm is used to compose the Btree
+  # in a much faster way than with normal inserts.
   def load(enum, store, cap \\ @default_capacity) do
     unless Store.blank?(store),
       do: raise(ArgumentError, message: "cannot load into non-empty store")
