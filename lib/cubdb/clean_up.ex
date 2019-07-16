@@ -1,6 +1,12 @@
 defmodule CubDB.CleanUp do
   @moduledoc false
 
+  # The `CubDB.CleanUp` module takes care of cleaning up obsolete files, like
+  # old database files after a compaction (and catch-up) completes, or old
+  # compaction files left over by compactions that did not complete.
+  #
+  # It performs each clean-up operation in sequence. 
+
   use GenServer
 
   alias CubDB.Btree

@@ -1,6 +1,10 @@
 defprotocol CubDB.Store do
   @moduledoc false
 
+  # The `CubDB.Store` protocol defines the storage interface for CubDB. It
+  # provides functions to read and write nodes and headers, locate the latest
+  # header, and managing durability.
+
   alias CubDB.Btree
 
   @spec put_node(t, Btree.btree_node()) :: Btree.location()

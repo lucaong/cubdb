@@ -1,6 +1,17 @@
 defmodule CubDB.CatchUp do
   @moduledoc false
 
+  # The `CubDB.CatchUp` module takes care of catching up a compacted Btree with
+  # updates performed on the live Btree during a compaction process. The
+  # catch-up process is ran in the background, does not block read/write
+  # operations, and can be started multiple times until the compacted Btree is
+  # in sync with the live one.
+  #
+  # The catch-up is performed by iterating through all updates happened after
+  # the compaction (or the last catch-up) started, using the `Btree.Diff`
+  # enumerable to enumerate updates between two Btrees representing two
+  # snapshots of the same (live) store.
+
   use Task
 
   alias CubDB.Btree

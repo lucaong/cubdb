@@ -1,6 +1,11 @@
 defmodule CubDB.Store.TestStore do
   @moduledoc false
 
+  # `CubDB.Store.TestStore` is an implementation of the `Store` protocol
+  # intended for test purposes only. It is backed by a map, but supports all the
+  # operations of a `CubDB.Store`. It allows some tests to be simpler and faster
+  # by avoid using the file system.
+
   defstruct agent: nil
   alias CubDB.Store.TestStore
 

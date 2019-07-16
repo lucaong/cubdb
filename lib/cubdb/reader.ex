@@ -1,6 +1,18 @@
 defmodule CubDB.Reader do
   @moduledoc false
 
+  # The `CubDB.Reader` module performs all read operations that involve access
+  # to the store. Each read operation is ran in its own process, as a `Task`, so
+  # that read operations can run concurrently. Read operations are performed on
+  # the Btree representing a snapshot of the database at the time the read
+  # operation was invoked.
+  #
+  # At the end of each read operation, a `{:check_out_reader, btree}` message is
+  # sent to the main `db` process. That allows the main process to keep track of
+  # which files are still referenced by readers, so that clean-up of old files
+  # after a compaction can be delayed until no more `Reader` processes reference
+  # them.
+
   use Task
 
   alias CubDB.Btree

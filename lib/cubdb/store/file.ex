@@ -1,6 +1,20 @@
 defmodule CubDB.Store.File do
   @moduledoc false
 
+  # `CubDB.Store.File` is the main implementation of the `CubDB.Store` protocol,
+  # based on an append-only file. In order to be able to locate the latest
+  # header, the file is divided in blocks of the same byte size, each beginning
+  # with a one-byte marker at the beginning (utilities to deal with blocks are
+  # in the `CubDB.Store.File.Blocks` module). The block marker indicates whether
+  # a block is a data block or a header block. Headers are only written at the
+  # beginning of a header block.
+  #
+  # The file is never updated in-place, and all updates are appended at the end
+  # of the file. When the database starts, the data file is traversed backwards
+  # block by block until the latest readable header is located. This allows
+  # operations to be atomic, and makes the database robust to corruption due to
+  # sudden shutdowns.
+
   alias CubDB.Store
 
   @type t :: %Store.File{pid: pid, file_path: binary}

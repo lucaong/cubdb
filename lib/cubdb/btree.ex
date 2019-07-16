@@ -1,8 +1,8 @@
 defmodule CubDB.Btree do
   @moduledoc false
 
-  # `Btree` is the internal module implementing the fundamental data structure
-  # for CubDB: an append-only, copy-on-write B+tree
+  # `CubDB.Btree` is the internal module implementing the fundamental data
+  # structure for CubDB: an append-only, copy-on-write B+tree.
   #
   # Operations on Btree generally return another modified Btree, similarly to
   # immutable data structures like maps. The new Btree points to the updated
@@ -13,8 +13,6 @@ defmodule CubDB.Btree do
   # `commit/1` is explicitly called. Also, they may not be durable until
   # `sync/1` is called (although the OS will eventually sync changes to disk
   # even if `sync/1` is not explicitly called).
-  #
-  # This module is part of the private internal implementation of CubDB.
 
   @leaf :l
   @branch :b

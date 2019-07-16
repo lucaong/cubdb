@@ -1,6 +1,17 @@
 defmodule CubDB.Store.File.Blocks do
   @moduledoc false
 
+  # `CubDB.Store.File.Blocks` contains helper functions to deal with file
+  # blocks. In order to efficiently locate the latest readable header, the file
+  # is divided in blocks of 1024 bytes. Each block starts with a 1-byte marker,
+  # that indicates whether the block is a data block or a header block. Headers
+  # can only be written at the beginning of a header block, so when appending a
+  # header, the remaining space of the previous block is padded with 0s.
+  #
+  # This module takes care of adding/stripping block markers to/from a binary,
+  # computing the possible location of headers, and computing the length of a
+  # binary after adding block markers.
+
   @block_size 1024
   @data_marker 0
   @header_marker 42

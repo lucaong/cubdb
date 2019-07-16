@@ -1,10 +1,11 @@
 defmodule CubDB.Btree.Enumerable do
   @moduledoc false
 
-  # `Btree.Enumerable` is a module providing a generic `reduce/4` function used
-  # to implement the `Enumerable` protocol on various modules (`Btree`,
-  # `Btree.Diff`, `Btree.KeyRange`). Different implementations differ only by
-  # the `get_children` function argument of `reduce/4`.
+  # `CubDB.Btree.Enumerable` is a module providing a generic `reduce/4` function
+  # used to implement the `Enumerable` protocol on various modules
+  # (`CubDB.Btree`, `CubDB.Btree.Diff`, `CubDB.Btree.KeyRange`). Different
+  # implementations differ only by the `get_children` function argument of
+  # `reduce/4`.
 
   alias CubDB.Btree
   alias CubDB.Store
