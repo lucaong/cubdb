@@ -10,8 +10,6 @@ script:
 before_script:
   - MIX_ENV=test mix compile --warnings-as-errors
   - travis_wait mix dialyzer --plt
-env:
-  - MIX_ENV=test
 cache:
   directories:
     - _build
