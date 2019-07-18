@@ -8,9 +8,10 @@ script:
   - mix dialyzer --halt-exit-status
   - mix coveralls.travis --include property_based
 before_script:
-  - mix deps.get
   - MIX_ENV=test mix compile --warnings-as-errors
   - travis_wait mix dialyzer --plt
+env:
+  - MIX_ENV=test
 cache:
   directories:
     - _build
