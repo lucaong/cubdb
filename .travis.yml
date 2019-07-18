@@ -1,6 +1,5 @@
 language: elixir
 elixir:
-  - 1.6.6
   - 1.7.4
   - 1.8.2
   - 1.9.0
@@ -8,3 +7,11 @@ dist: trusty
 script:
   - mix dialyzer --halt-exit-status
   - mix coveralls.travis --include property_based
+before_script:
+  - mix deps.get
+  - MIX_ENV=test mix compile --warnings-as-errors
+  - travis_wait mix dialyzer --plt
+cache:
+  directories:
+    - _build
+    - deps

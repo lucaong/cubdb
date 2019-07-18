@@ -5,7 +5,7 @@ defmodule CubDB.Mixfile do
     [
       app: :cubdb,
       version: "0.10.0",
-      elixir: "~> 1.4",
+      elixir: "~> 1.6",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       elixirc_paths: elixirc_paths(Mix.env),
