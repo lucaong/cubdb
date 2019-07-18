@@ -313,16 +313,23 @@ defmodule CubDB.BtreeTest do
 
   test "load/3 creates a Btree from a sorted enumerable of key/values" do
     store = Store.TestStore.new
-    key_vals = Stream.map((0..20), &({&1, &1}))
+    key_vals = Stream.map((0..19), &({&1, &1}))
     tree = key_vals |> Btree.load(store, 4)
     assert key_vals |> Enum.to_list == tree |> Enum.to_list
   end
 
-  test "load/3 creates a Btree from a single item sorted Enumerable" do
+  test "load/3 creates a Btree from a single item Enumerable" do
     store = Store.TestStore.new
     key_vals = [foo: 123]
     tree = key_vals |> Btree.load(store, 4)
-    assert key_vals |> Enum.to_list == tree |> Enum.to_list
+    assert ^key_vals = tree |> Enum.to_list
+  end
+
+  test "load/3 creates a Btree from an empty Enumerable" do
+    store = Store.TestStore.new
+    key_vals = []
+    tree = key_vals |> Btree.load(store, 4)
+    assert [] = tree |> Enum.to_list
   end
 
   test "load/3 raises ArgumentError if the given store is not empty" do
@@ -366,6 +373,13 @@ defmodule CubDB.BtreeTest do
       max_key: {^max_key, :excluded},
       reverse: ^reverse
     } = Btree.key_range(btree, nil, {max_key, :excluded}, reverse)
+
+    assert %Btree.KeyRange{
+      btree: ^btree,
+      min_key: {^min_key, :excluded},
+      max_key: nil,
+      reverse: false
+    } = Btree.key_range(btree, {min_key, :excluded}, nil)
   end
 
   test "dirt_factor/1 returns a numeric dirt factor" do
@@ -413,5 +427,23 @@ defmodule CubDB.BtreeTest do
     store = Store.TestStore.new
     tree = make_btree(store, [a: 1, b: 2, c: 3, d: 4], 3) |> Btree.mark_deleted(:b)
     assert Enum.to_list(tree) == [a: 1, c: 3, d: 4]
+  end
+
+  test "Btree.leaf creates a leaf node" do
+    leaf_marker = Btree.__leaf__
+    assert {^leaf_marker, []} = Btree.leaf()
+    assert {^leaf_marker, [1, 2, 3]} = Btree.leaf(children: [1, 2, 3])
+  end
+
+  test "Btree.branch creates a branch node" do
+    branch_marker = Btree.__branch__
+    assert {^branch_marker, []} = Btree.branch()
+    assert {^branch_marker, [1, 2, 3]} = Btree.branch(children: [1, 2, 3])
+  end
+
+  test "Btree.value creates a value node" do
+    value_marker = Btree.__value__
+    assert {^value_marker, nil} = Btree.value()
+    assert {^value_marker, "hello"} = Btree.value(val: "hello")
   end
 end

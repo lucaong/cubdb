@@ -15,7 +15,27 @@ defmodule CubDBTest do
     {:ok, tmp_dir: tmp_dir}
   end
 
-  test "put/3, get/3, delete/3, and has_key?/2 work as expected", %{tmp_dir: tmp_dir} do
+  test "start_link/3 starts and links the process", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    assert Process.alive?(db) == true
+
+    {:links, links} = Process.info(self(), :links)
+    assert Enum.member?(links, db) == true
+  end
+
+  test "start_link/3 returns error if options are invalid", %{tmp_dir: tmp_dir} do
+    assert {:error, _} = CubDB.start_link(tmp_dir, [auto_compact: "maybe"])
+  end
+
+  test "start/3 starts the process without linking", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start(tmp_dir)
+    assert Process.alive?(db) == true
+
+    {:links, links} = Process.info(self(), :links)
+    assert Enum.member?(links, db) == false
+  end
+
+  test "put/3, get/3, fetch/2, delete/3, and has_key?/2 work as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     key = {:some, arbitrary: "key"}
 
@@ -27,10 +47,12 @@ defmodule CubDBTest do
     assert :ok = CubDB.put(db, key, value)
 
     assert CubDB.get(db, key, 42) == value
+    assert {:ok, ^value} = CubDB.fetch(db, key)
     assert CubDB.has_key?(db, key) == true
 
     assert :ok = CubDB.delete(db, key)
     assert CubDB.get(db, key) == nil
+    assert :error = CubDB.fetch(db, key)
     assert CubDB.has_key?(db, key) == false
   end
 
@@ -62,6 +84,22 @@ defmodule CubDBTest do
       reduce: fn n, sum -> sum + n end
     )
     assert result == 6
+  end
+
+  test "reads are concurrent", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    entries = [a: 1, b: 2, c: 3, d: 4]
+
+    CubDB.put_multi(db, entries)
+
+    reads = Task.async_stream([:a, :b, :c], fn key ->
+      value = CubDB.get(db, key)
+      CubDB.put(db, :b, 0)
+      value
+    end) |> Enum.to_list
+
+    assert [ok: 1, ok: 2, ok: 3] = reads
+    assert {:ok, [a: 1, b: 0, c: 3, d: 4]} = CubDB.select(db)
   end
 
   test "get_and_update_multi/4, get_and_update/3 and update/3 work as expected", %{tmp_dir: tmp_dir} do
@@ -107,6 +145,26 @@ defmodule CubDBTest do
       raise(RuntimeError, message: "boom")
     end)
     assert %RuntimeError{message: "boom"} = error
+  end
+
+  test "get_and_update_multi/4 works well during a compaction", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    entries = [a: 1, b: 2, c: 3, d: 4]
+
+    for {key, value} <- entries, do: CubDB.put(db, key, value)
+
+    CubDB.compact(db)
+
+    assert {:ok, result} = CubDB.get_and_update_multi(db, [:a, :c], fn %{a: a, c: c} ->
+      a = a + 1
+      c = c - 1
+      {[a, c], %{a: a, c: c}, [:d]}
+    end)
+    assert result == [2, 2]
+    assert CubDB.get(db, :a) == 2
+    assert CubDB.get(db, :c) == 2
+    assert CubDB.has_key?(db, :d) == false
   end
 
   test "get_multi/3, put_multi/2 and delete_multi/2 work as expected", %{tmp_dir: tmp_dir} do
@@ -263,6 +321,9 @@ defmodule CubDBTest do
 
     CubDB.put(db, :a, 3)
     assert_received :compaction_started
+
+    CubDB.put(db, :a, 4)
+    refute_received :compaction_started
   end
 
   test "set_auto_compact/1 configures auto compaction behavior", %{tmp_dir: tmp_dir} do
@@ -285,6 +346,37 @@ defmodule CubDBTest do
     assert {:error, _} = CubDB.set_auto_compact(db, {:x, 100})
   end
 
+  test "compact/1 returns :ok, or {:error, :pending_compaction} if already compacting", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3, d: 4, e: 5])
+    CubDB.subscribe(db)
+
+    assert :ok = CubDB.compact(db)
+    assert_received :compaction_started
+
+    assert {:error, :pending_compaction} = CubDB.compact(db)
+    refute_received :compaction_started
+  end
+
+  test "compact/1 postpones clean-up when old file is still referenced", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    CubDB.subscribe(db)
+
+    %CubDB.State{btree: btree} = :sys.get_state(db)
+    send(db, {:_test_check_in_reader, btree})
+
+    :ok = CubDB.compact(db)
+
+    assert_received :compaction_started
+    refute_receive :clean_up_started
+
+    assert %CubDB.State{clean_up_pending: true} = :sys.get_state(db)
+
+    send(db, {:check_out_reader, btree})
+    assert_receive :clean_up_started
+  end
+
   test "set_auto_file_sync/1 configures auto file sync behavior", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir, auto_file_sync: true)
 
@@ -297,5 +389,10 @@ defmodule CubDBTest do
     CubDB.set_auto_file_sync(db, true)
 
     assert %CubDB.State{auto_file_sync: true} = :sys.get_state(db)
+  end
+
+  test "file_sync/1 returns :ok", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    assert :ok = CubDB.file_sync(db)
   end
 end

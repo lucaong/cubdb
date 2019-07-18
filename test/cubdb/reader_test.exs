@@ -128,4 +128,14 @@ defmodule CubDB.Store.ReaderTest do
     assert_receive {:test_tag, {:ok, [c: 3, d: 4]}}
     assert_receive {:check_out_reader, ^btree}
   end
+
+  test "start_link/4 performs :select with invalid :pipe", %{btree: btree} do
+    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:select, [
+      pipe: [
+        xxx: 123,
+      ]
+    ]})
+    assert_receive {:test_tag, {:error, _}}
+    assert_receive {:check_out_reader, ^btree}
+  end
 end

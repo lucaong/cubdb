@@ -86,7 +86,7 @@ defmodule CubDB.Btree do
 
     {st, count} =
       Enum.reduce(enum, {[], 0}, fn {k, v}, {st, count} ->
-        {load_node(store, k, {@value, v}, st, 1, cap), count + 1}
+        {load_node(store, k, value(val: v), st, 1, cap), count + 1}
       end)
 
     if count == 0 do
@@ -123,7 +123,7 @@ defmodule CubDB.Btree do
   # same key if existing. It does not commit the operation, so `commit/1` must
   # be explicitly called to commit the insertion.
   def insert(btree, key, value) do
-    insert_terminal_node(btree, key, {@value, value})
+    insert_terminal_node(btree, key, value(val: value))
   end
 
   @spec delete(Btree.t(), key) :: Btree.t()
@@ -318,7 +318,7 @@ defmodule CubDB.Btree do
 
   defp make_node(children, level) do
     children = Enum.reverse(children)
-    if level == 1, do: {@leaf, children}, else: {@branch, children}
+    if level == 1, do: leaf(children: children), else: branch(children: children)
   end
 
   @spec lookup_leaf(internal_node, Store.t(), key, [internal_node]) :: {leaf_node, [internal_node]}
@@ -360,7 +360,7 @@ defmodule CubDB.Btree do
 
       new_nodes ->
         new_locs = store_nodes(store, new_nodes)
-        root = {@branch, new_locs}
+        root = branch(children: new_locs)
         {Store.put_node(store, root), root}
     end
   end

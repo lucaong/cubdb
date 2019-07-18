@@ -3,7 +3,8 @@ VERSION_TAG = v$(VERSION)
 
 .PHONY: test
 test:
-	mix test --include property_based
+	mix dialyzer --halt-exit-status
+	mix coveralls --include property_based
 
 .PHONY: benchmarks
 benchmarks:

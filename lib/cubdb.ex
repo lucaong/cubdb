@@ -630,13 +630,6 @@ defmodule CubDB do
     Enum.member?(file_extensions, Path.extname(file_name))
   end
 
-  @spec db_file?(binary) :: boolean
-
-  @doc false
-  def db_file?(file_name) do
-    Path.extname(file_name) == @db_file_extension
-  end
-
   @spec compaction_file?(binary) :: boolean
 
   @doc false
@@ -768,8 +761,10 @@ defmodule CubDB do
 
   def handle_call(:compact, _, state) do
     case trigger_compaction(state) do
-      {:ok, compactor} -> {:reply, :ok, %State{state | compactor: compactor}}
-      error -> {:reply, error, state}
+      {:ok, compactor} ->
+        {:reply, :ok, %State{state | compactor: compactor}}
+      error ->
+        {:reply, error, state}
     end
   end
 
@@ -822,6 +817,11 @@ defmodule CubDB do
         else: state
 
     {:noreply, state}
+  end
+
+  # Only used for testing
+  def handle_info({:_test_check_in_reader, btree}, state) do
+    {:noreply, check_in_reader(btree, state)}
   end
 
   @spec read(GenServer.from(), Btree.t(), Reader.operation(), %State{}) :: %State{}
@@ -940,6 +940,7 @@ defmodule CubDB do
 
   defp clean_up_now(state = %State{btree: btree, clean_up: clean_up}) do
     :ok = CleanUp.clean_up(clean_up, btree)
+    for pid <- state.subs, do: send(pid, :clean_up_started)
     %State{state | clean_up_pending: false}
   end
 

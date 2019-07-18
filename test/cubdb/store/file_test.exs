@@ -2,11 +2,11 @@ defmodule CubDB.Store.FileTest do
   use CubDB.StoreExamples, async: true
 
   setup do
-    tmp_path = :os.cmd('mktemp') |> List.to_string |> String.trim |> String.to_charlist
+    tmp_path = :os.cmd('mktemp') |> List.to_string |> String.trim
     store = CubDB.Store.File.new(tmp_path)
 
     on_exit(fn ->
-      :file.delete(tmp_path)
+      :file.delete(tmp_path |> String.to_charlist)
     end)
 
     {:ok, store: store, file_path: tmp_path}
@@ -18,33 +18,44 @@ defmodule CubDB.Store.FileTest do
     assert Process.alive?(pid)
   end
 
-  test "skips corrupted header and locates latest good header", %{store: store} do
+  test "get_latest_header/1 skips corrupted header and locates latest good header", %{store: store} do
     good_header = {1, 2, 3}
     CubDB.Store.put_header(store, good_header)
 
     CubDB.Store.put_header(store, {0, 0, 0})
 
     # corrupt the last header
-    with {:ok, file} <- :file.open(store.file_path, [:read, :write, :raw, :binary]),
-         {:ok, pos} <- :file.position(file, :eof),
-         :ok <- :file.pwrite(file, pos - 7, "garbage") do
-      assert {_, ^good_header} = CubDB.Store.get_latest_header(store)
-    end
+    {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])
+    {:ok, pos} = :file.position(file, :eof)
+    :ok = :file.pwrite(file, pos - 7, "garbage")
+
+    assert {_, ^good_header} = CubDB.Store.get_latest_header(store)
   end
 
-  test "skips truncated header and locates latest good header", %{store: store} do
+  test "get_latest_header/1 skips truncated header and locates latest good header", %{store: store} do
     good_header = {1, 2, 3}
     CubDB.Store.put_header(store, good_header)
 
     CubDB.Store.put_header(store, {0, 0, 0})
 
     # truncate the last header
-    with {:ok, file} <- :file.open(store.file_path, [:read, :write, :raw, :binary]),
-         {:ok, pos} <- :file.position(file, :eof),
-         :ok <- :file.position(file, pos - 1),
-         :ok <- :file.truncate(file) do
-      assert {_, ^good_header} = CubDB.Store.get_latest_header(store)
-    end
+    {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])
+    {:ok, pos} = :file.position(file, :eof)
+    {:ok, _} = :file.position(file, pos - 1)
+    :ok = :file.truncate(file)
+
+    assert {_, ^good_header} = CubDB.Store.get_latest_header(store)
+  end
+
+  test "get_latest_header/1 skips data and locates latest good header", %{store: store} do
+    header = {1, 2, 3}
+    CubDB.Store.put_header(store, header)
+
+    data_longer_than_one_block = String.duplicate("x", 1030)
+
+    CubDB.Store.put_node(store, data_longer_than_one_block)
+
+    assert {_, ^header} = CubDB.Store.get_latest_header(store)
   end
 
   test "close/1 stops the agent", %{store: store} do
