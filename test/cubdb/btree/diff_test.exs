@@ -9,26 +9,28 @@ defmodule CubDB.Btree.DiffTest do
 
   doctest Btree.Diff
 
-  @value Btree.__value__
-  @deleted Btree.__deleted__
+  @value Btree.__value__()
+  @deleted Btree.__deleted__()
 
   test "Diff implements Enumerable" do
     Protocol.assert_impl!(Enumerable, Diff)
   end
 
   test "new/2 returns a Diff" do
-    store = Store.TestStore.new
+    store = Store.TestStore.new()
     from_btree = make_btree(store, [foo: 1, bar: 2, baz: 3], 3)
-    to_btree = Enum.reduce([qux: 4, quux: 5], from_btree, fn {key, val}, btree ->
-      Btree.insert(btree, key, val)
-    end)
+
+    to_btree =
+      Enum.reduce([qux: 4, quux: 5], from_btree, fn {key, val}, btree ->
+        Btree.insert(btree, key, val)
+      end)
 
     assert %Diff{from_btree: from_btree, to_btree: to_btree} = Diff.new(from_btree, to_btree)
   end
 
   test "new/2 raises an error if from_btree and to_btree do not share the same store" do
-    from_btree = make_btree(Store.TestStore.new, [foo: 1, bar: 2, baz: 3], 3)
-    to_btree = make_btree(Store.TestStore.new, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
+    from_btree = make_btree(Store.TestStore.new(), [foo: 1, bar: 2, baz: 3], 3)
+    to_btree = make_btree(Store.TestStore.new(), [foo: 1, bar: 2, baz: 3, qux: 4], 3)
 
     assert_raise ArgumentError, fn ->
       Diff.new(from_btree, to_btree)
@@ -36,11 +38,14 @@ defmodule CubDB.Btree.DiffTest do
   end
 
   test "iterates through updates between from_btree and to_btree" do
-    store = Store.TestStore.new
+    store = Store.TestStore.new()
     from_btree = make_btree(store, [foo: 1, bar: 2, baz: 3], 3)
-    to_btree = Enum.reduce([qux: 4, quux: 5], from_btree, fn {key, val}, btree ->
-      Btree.insert(btree, key, val)
-    end) |> Btree.mark_deleted(:bar)
+
+    to_btree =
+      Enum.reduce([qux: 4, quux: 5], from_btree, fn {key, val}, btree ->
+        Btree.insert(btree, key, val)
+      end)
+      |> Btree.mark_deleted(:bar)
 
     to_btree |> Btree.insert(:x, 6) |> Btree.mark_deleted(:baz)
 
@@ -50,11 +55,13 @@ defmodule CubDB.Btree.DiffTest do
   end
 
   test "Enumerable.count, Enumerable.member?, and Enumerable.slice return {:error, __MODULE__}" do
-    store = Store.TestStore.new
+    store = Store.TestStore.new()
     from_btree = make_btree(store, [foo: 1, bar: 2, baz: 3], 3)
-    to_btree = Enum.reduce([qux: 4, quux: 5], from_btree, fn {key, val}, btree ->
-      Btree.insert(btree, key, val)
-    end)
+
+    to_btree =
+      Enum.reduce([qux: 4, quux: 5], from_btree, fn {key, val}, btree ->
+        Btree.insert(btree, key, val)
+      end)
 
     diff = Diff.new(from_btree, to_btree)
 

@@ -2,13 +2,15 @@ ExUnit.configure(
   exclude: [property_based: true],
   assert_receive_timeout: System.get_env("ASSERT_RECEIVE_TIMEOUT", "100") |> String.to_integer()
 )
+
 ExUnit.start()
 
 defmodule TestHelper do
   def make_btree(store, entries, cap \\ 32) do
     Enum.reduce(entries, CubDB.Btree.new(store, cap), fn {key, value}, btree ->
       CubDB.Btree.insert(btree, key, value)
-    end) |> CubDB.Btree.commit
+    end)
+    |> CubDB.Btree.commit()
   end
 
   defmodule Btree.Utils do

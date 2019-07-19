@@ -25,28 +25,38 @@ defmodule CubDB.Btree.KeyRangeTest do
       quuux: 8
     ]
 
-    store = Store.TestStore.new
+    store = Store.TestStore.new()
     btree = make_btree(store, entries, 3)
 
-    for {min, max} <- [{nil, nil}, {:bar, :qux}, {:ba, :zz}, {nil, :qux}, {:yy, :zz}, {:baz, nil}, {:c, :a}],
-      min_incl <- [:included, :excluded],
-      max_incl <- [:included, :excluded] do
+    for {min, max} <- [
+          {nil, nil},
+          {:bar, :qux},
+          {:ba, :zz},
+          {nil, :qux},
+          {:yy, :zz},
+          {:baz, nil},
+          {:c, :a}
+        ],
+        min_incl <- [:included, :excluded],
+        max_incl <- [:included, :excluded] do
       min_key = if min == nil, do: min, else: {min, min_incl}
       max_key = if max == nil, do: max, else: {max, max_incl}
       key_range = KeyRange.new(btree, min_key, max_key)
+
       expected_entries =
         entries
         |> Enum.filter(fn {key, _} ->
-          (min_key == nil || (min_incl == :included && key >= min) || key > min)
-            && (max_key == nil || (max_incl == :included && key <= max) || key < max)
+          (min_key == nil || (min_incl == :included && key >= min) || key > min) &&
+            (max_key == nil || (max_incl == :included && key <= max) || key < max)
         end)
         |> List.keysort(0)
 
       assert Enum.to_list(key_range) == expected_entries
       assert Enum.count(key_range) == length(expected_entries)
-      assert Stream.map(key_range, &(&1)) |> Enum.to_list == expected_entries
-      assert Stream.zip(key_range, entries) |> Enum.to_list ==
-        Enum.zip(expected_entries, entries)
+      assert Stream.map(key_range, & &1) |> Enum.to_list() == expected_entries
+
+      assert Stream.zip(key_range, entries) |> Enum.to_list() ==
+               Enum.zip(expected_entries, entries)
     end
   end
 
@@ -62,7 +72,7 @@ defmodule CubDB.Btree.KeyRangeTest do
       h: 8
     ]
 
-    store = Store.TestStore.new
+    store = Store.TestStore.new()
     btree = make_btree(store, entries, 3)
 
     key_range = KeyRange.new(btree, {:b, :included}, {:g, :included}, true)
@@ -72,7 +82,7 @@ defmodule CubDB.Btree.KeyRangeTest do
 
   test "Enum.member/2 returns false if key is outside of range, or not in the btree, and true otherwise" do
     entries = [a: 1, b: 2, c: 3, d: 4]
-    store = Store.TestStore.new
+    store = Store.TestStore.new()
     btree = make_btree(store, entries, 3)
 
     assert Enum.member?(KeyRange.new(btree, {:b, :included}, {:c, :included}), {:a, 1}) == false
@@ -90,7 +100,7 @@ defmodule CubDB.Btree.KeyRangeTest do
   end
 
   test "Enumerable.Btree.KeyRange.reduce/3 skips nodes marked as deleted" do
-    store = Store.TestStore.new
+    store = Store.TestStore.new()
     tree = make_btree(store, [a: 1, b: 2, c: 3, d: 4], 3) |> Btree.mark_deleted(:b)
     key_range = KeyRange.new(tree, {:a, :included}, {:d, :excluded})
     assert Enum.to_list(key_range) == [a: 1, c: 3]

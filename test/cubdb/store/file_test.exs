@@ -2,11 +2,11 @@ defmodule CubDB.Store.FileTest do
   use CubDB.StoreExamples, async: true
 
   setup do
-    tmp_path = :os.cmd('mktemp') |> List.to_string |> String.trim
+    tmp_path = :os.cmd('mktemp') |> List.to_string() |> String.trim()
     store = CubDB.Store.File.new(tmp_path)
 
     on_exit(fn ->
-      :file.delete(tmp_path |> String.to_charlist)
+      :file.delete(tmp_path |> String.to_charlist())
     end)
 
     {:ok, store: store, file_path: tmp_path}
@@ -18,7 +18,9 @@ defmodule CubDB.Store.FileTest do
     assert Process.alive?(pid)
   end
 
-  test "get_latest_header/1 skips corrupted header and locates latest good header", %{store: store} do
+  test "get_latest_header/1 skips corrupted header and locates latest good header", %{
+    store: store
+  } do
     good_header = {1, 2, 3}
     CubDB.Store.put_header(store, good_header)
 
@@ -32,7 +34,9 @@ defmodule CubDB.Store.FileTest do
     assert {_, ^good_header} = CubDB.Store.get_latest_header(store)
   end
 
-  test "get_latest_header/1 skips truncated header and locates latest good header", %{store: store} do
+  test "get_latest_header/1 skips truncated header and locates latest good header", %{
+    store: store
+  } do
     good_header = {1, 2, 3}
     CubDB.Store.put_header(store, good_header)
 

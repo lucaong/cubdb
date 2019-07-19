@@ -3,12 +3,13 @@ defmodule CubDBTest do
   doctest CubDB
 
   setup do
-    tmp_dir = :os.cmd('mktemp -d') |> List.to_string |> String.trim |> String.to_charlist
+    tmp_dir = :os.cmd('mktemp -d') |> List.to_string() |> String.trim() |> String.to_charlist()
 
     on_exit(fn ->
       with {:ok, files} <- File.ls(tmp_dir) do
         for file <- files, do: File.rm(Path.join(tmp_dir, file))
       end
+
       :ok = File.rmdir(tmp_dir)
     end)
 
@@ -24,7 +25,7 @@ defmodule CubDBTest do
   end
 
   test "start_link/3 returns error if options are invalid", %{tmp_dir: tmp_dir} do
-    assert {:error, _} = CubDB.start_link(tmp_dir, [auto_compact: "maybe"])
+    assert {:error, _} = CubDB.start_link(tmp_dir, auto_compact: "maybe")
   end
 
   test "start/3 starts the process without linking", %{tmp_dir: tmp_dir} do
@@ -58,6 +59,7 @@ defmodule CubDBTest do
 
   test "select/3 works as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
+
     entries = [
       {{:names, 0}, "Ada"},
       {{:names, 2}, "Zoe"},
@@ -69,20 +71,24 @@ defmodule CubDBTest do
 
     for {key, value} <- entries, do: CubDB.put(db, key, value)
 
-    assert {:ok, result} = CubDB.select(db,
-      min_key: {:names, 0},
-      max_key: {{:names, 2}, :excluded}
-    )
+    assert {:ok, result} =
+             CubDB.select(db,
+               min_key: {:names, 0},
+               max_key: {{:names, 2}, :excluded}
+             )
+
     assert result == [{{:names, 0}, "Ada"}, {{:names, 1}, "Jay"}]
 
-    assert {:ok, result} = CubDB.select(db,
-      min_key: :a,
-      max_key: :c,
-      pipe: [
-        map: fn {_, value} -> value end
-      ],
-      reduce: fn n, sum -> sum + n end
-    )
+    assert {:ok, result} =
+             CubDB.select(db,
+               min_key: :a,
+               max_key: :c,
+               pipe: [
+                 map: fn {_, value} -> value end
+               ],
+               reduce: fn n, sum -> sum + n end
+             )
+
     assert result == 6
   end
 
@@ -92,58 +98,74 @@ defmodule CubDBTest do
 
     CubDB.put_multi(db, entries)
 
-    reads = Task.async_stream([:a, :b, :c], fn key ->
-      value = CubDB.get(db, key)
-      CubDB.put(db, :b, 0)
-      value
-    end) |> Enum.to_list
+    reads =
+      Task.async_stream([:a, :b, :c], fn key ->
+        value = CubDB.get(db, key)
+        CubDB.put(db, :b, 0)
+        value
+      end)
+      |> Enum.to_list()
 
     assert [ok: 1, ok: 2, ok: 3] = reads
     assert {:ok, [a: 1, b: 0, c: 3, d: 4]} = CubDB.select(db)
   end
 
-  test "get_and_update_multi/4, get_and_update/3 and update/3 work as expected", %{tmp_dir: tmp_dir} do
+  test "get_and_update_multi/4, get_and_update/3 and update/3 work as expected", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
     entries = [a: 1, b: 2, c: 3, d: 4]
 
     for {key, value} <- entries, do: CubDB.put(db, key, value)
 
-    assert {:ok, result} = CubDB.get_and_update_multi(db, [:a, :c], fn %{a: a, c: c} ->
-      a = a + 1
-      c = c - 1
-      {[a, c], %{a: a, c: c}, [:d]}
-    end)
+    assert {:ok, result} =
+             CubDB.get_and_update_multi(db, [:a, :c], fn %{a: a, c: c} ->
+               a = a + 1
+               c = c - 1
+               {[a, c], %{a: a, c: c}, [:d]}
+             end)
+
     assert result == [2, 2]
     assert CubDB.get(db, :a) == 2
     assert CubDB.get(db, :c) == 2
     assert CubDB.has_key?(db, :d) == false
 
-    assert {:ok, result} = CubDB.get_and_update(db, :b, fn b ->
-      {b, b + 3}
-    end)
+    assert {:ok, result} =
+             CubDB.get_and_update(db, :b, fn b ->
+               {b, b + 3}
+             end)
+
     assert result == 2
     assert CubDB.get(db, :b) == 5
 
-    assert {:ok, result} = CubDB.get_and_update(db, :b, fn _ ->
-      :pop
-    end)
+    assert {:ok, result} =
+             CubDB.get_and_update(db, :b, fn _ ->
+               :pop
+             end)
+
     assert result == 5
     assert CubDB.has_key?(db, :b) == false
 
-    assert :ok = CubDB.update(db, :b, 0, fn b ->
-      b + 1
-    end)
+    assert :ok =
+             CubDB.update(db, :b, 0, fn b ->
+               b + 1
+             end)
+
     assert CubDB.get(db, :b) == 0
 
-    assert :ok = CubDB.update(db, :b, 0, fn b ->
-      b + 1
-    end)
+    assert :ok =
+             CubDB.update(db, :b, 0, fn b ->
+               b + 1
+             end)
+
     assert CubDB.get(db, :b) == 1
 
-    assert {:error, error} = CubDB.get_and_update_multi(db, [:a, :c], fn _ ->
-      raise(RuntimeError, message: "boom")
-    end)
+    assert {:error, error} =
+             CubDB.get_and_update_multi(db, [:a, :c], fn _ ->
+               raise(RuntimeError, message: "boom")
+             end)
+
     assert %RuntimeError{message: "boom"} = error
   end
 
@@ -156,11 +178,13 @@ defmodule CubDBTest do
 
     CubDB.compact(db)
 
-    assert {:ok, result} = CubDB.get_and_update_multi(db, [:a, :c], fn %{a: a, c: c} ->
-      a = a + 1
-      c = c - 1
-      {[a, c], %{a: a, c: c}, [:d]}
-    end)
+    assert {:ok, result} =
+             CubDB.get_and_update_multi(db, [:a, :c], fn %{a: a, c: c} ->
+               a = a + 1
+               c = c - 1
+               {[a, c], %{a: a, c: c}, [:d]}
+             end)
+
     assert result == [2, 2]
     assert CubDB.get(db, :a) == 2
     assert CubDB.get(db, :c) == 2
@@ -201,7 +225,7 @@ defmodule CubDBTest do
   test "put_multi/2 is persisted to disk", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
 
     GenServer.stop(db)
 
@@ -241,12 +265,13 @@ defmodule CubDBTest do
   test "get_and_update_multi/4 is persisted to disk", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
 
-    {:ok, %{a: 1, b: 2, c: 3}} = CubDB.get_and_update_multi(db, [:a, :b, :c], fn entries ->
-      entries_incremented = entries |> Enum.map(fn {k, v} -> {k, v + 1} end) |> Enum.into(%{})
-      {entries, entries_incremented, []}
-    end)
+    {:ok, %{a: 1, b: 2, c: 3}} =
+      CubDB.get_and_update_multi(db, [:a, :b, :c], fn entries ->
+        entries_incremented = entries |> Enum.map(fn {k, v} -> {k, v + 1} end) |> Enum.into(%{})
+        {entries, entries_incremented, []}
+      end)
 
     GenServer.stop(db)
 
@@ -258,7 +283,7 @@ defmodule CubDBTest do
   test "delete/2 is persisted to disk", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
 
     :ok = CubDB.delete(db, :a)
 
@@ -272,7 +297,7 @@ defmodule CubDBTest do
   test "delete_multi/2 is persisted to disk", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3])
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
 
     :ok = CubDB.delete_multi(db, [:a, :c])
 
@@ -346,9 +371,11 @@ defmodule CubDBTest do
     assert {:error, _} = CubDB.set_auto_compact(db, {:x, 100})
   end
 
-  test "compact/1 returns :ok, or {:error, :pending_compaction} if already compacting", %{tmp_dir: tmp_dir} do
+  test "compact/1 returns :ok, or {:error, :pending_compaction} if already compacting", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, db} = CubDB.start_link(tmp_dir)
-    :ok = CubDB.put_multi(db, [a: 1, b: 2, c: 3, d: 4, e: 5])
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
     CubDB.subscribe(db)
 
     assert :ok = CubDB.compact(db)

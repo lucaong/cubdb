@@ -6,12 +6,13 @@ defmodule CubDB.Store.CompactorTest do
   alias CubDB.Compactor
 
   setup do
-    tmp_dir = :os.cmd('mktemp -d') |> List.to_string |> String.trim |> String.to_charlist
+    tmp_dir = :os.cmd('mktemp -d') |> List.to_string() |> String.trim() |> String.to_charlist()
 
     on_exit(fn ->
       with {:ok, files} <- File.ls(tmp_dir) do
         for file <- files, do: File.rm(Path.join(tmp_dir, file))
       end
+
       :ok = File.rmdir(tmp_dir)
     end)
 
@@ -20,9 +21,12 @@ defmodule CubDB.Store.CompactorTest do
 
   test "start_link/3 runs compaction on a Btree and sends back the result", %{tmp_dir: tmp_dir} do
     entries = [foo: 1, bar: 2, baz: 3]
-    btree = Enum.reduce(entries, Btree.new(Store.TestStore.new), fn {key, value}, btree ->
-      Btree.insert(btree, key, value)
-    end)
+
+    btree =
+      Enum.reduce(entries, Btree.new(Store.TestStore.new()), fn {key, value}, btree ->
+        Btree.insert(btree, key, value)
+      end)
+
     store = Store.File.new(Path.join(tmp_dir, "1.compact"))
 
     {:ok, _pid} = Compactor.start_link(self(), btree, store)
