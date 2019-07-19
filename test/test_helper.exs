@@ -1,6 +1,11 @@
+assert_receive_timeout = case System.get_env("ASSERT_RECEIVE_TIMEOUT") do
+  nil -> 100
+  str -> String.to_integer(str)
+end
+
 ExUnit.configure(
   exclude: [property_based: true],
-  assert_receive_timeout: System.get_env("ASSERT_RECEIVE_TIMEOUT", "100") |> String.to_integer()
+  assert_receive_timeout: assert_receive_timeout
 )
 
 ExUnit.start()
