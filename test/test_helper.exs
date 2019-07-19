@@ -1,4 +1,7 @@
-ExUnit.configure(exclude: [property_based: true])
+ExUnit.configure(
+  exclude: [property_based: true],
+  assert_receive_timeout: System.get_env("ASSERT_RECEIVE_TIMEOUT", "100") |> String.to_integer()
+)
 ExUnit.start()
 
 defmodule TestHelper do
