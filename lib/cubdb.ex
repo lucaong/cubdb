@@ -149,7 +149,11 @@ defmodule CubDB do
               subs: []
   end
 
-  @spec start_link(binary, Keyword.t(), GenServer.options()) :: GenServer.on_start()
+  @spec start_link(
+          binary,
+          [auto_compact: {pos_integer, number} | boolean, auto_file_sync: boolean],
+          GenServer.options()
+        ) :: GenServer.on_start()
 
   @doc """
   Starts the `CubDB` database process linked to the current process.
@@ -175,7 +179,11 @@ defmodule CubDB do
     GenServer.start_link(__MODULE__, [data_dir, options], gen_server_options)
   end
 
-  @spec start(binary, Keyword.t(), GenServer.options()) :: GenServer.on_start()
+  @spec start(
+          binary,
+          [auto_compact: {pos_integer, number} | boolean, auto_file_sync: boolean],
+          GenServer.options()
+        ) :: GenServer.on_start()
 
   @doc """
   Starts the `CubDB` database without a link.
