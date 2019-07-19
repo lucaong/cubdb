@@ -38,8 +38,10 @@ defmodule CubDB.CatchUp do
     Enum.reduce(diff, compacted_btree, fn
       {key, {@value, value}}, compacted_btree ->
         Btree.insert(compacted_btree, key, value)
+
       {key, @deleted}, compacted_btree ->
         Btree.delete(compacted_btree, key)
-    end) |> Btree.commit
+    end)
+    |> Btree.commit()
   end
 end

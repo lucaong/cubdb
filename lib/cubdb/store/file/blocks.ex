@@ -88,7 +88,7 @@ defmodule CubDB.Store.File.Blocks do
     data_size = block_size - 1
 
     if byte_size(bin) <= data_size do
-      [bin | [<<@data_marker>> | acc]] |> Enum.reverse
+      [bin | [<<@data_marker>> | acc]] |> Enum.reverse()
     else
       <<block::binary-size(data_size), rest::binary>> = bin
       add(rest, [block | [<<@data_marker>> | acc]], block_size)
@@ -98,7 +98,7 @@ defmodule CubDB.Store.File.Blocks do
   defp strip(bin, acc, block_size) do
     if byte_size(bin) <= block_size do
       <<_::binary-1, block::binary>> = bin
-      [block | acc] |> Enum.reverse
+      [block | acc] |> Enum.reverse()
     else
       data_size = block_size - 1
       <<_::binary-1, block::binary-size(data_size), rest::binary>> = bin

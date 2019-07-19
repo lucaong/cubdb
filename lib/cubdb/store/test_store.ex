@@ -37,8 +37,8 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
 
   def get_node(%TestStore{agent: agent}, location) do
     case Agent.get(agent, fn {map, _} ->
-      Map.fetch(map, location)
-    end) do
+           Map.fetch(map, location)
+         end) do
       {:ok, value} -> value
       :error -> raise(ArgumentError, message: "End of file")
     end

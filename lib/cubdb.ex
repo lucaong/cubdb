@@ -494,6 +494,7 @@ defmodule CubDB do
       values = keys |> Enum.map(fn key -> Map.get(entries, key, default) end)
       {values, %{}, []}
     end
+
     {:ok, result} = GenServer.call(db, {:get_and_update_multi, keys, fun})
     result
   end
@@ -505,12 +506,14 @@ defmodule CubDB do
 
   Entries are passed as a map of `%{key => value}` or a list of `{key, value}`.
   """
-  def put_multi(db, entries) when not is_map(entries), do: put_multi(db, entries |> Enum.into(%{}))
+  def put_multi(db, entries) when not is_map(entries),
+    do: put_multi(db, entries |> Enum.into(%{}))
 
   def put_multi(db, entries) do
     fun = fn _ ->
       {:ok, entries, []}
     end
+
     {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun})
     result
   end
@@ -526,6 +529,7 @@ defmodule CubDB do
     fun = fn _ ->
       {:ok, %{}, keys}
     end
+
     {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun})
     result
   end
@@ -703,7 +707,7 @@ defmodule CubDB do
 
   def handle_call({:put, key, value}, _, state) do
     %State{btree: btree, auto_file_sync: auto_file_sync} = state
-    btree = Btree.insert(btree, key, value) |> Btree.commit
+    btree = Btree.insert(btree, key, value) |> Btree.commit()
     btree = if auto_file_sync, do: Btree.sync(btree), else: btree
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
@@ -713,8 +717,8 @@ defmodule CubDB do
 
     btree =
       case compactor do
-        nil -> Btree.delete(btree, key) |> Btree.commit
-        _ -> Btree.mark_deleted(btree, key) |> Btree.commit
+        nil -> Btree.delete(btree, key) |> Btree.commit()
+        _ -> Btree.mark_deleted(btree, key) |> Btree.commit()
       end
 
     btree = if auto_file_sync, do: Btree.sync(btree), else: btree
@@ -763,6 +767,7 @@ defmodule CubDB do
     case trigger_compaction(state) do
       {:ok, compactor} ->
         {:reply, :ok, %State{state | compactor: compactor}}
+
       error ->
         {:reply, error, state}
     end

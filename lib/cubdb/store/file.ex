@@ -78,8 +78,8 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
   def get_node(%Store.File{pid: pid}, location) do
     case Agent.get(pid, fn {file, _} ->
-      read_term(file, location)
-    end) do
+           read_term(file, location)
+         end) do
       {:ok, term} -> term
       {:error, error} -> raise(error)
     end
@@ -123,7 +123,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     length_with_markers = Blocks.length_with_markers(location, length)
 
     with {:ok, bin} <- :file.pread(file, location, length_with_markers) do
-      bytes = Blocks.strip_markers(bin, location) |> Enum.join
+      bytes = Blocks.strip_markers(bin, location) |> Enum.join()
       {:ok, bytes, length_with_markers}
     end
   end
