@@ -422,4 +422,24 @@ defmodule CubDBTest do
     {:ok, db} = CubDB.start_link(tmp_dir)
     assert :ok = CubDB.file_sync(db)
   end
+
+  test "data_dir/1 returns the path to the data directory", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    assert ^tmp_dir = CubDB.data_dir(db)
+  end
+
+  test "current_db_file/1 returns the path to the current database file", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    expected_file_path = Path.join(tmp_dir, "0.cub")
+    assert ^expected_file_path = CubDB.current_db_file(db)
+
+    CubDB.subscribe(db)
+    CubDB.compact(db)
+
+    assert_receive :catch_up_completed
+    assert_receive :clean_up_started
+
+    expected_file_path = Path.join(tmp_dir, "1.cub")
+    assert ^expected_file_path = CubDB.current_db_file(db)
+  end
 end

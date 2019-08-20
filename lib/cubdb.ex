@@ -634,6 +634,43 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_file_sync, bool})
   end
 
+  @spec data_dir(GenServer.server()) :: binary
+
+  @doc """
+  Returns the path of the data directory, as given when the `CubDB` process was
+  started.
+
+  ## Example
+
+      {:ok, db} = CubDB.start_link("some/data/directory")
+
+      CubDB.data_dir(db)
+      #=> "some/data/directory"
+  """
+
+  def data_dir(db) do
+    GenServer.call(db, :data_dir)
+  end
+
+  @spec current_db_file(GenServer.server()) :: binary
+
+  @doc """
+  Returns the path of the current database file.
+
+  The current database file will change after a compaction operation.
+
+  ## Example
+
+      {:ok, db} = CubDB.start_link("some/data/directory")
+
+      CubDB.current_db_file(db)
+      #=> "some/data/directory/0.cub"
+  """
+
+  def current_db_file(db) do
+    GenServer.call(db, :current_db_file)
+  end
+
   @spec cubdb_file?(binary) :: boolean
 
   @doc false
@@ -799,6 +836,16 @@ defmodule CubDB do
   def handle_call(:file_sync, _, state = %State{btree: btree}) do
     btree = Btree.sync(btree)
     {:reply, :ok, %State{state | btree: btree}}
+  end
+
+  def handle_call(:data_dir, _, state = %State{data_dir: data_dir}) do
+    {:reply, data_dir, state}
+  end
+
+  def handle_call(:current_db_file, _, state = %State{btree: btree}) do
+    %Btree{store: store} = btree
+    %Store.File{file_path: file_path} = store
+    {:reply, file_path, state}
   end
 
   def handle_info({:compaction_completed, original_btree, compacted_btree}, state) do
