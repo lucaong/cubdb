@@ -576,8 +576,8 @@ defmodule CubDB do
   If set to `false`, no automatic compaction is performed. If set to `true`,
   auto-compaction is performed, following a write operation, if at least 100
   write operations occurred since the last compaction, and the dirt factor is at
-  least 0.2. These values can be customized by setting the `auto_compact` option
-  to `{min_writes, min_dirt_factor}`.
+  least 0.25. These values can be customized by setting the `auto_compact`
+  option to `{min_writes, min_dirt_factor}`.
 
   It returns `:ok`, or `{:error, reason}` if `setting` is invalid.
 
