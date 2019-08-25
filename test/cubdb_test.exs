@@ -307,6 +307,34 @@ defmodule CubDBTest do
     assert {:ok, [b: 2]} = CubDB.select(db)
   end
 
+  test "start_link/3 uses the last filename (in base 16)", %{tmp_dir: tmp_dir} do
+    File.touch(Path.join(tmp_dir, "F.cub"))
+    File.touch(Path.join(tmp_dir, "X.cub"))
+    File.touch(Path.join(tmp_dir, "10.cub"))
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert CubDB.current_db_file(db) == Path.join(tmp_dir, "10.cub")
+  end
+
+  test "compaction switches to a new file incrementing in base 16", %{tmp_dir: tmp_dir} do
+    File.touch(Path.join(tmp_dir, "F.cub"))
+    File.touch(Path.join(tmp_dir, "X.cub"))
+    File.touch(Path.join(tmp_dir, "10.cub"))
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    CubDB.subscribe(db)
+
+    :ok = CubDB.compact(db)
+
+    assert_receive :compaction_started
+    assert_receive :compaction_completed, 1000
+    assert_receive :catch_up_completed, 1000
+
+    assert CubDB.current_db_file(db) == Path.join(tmp_dir, "11.cub")
+  end
+
   test "compaction catches up on newer updates", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 

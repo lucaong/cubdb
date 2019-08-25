@@ -676,7 +676,8 @@ defmodule CubDB do
   @doc false
   def cubdb_file?(file_name) do
     file_extensions = [@db_file_extension, @compaction_file_extension]
-    Enum.member?(file_extensions, Path.extname(file_name))
+    basename = Path.basename(file_name, Path.extname(file_name))
+    Enum.member?(file_extensions, Path.extname(file_name)) && Regex.match?(~r/[\da-fA-F]+/, basename)
   end
 
   @spec compaction_file?(binary) :: boolean
@@ -689,6 +690,12 @@ defmodule CubDB do
   @doc false
   def subscribe(db) do
     GenServer.call(db, {:subscribe, self()})
+  end
+
+  @doc false
+  def file_name_to_n(file_name) do
+    base_name = Path.basename(file_name, Path.extname(file_name))
+    String.to_integer(base_name, 16)
   end
 
   # OTP callbacks
@@ -897,8 +904,9 @@ defmodule CubDB do
     with :ok <- File.mkdir_p(data_dir),
          {:ok, files} <- File.ls(data_dir) do
       files
+      |> Enum.filter(&cubdb_file?/1)
       |> Enum.filter(&String.ends_with?(&1, @db_file_extension))
-      |> Enum.sort()
+      |> Enum.sort_by(&file_name_to_n/1)
       |> List.last()
     end
   end
@@ -937,10 +945,9 @@ defmodule CubDB do
       new_filename =
         file_names
         |> Enum.filter(&cubdb_file?/1)
-        |> Enum.map(fn file_name -> Path.basename(file_name, Path.extname(file_name)) end)
+        |> Enum.map(&file_name_to_n/1)
         |> Enum.sort()
         |> List.last()
-        |> String.to_integer(16)
         |> (&(&1 + 1)).()
         |> Integer.to_string(16)
         |> (&(&1 <> @compaction_file_extension)).()

@@ -5,7 +5,7 @@ defmodule CubDB.CleanUp do
   # old database files after a compaction (and catch-up) completes, or old
   # compaction files left over by compactions that did not complete.
   #
-  # It performs each clean-up operation in sequence. 
+  # It performs each clean-up operation in sequence.
 
   use GenServer
 
@@ -50,12 +50,15 @@ defmodule CubDB.CleanUp do
   end
 
   defp remove_older_files(data_dir, latest_file_name) do
+    latest_file_n = CubDB.file_name_to_n(latest_file_name)
     with {:ok, file_names} <- File.ls(data_dir) do
       file_names
       |> Enum.filter(&CubDB.cubdb_file?/1)
-      |> Enum.filter(&(&1 < latest_file_name))
-      |> Enum.reduce(:ok, fn file, _ ->
-        :ok = File.rm(Path.join(data_dir, file))
+      |> Enum.filter(fn file_name ->
+        CubDB.file_name_to_n(file_name) < latest_file_n
+      end)
+      |> Enum.reduce(:ok, fn file_name, _ ->
+        :ok = File.rm(Path.join(data_dir, file_name))
       end)
     end
   end

@@ -22,10 +22,10 @@ defmodule CubDB.Store.CleanUpTest do
   test "clean_up/2 removes all cubdb files older than the one used by the btree", %{
     tmp_dir: tmp_dir
   } do
-    files = ["0.cub", "0.txt", "1.cub", "2.compact", "3.cub", "4.compact", "5.cub"]
+    files = ["E.cub", "E.txt", "1.cub", "2.compact", "F.cub", "10.compact", "11.cub"]
     for file <- files, do: File.touch(Path.join(tmp_dir, file))
 
-    store = Store.File.new(Path.join(tmp_dir, "3.cub"))
+    store = Store.File.new(Path.join(tmp_dir, "F.cub"))
     btree = Btree.new(store)
 
     {:ok, pid} = CleanUp.start_link(tmp_dir)
@@ -35,7 +35,7 @@ defmodule CubDB.Store.CleanUpTest do
     :sys.get_state(pid)
 
     {:ok, remaining_files} = File.ls(tmp_dir)
-    assert Enum.sort(remaining_files) == ["0.txt", "3.cub", "4.compact", "5.cub"]
+    assert Enum.sort(remaining_files) == ["10.compact", "11.cub", "E.txt", "F.cub"]
   end
 
   test "clean_up_old_compaction_files/2 removes all compaction files not used by the store", %{
