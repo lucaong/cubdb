@@ -51,6 +51,7 @@ defmodule CubDB.CleanUp do
 
   defp remove_older_files(data_dir, latest_file_name) do
     latest_file_n = CubDB.file_name_to_n(latest_file_name)
+
     with {:ok, file_names} <- File.ls(data_dir) do
       file_names
       |> Enum.filter(&CubDB.cubdb_file?/1)
