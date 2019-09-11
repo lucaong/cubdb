@@ -190,26 +190,12 @@ defmodule CubDB.Btree do
     tree
   end
 
-  @spec key_range(Btree.t(), key | Btree.KeyRange.bound(), key | Btree.KeyRange.bound(), boolean) ::
+  @spec key_range(Btree.t(), Btree.KeyRange.bound(), Btree.KeyRange.bound(), boolean) ::
           Btree.KeyRange.t()
 
   # `key_range/4` returns a `Btree.KeyRange` `Enumerable` that can be used to
   # iterate through a range of entries with key between `min_key` and `max_key`.
   def key_range(tree, min_key \\ nil, max_key \\ nil, reverse \\ false) do
-    min_key =
-      case min_key do
-        {_, x} when x == :included or x == :excluded -> min_key
-        nil -> nil
-        _ -> {min_key, :included}
-      end
-
-    max_key =
-      case max_key do
-        {_, x} when x == :included or x == :excluded -> max_key
-        nil -> nil
-        _ -> {max_key, :included}
-      end
-
     Btree.KeyRange.new(tree, min_key, max_key, reverse)
   end
 

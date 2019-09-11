@@ -3,13 +3,14 @@ defmodule CubDB.Btree.KeyRange do
 
   # `CubDB.Btree.KeyRange` is a module implementing the `Enumerable` protocol to
   # iterate through a range of entries on a Btree bounded by a minimum and
-  # maximum key. The bounds can be exclusive or inclusive. This is primarily
-  # used for selection operations.
+  # maximum key. The bounds can be exclusive or inclusive: bounds are either
+  # `nil` or tuples of `{key, boolean}`, where the boolean indicates whether the
+  # bound is inclusive or not. This is primarily used for selection operations.
 
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
 
-  @type bound :: {Btree.key(), :included | :excluded} | nil
+  @type bound :: {Btree.key(), boolean} | nil
   @type t :: %KeyRange{btree: Btree.t(), min_key: bound, max_key: bound, reverse: boolean}
 
   @enforce_keys [:btree]
@@ -38,19 +39,19 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
 
   def count(_), do: {:error, __MODULE__}
 
-  def member?(%KeyRange{min_key: {min, :included}, max_key: _}, {key, _}) when key < min do
+  def member?(%KeyRange{min_key: {min, true}, max_key: _}, {key, _}) when key < min do
     {:ok, false}
   end
 
-  def member?(%KeyRange{min_key: _, max_key: {max, :included}}, {key, _}) when key > max do
+  def member?(%KeyRange{min_key: _, max_key: {max, true}}, {key, _}) when key > max do
     {:ok, false}
   end
 
-  def member?(%KeyRange{min_key: {min, :excluded}, max_key: _}, {key, _}) when key <= min do
+  def member?(%KeyRange{min_key: {min, false}, max_key: _}, {key, _}) when key <= min do
     {:ok, false}
   end
 
-  def member?(%KeyRange{min_key: _, max_key: {max, :excluded}}, {key, _}) when key >= max do
+  def member?(%KeyRange{min_key: _, max_key: {max, false}}, {key, _}) when key >= max do
     {:ok, false}
   end
 
@@ -99,19 +100,19 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
   defp get_children(_, _, _, {@value, v}, _), do: v
 
   defp filter_branch(nil, nil, _, _), do: true
-  defp filter_branch(nil, {max, :included}, key, _), do: key <= max
-  defp filter_branch(nil, {max, :excluded}, key, _), do: key < max
+  defp filter_branch(nil, {max, true}, key, _), do: key <= max
+  defp filter_branch(nil, {max, false}, key, _), do: key < max
   defp filter_branch({min, _}, nil, _, next_key), do: next_key > min
-  defp filter_branch({min, _}, {max, :included}, key, next_key), do: key <= max && next_key > min
-  defp filter_branch({min, _}, {max, :excluded}, key, next_key), do: key < max && next_key > min
+  defp filter_branch({min, _}, {max, true}, key, next_key), do: key <= max && next_key > min
+  defp filter_branch({min, _}, {max, false}, key, next_key), do: key < max && next_key > min
 
   defp filter_leave(nil, nil, _), do: true
-  defp filter_leave({min, :included}, nil, key), do: key >= min
-  defp filter_leave({min, :excluded}, nil, key), do: key > min
-  defp filter_leave(nil, {max, :included}, key), do: key <= max
-  defp filter_leave(nil, {max, :excluded}, key), do: key < max
-  defp filter_leave({min, :included}, {max, :included}, key), do: key >= min && key <= max
-  defp filter_leave({min, :excluded}, {max, :included}, key), do: key > min && key <= max
-  defp filter_leave({min, :included}, {max, :excluded}, key), do: key >= min && key < max
-  defp filter_leave({min, :excluded}, {max, :excluded}, key), do: key > min && key < max
+  defp filter_leave({min, true}, nil, key), do: key >= min
+  defp filter_leave({min, false}, nil, key), do: key > min
+  defp filter_leave(nil, {max, true}, key), do: key <= max
+  defp filter_leave(nil, {max, false}, key), do: key < max
+  defp filter_leave({min, true}, {max, true}, key), do: key >= min && key <= max
+  defp filter_leave({min, false}, {max, true}, key), do: key > min && key <= max
+  defp filter_leave({min, true}, {max, false}, key), do: key >= min && key < max
+  defp filter_leave({min, false}, {max, false}, key), do: key > min && key < max
 end

@@ -381,24 +381,24 @@ defmodule CubDB.BtreeTest do
 
     assert %Btree.KeyRange{
              btree: ^btree,
-             min_key: {^min_key, :included},
-             max_key: {^max_key, :included},
+             min_key: {^min_key, true},
+             max_key: {^max_key, true},
              reverse: ^reverse
-           } = Btree.key_range(btree, min_key, max_key, reverse)
+           } = Btree.key_range(btree, {min_key, true}, {max_key, true}, reverse)
 
     assert %Btree.KeyRange{
              btree: ^btree,
              min_key: nil,
-             max_key: {^max_key, :excluded},
+             max_key: {^max_key, false},
              reverse: ^reverse
-           } = Btree.key_range(btree, nil, {max_key, :excluded}, reverse)
+           } = Btree.key_range(btree, nil, {max_key, false}, reverse)
 
     assert %Btree.KeyRange{
              btree: ^btree,
-             min_key: {^min_key, :excluded},
+             min_key: {^min_key, false},
              max_key: nil,
              reverse: false
-           } = Btree.key_range(btree, {min_key, :excluded}, nil)
+           } = Btree.key_range(btree, {min_key, false}, nil)
   end
 
   test "dirt_factor/1 returns a numeric dirt factor" do

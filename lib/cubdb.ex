@@ -246,25 +246,23 @@ defmodule CubDB do
       # Select all entries where "a" <= key <= "d"
       CubDB.select(db, min_key: "b", max_key: "d")
 
-  The range boundaries can be excluded by setting `min_key` or `max_key` to
-  `{key, :excluded}`:
+  The range boundaries can be excluded by setting `min_key_inclusive` or
+  `max_key_inclusive` to `false`:
 
       # Select all entries where "a" <= key < "d"
-      CubDB.select(db, min_key: "b", max_key: {"d", :excluded})
+      CubDB.select(db, min_key: "b", max_key: "d", max_key_inclusive: false)
 
-  Any of `:min_key` and `:max_key` can be omitted or set to `nil`, to leave the
-  range open-ended.
+  Any of `:min_key` and `:max_key` can be omitted, to leave the range
+  open-ended.
 
       # Select entries where key <= "a"
       CubDB.select(db, max_key: "a")
 
-      # Or, equivalently:
-      CubDB.select(db, min_key: nil, max_key: "a")
-
-  In case the key boundary is the literal value `nil`, the longer form must be used:
+  As `nil` is a valid key, setting `min_key` or `max_key` to `nil` does NOT
+  leave the range open ended:
 
       # Select entries where nil <= key <= "a"
-      CubDB.select(db, min_key: {nil, :included}, max_key: "a")
+      CubDB.select(db, min_key: nil, max_key: "a")
 
   The `reverse` option, when set to true, causes the entries to be selected and
   traversed in reverse order.
@@ -304,9 +302,10 @@ defmodule CubDB do
       {:ok, entries} = CubDB.select(db, min_key: :a, max_key: :c)
 
   If we want to get all entries with keys between `:a` and `:c`, with `:c`
-  exluded, we can do:
+  excluded, we can do:
 
-      {:ok, entries} = CubDB.select(db, min_key: :a, max_key: {:c, :excluded})
+      {:ok, entries} = CubDB.select(db,
+        min_key: :a, max_key: :c, max_key_inclusive: false)
 
   To select the last 3 entries, we can do:
 
