@@ -30,10 +30,8 @@ defmodule PropertyBased.Btree.KeyRangeTest do
           repeat_for: 50 do
       store = Store.TestStore.new()
       btree = make_btree(store, key_values, cap)
-      min_incl = if min_included, do: :included, else: :excluded
-      max_incl = if max_included, do: :included, else: :excluded
-      min_key = {min, min_incl}
-      max_key = {max, max_incl}
+      min_key = {min, min_included}
+      max_key = {max, max_included}
       key_range = KeyRange.new(btree, min_key, max_key)
       reverse_key_range = KeyRange.new(btree, min_key, max_key, true)
 

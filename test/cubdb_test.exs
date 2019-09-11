@@ -74,7 +74,8 @@ defmodule CubDBTest do
     assert {:ok, result} =
              CubDB.select(db,
                min_key: {:names, 0},
-               max_key: {{:names, 2}, :excluded}
+               max_key: {:names, 2},
+               max_key_inclusive: false
              )
 
     assert result == [{{:names, 0}, "Ada"}, {{:names, 1}, "Jay"}]
