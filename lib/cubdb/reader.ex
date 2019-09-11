@@ -64,18 +64,24 @@ defmodule CubDB.Reader do
   @spec select(Btree.t(), Keyword.t()) :: any
 
   defp select(btree, options) when is_list(options) do
-    min_key = case Keyword.fetch(options, :min_key) do
-      {:ok, key} ->
-        {key, Keyword.get(options, :min_key_inclusive, true)}
-      :error ->
-        nil
-    end
-    max_key = case Keyword.fetch(options, :max_key) do
-      {:ok, key} ->
-        {key, Keyword.get(options, :max_key_inclusive, true)}
-      :error ->
-        nil
-    end
+    min_key =
+      case Keyword.fetch(options, :min_key) do
+        {:ok, key} ->
+          {key, Keyword.get(options, :min_key_inclusive, true)}
+
+        :error ->
+          nil
+      end
+
+    max_key =
+      case Keyword.fetch(options, :max_key) do
+        {:ok, key} ->
+          {key, Keyword.get(options, :max_key_inclusive, true)}
+
+        :error ->
+          nil
+      end
+
     pipe = Keyword.get(options, :pipe, [])
     reduce = Keyword.get(options, :reduce)
     reverse = Keyword.get(options, :reverse, false)
