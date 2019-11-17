@@ -101,14 +101,12 @@ defmodule CubDBTest do
 
     reads =
       Task.async_stream([:a, :b, :c], fn key ->
-        value = CubDB.get(db, key)
-        CubDB.put(db, :b, 0)
-        value
+        CubDB.get(db, key)
       end)
       |> Enum.to_list()
 
     assert [ok: 1, ok: 2, ok: 3] = reads
-    assert {:ok, [a: 1, b: 0, c: 3, d: 4]} = CubDB.select(db)
+    assert {:ok, [a: 1, b: 2, c: 3, d: 4]} = CubDB.select(db)
   end
 
   test "get_and_update_multi/4, get_and_update/3 and update/3 work as expected", %{
