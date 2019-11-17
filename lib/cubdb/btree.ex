@@ -332,7 +332,7 @@ defmodule CubDB.Btree do
     {leaf, path}
   end
 
-  @spec build_up(Store.t(), btree_node, [{key, val}], [key], [internal_node], capacity) ::
+  @spec build_up(Store.t(), internal_node, [{key, val}], [key], [internal_node], capacity) ::
           {location, internal_node}
 
   defp build_up(store, node, to_merge, to_delete, [], cap) do
