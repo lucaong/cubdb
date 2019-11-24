@@ -121,6 +121,10 @@ defmodule CubDB.BtreeTest do
     assert %Btree{size: 1} = tree
     tree = Btree.insert(tree, :foo, 2) |> Btree.commit()
     assert %Btree{size: 1} = tree
+    tree = Btree.mark_deleted(tree, :foo) |> Btree.commit()
+    assert %Btree{size: 0} = tree
+    tree = Btree.insert(tree, :foo, 1) |> Btree.commit()
+    assert %Btree{size: 1} = tree
   end
 
   test "insert/3 increases dirt by one" do
