@@ -1,5 +1,5 @@
 assert_receive_timeout = case System.get_env("ASSERT_RECEIVE_TIMEOUT") do
-  nil -> 100
+  nil -> 200
   str -> String.to_integer(str)
 end
 
