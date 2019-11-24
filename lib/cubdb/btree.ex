@@ -238,10 +238,12 @@ defmodule CubDB.Btree do
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
     {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
 
-    s =
-      case terminal_node do
-        {@value, _} -> if List.keymember?(children, key, 0), do: s, else: s + 1
-        @deleted -> if List.keymember?(children, key, 0), do: s - 1, else: s
+    size =
+      case {terminal_node, child_was_set?(store, children, key)} do
+        {{@value, _}, true} -> s
+        {{@value, _}, false} -> s + 1
+        {@deleted, true} -> s - 1
+        {@deleted, false} -> s
       end
 
     %Btree{
@@ -249,9 +251,18 @@ defmodule CubDB.Btree do
       root_loc: root_loc,
       capacity: cap,
       store: store,
-      size: s,
+      size: size,
       dirt: dirt + 1
     }
+  end
+
+  @spec child_was_set?(Store.t(), [child_pointer], key) :: boolean
+
+  defp child_was_set?(store, children, key) do
+    case List.keyfind(children, key, 0) do
+      nil -> false
+      {_, pos} -> Store.get_node(store, pos) != @deleted
+    end
   end
 
   @spec load_node(Store.t(), key, btree_node, [btree_node], pos_integer, capacity) :: [
