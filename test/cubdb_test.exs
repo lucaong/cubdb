@@ -56,8 +56,25 @@ defmodule CubDBTest do
 
     assert %{
              id: CubDB,
-             start: {CubDB, :start_link, [^data_dir, [foo: 123]]}
+             start: {CubDB, :start_link, [^data_dir, [foo: 123], []]}
            } = CubDB.child_spec(data_dir: data_dir, foo: 123)
+
+    options = [auto_compact: true, auto_file_sync: false]
+
+    gen_server_opts = [
+      name: :foo,
+      timeout: 5000,
+      spawn_opt: :something,
+      hibernate_after: 3000,
+      debug: :bar
+    ]
+
+    arg = options |> Keyword.merge(gen_server_opts) |> Keyword.merge(data_dir: data_dir)
+
+    assert %{
+             id: CubDB,
+             start: {CubDB, :start_link, [^data_dir, ^options, ^gen_server_opts]}
+           } = CubDB.child_spec(arg)
   end
 
   test "child_spec/1 raises a helpful error if data_dir is not given" do

@@ -230,9 +230,12 @@ defmodule CubDB do
         end
 
       {data_dir, arg} ->
+        {gen_server_opts, opts} =
+          Keyword.split(arg, [:name, :timeout, :spawn_opt, :hibernate_after, :debug])
+
         %{
           id: __MODULE__,
-          start: {__MODULE__, :start_link, [data_dir, arg]}
+          start: {__MODULE__, :start_link, [data_dir, opts, gen_server_opts]}
         }
     end
   end
