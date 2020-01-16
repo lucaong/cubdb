@@ -36,6 +36,39 @@ defmodule CubDBTest do
     assert Enum.member?(links, db) == false
   end
 
+  test "child_spec/1 accepts data_dir as a string or charlist argument" do
+    string_data_dir = "some_data_dir"
+    charlist_data_dir = 'some_data_dir'
+
+    assert %{
+             id: CubDB,
+             start: {CubDB, :start_link, [^string_data_dir]}
+           } = CubDB.child_spec(string_data_dir)
+
+    assert %{
+             id: CubDB,
+             start: {CubDB, :start_link, [^string_data_dir]}
+           } = CubDB.child_spec(charlist_data_dir)
+  end
+
+  test "child_spec/1 accepts data_dir and other options as a keyword list" do
+    data_dir = "some_data_dir"
+
+    assert %{
+             id: CubDB,
+             start: {CubDB, :start_link, [^data_dir, [foo: 123]]}
+           } = CubDB.child_spec(data_dir: data_dir, foo: 123)
+  end
+
+  test "child_spec/1 raises a helpful error if data_dir is not given" do
+    message =
+      "no data_dir given. CubDB.child_spec/1 must be given a keyword list including a :data_dir."
+
+    assert_raise ArgumentError, message, fn ->
+      CubDB.child_spec(foo: 123)
+    end
+  end
+
   test "put/3, get/3, fetch/2, delete/3, and has_key?/2 work as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     key = {:some, arbitrary: "key"}

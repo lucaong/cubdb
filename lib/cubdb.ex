@@ -121,6 +121,7 @@ defmodule CubDB do
   @type key :: any
   @type value :: any
   @type entry :: {key, value}
+  @type option :: {:auto_compact, {pos_integer, number} | boolean} | {:auto_file_sync, boolean}
 
   defmodule State do
     @moduledoc false
@@ -150,8 +151,8 @@ defmodule CubDB do
   end
 
   @spec start_link(
-          binary,
-          [auto_compact: {pos_integer, number} | boolean, auto_file_sync: boolean],
+          binary | charlist,
+          [option],
           GenServer.options()
         ) :: GenServer.on_start()
 
@@ -181,7 +182,7 @@ defmodule CubDB do
 
   @spec start(
           binary,
-          [auto_compact: {pos_integer, number} | boolean, auto_file_sync: boolean],
+          [option],
           GenServer.options()
         ) :: GenServer.on_start()
 
@@ -192,6 +193,48 @@ defmodule CubDB do
   """
   def start(data_dir, options \\ [], gen_server_options \\ []) do
     GenServer.start(__MODULE__, [data_dir, options], gen_server_options)
+  end
+
+  @spec child_spec([option | {:data_dir, binary | charlist}] | binary | charlist) ::
+          Supervisor.child_spec()
+
+  @doc """
+  Returns a specification to start this module under a supervisor.
+
+  The `arg` must be either the data directory (string or charlist), or a keyword list of options including a `:data_dir` option.
+
+  For more information, see the `Supervisor` module, the `Supervisor.child_spec/2` function and the `Supervisor.child_spec/0` type.
+  """
+
+  def child_spec(arg) when is_binary(arg) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [arg]}
+    }
+  end
+
+  def child_spec(arg) do
+    case Keyword.pop(arg, :data_dir) do
+      {nil, arg} ->
+        try do
+          %{
+            id: __MODULE__,
+            start: {__MODULE__, :start_link, [to_string(arg)]}
+          }
+        rescue
+          ArgumentError ->
+            raise(ArgumentError,
+              message:
+                "no data_dir given. CubDB.child_spec/1 must be given a keyword list including a :data_dir."
+            )
+        end
+
+      {data_dir, arg} ->
+        %{
+          id: __MODULE__,
+          start: {__MODULE__, :start_link, [data_dir, arg]}
+        }
+    end
   end
 
   @spec get(GenServer.server(), key, value) :: value
