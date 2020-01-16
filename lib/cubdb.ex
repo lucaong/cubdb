@@ -201,9 +201,13 @@ defmodule CubDB do
   @doc """
   Returns a specification to start this module under a supervisor.
 
-  The `arg` must be either the data directory (string or charlist), or a keyword list of options including a `:data_dir` option.
+  The `arg` must be either the data directory (string or charlist), or a keyword
+  list of options including a `:data_dir` option. The keyword list of options
+  can include `CubDB` options and other `GenServer` options, which are sent
+  respectively as the second and third argument of `start_link/3`.
 
-  For more information, see the `Supervisor` module, the `Supervisor.child_spec/2` function and the `Supervisor.child_spec/0` type.
+  For more information, see the `Supervisor` module, the
+  `Supervisor.child_spec/2` function and the `Supervisor.child_spec/0` type.
   """
 
   def child_spec(arg) when is_binary(arg) do
