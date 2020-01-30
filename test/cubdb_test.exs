@@ -16,7 +16,7 @@ defmodule CubDBTest do
     {:ok, tmp_dir: tmp_dir}
   end
 
-  test "start_link/3 starts and links the process", %{tmp_dir: tmp_dir} do
+  test "start_link/1 starts and links the process", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     assert Process.alive?(db) == true
 
@@ -24,11 +24,35 @@ defmodule CubDBTest do
     assert Enum.member?(links, db) == true
   end
 
-  test "start_link/3 returns error if options are invalid", %{tmp_dir: tmp_dir} do
-    assert {:error, _} = CubDB.start_link(tmp_dir, auto_compact: "maybe")
+  test "start_link/1 accepts a keyword of options and GenServer options", %{tmp_dir: tmp_dir} do
+    name = :"#{tmp_dir}"
+    assert {:ok, _} = CubDB.start_link(data_dir: tmp_dir, name: name)
+    pid = Process.whereis(name)
+    assert Process.alive?(pid)
   end
 
-  test "start/3 starts the process without linking", %{tmp_dir: tmp_dir} do
+  test "start_link/1 returns error if options are invalid", %{tmp_dir: tmp_dir} do
+    assert {:error, _} = CubDB.start_link(data_dir: tmp_dir, auto_compact: "maybe")
+  end
+
+  test "start_link/1 returns error if data_dir is missing" do
+    assert {:error, _} = CubDB.start_link(foo: nil)
+  end
+
+  test "start_link/1 returns error if data_dir cannot be converted into a string" do
+    assert {:error, _} = CubDB.start_link(data_dir: {})
+  end
+
+  test "start_link/2 accepts data_dir, and a keyword of options and GenServer options", %{
+    tmp_dir: tmp_dir
+  } do
+    name = :"#{tmp_dir}"
+    assert {:ok, x} = CubDB.start_link(tmp_dir, name: name)
+    pid = Process.whereis(name)
+    assert Process.alive?(pid)
+  end
+
+  test "start/1 starts the process without linking", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start(tmp_dir)
     assert Process.alive?(db) == true
 
@@ -36,54 +60,32 @@ defmodule CubDBTest do
     assert Enum.member?(links, db) == false
   end
 
-  test "child_spec/1 accepts data_dir as a string or charlist argument" do
-    string_data_dir = "some_data_dir"
-    charlist_data_dir = 'some_data_dir'
-
-    assert %{
-             id: CubDB,
-             start: {CubDB, :start_link, [^string_data_dir]}
-           } = CubDB.child_spec(string_data_dir)
-
-    assert %{
-             id: CubDB,
-             start: {CubDB, :start_link, [^string_data_dir]}
-           } = CubDB.child_spec(charlist_data_dir)
+  test "start/1 accepts a keyword of options and GenServer options", %{tmp_dir: tmp_dir} do
+    name = :"#{tmp_dir}"
+    assert {:ok, _} = CubDB.start(data_dir: tmp_dir, name: name)
+    pid = Process.whereis(name)
+    assert Process.alive?(pid)
   end
 
-  test "child_spec/1 accepts data_dir and other options as a keyword list" do
-    data_dir = "some_data_dir"
-
-    assert %{
-             id: CubDB,
-             start: {CubDB, :start_link, [^data_dir, [foo: 123], []]}
-           } = CubDB.child_spec(data_dir: data_dir, foo: 123)
-
-    options = [auto_compact: true, auto_file_sync: false]
-
-    gen_server_opts = [
-      name: :foo,
-      timeout: 5000,
-      spawn_opt: :something,
-      hibernate_after: 3000,
-      debug: :bar
-    ]
-
-    arg = options |> Keyword.merge(gen_server_opts) |> Keyword.merge(data_dir: data_dir)
-
-    assert %{
-             id: CubDB,
-             start: {CubDB, :start_link, [^data_dir, ^options, ^gen_server_opts]}
-           } = CubDB.child_spec(arg)
+  test "start/1 returns error if options are invalid", %{tmp_dir: tmp_dir} do
+    assert {:error, _} = CubDB.start(data_dir: tmp_dir, auto_compact: "maybe")
   end
 
-  test "child_spec/1 raises a helpful error if data_dir is not given" do
-    message =
-      "no data_dir given. CubDB.child_spec/1 must be given a keyword list including a :data_dir."
+  test "start/1 returns error if data_dir is missing" do
+    assert {:error, _} = CubDB.start(foo: nil)
+  end
 
-    assert_raise ArgumentError, message, fn ->
-      CubDB.child_spec(foo: 123)
-    end
+  test "start/1 returns error if data_dir cannot be converted into a string" do
+    assert {:error, _} = CubDB.start(data_dir: {})
+  end
+
+  test "start/2 accepts data_dir, and a keyword of options and GenServer options", %{
+    tmp_dir: tmp_dir
+  } do
+    name = :"#{tmp_dir}"
+    assert {:ok, x} = CubDB.start(tmp_dir, name: name)
+    pid = Process.whereis(name)
+    assert Process.alive?(pid)
   end
 
   test "put/3, get/3, fetch/2, delete/3, and has_key?/2 work as expected", %{tmp_dir: tmp_dir} do
@@ -356,7 +358,7 @@ defmodule CubDBTest do
     assert {:ok, [b: 2]} = CubDB.select(db)
   end
 
-  test "start_link/3 uses the last filename (in base 16)", %{tmp_dir: tmp_dir} do
+  test "start_link/1 uses the last filename (in base 16)", %{tmp_dir: tmp_dir} do
     File.touch(Path.join(tmp_dir, "F.cub"))
     File.touch(Path.join(tmp_dir, "X.cub"))
     File.touch(Path.join(tmp_dir, "10.cub"))
@@ -502,7 +504,8 @@ defmodule CubDBTest do
 
   test "data_dir/1 returns the path to the data directory", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
-    assert ^tmp_dir = CubDB.data_dir(db)
+    tmp_dir_string = to_string(tmp_dir)
+    assert ^tmp_dir_string = CubDB.data_dir(db)
   end
 
   test "current_db_file/1 returns the path to the current database file", %{tmp_dir: tmp_dir} do

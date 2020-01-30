@@ -31,6 +31,10 @@ defmodule CubDB do
 
       {:ok, db} = CubDB.start_link("my/data/directory")
 
+  Alternatively, to specify more options, a keyword list can be passed:
+
+      {:ok, db} = CubDB.start_link(data_dir: "my/data/directory", auto_compact: true)
+
   `CubDB` functions can be called concurrently from different processes, but it
   is important that only one `CubDB` process is started on the same data
   directory.
@@ -96,8 +100,8 @@ defmodule CubDB do
       CubDB.compact(db)
       #=> :ok
 
-  Alternatively, automatic compaction can be enabled, either passing an option
-  to `start_link/3`, or by calling `set_auto_compact/2`.
+  Alternatively, automatic compaction can be enabled, either passing the
+  `:auto_compact` option to `start_link/1`, or by calling `set_auto_compact/2`.
   """
 
   @doc """
@@ -128,11 +132,11 @@ defmodule CubDB do
 
     @type t :: %CubDB.State{
             btree: Btree.t(),
-            data_dir: binary,
+            data_dir: String.t(),
             compactor: pid | nil,
             clean_up: pid,
             clean_up_pending: boolean,
-            busy_files: %{required(binary) => pos_integer},
+            busy_files: %{required(String.t()) => pos_integer},
             auto_compact: {pos_integer, number} | false,
             auto_file_sync: boolean,
             subs: list(pid)
@@ -151,9 +155,8 @@ defmodule CubDB do
   end
 
   @spec start_link(
-          binary | charlist,
-          [option],
-          GenServer.options()
+          String.t()
+          | [option | {:data_dir, String.t()} | GenServer.option()]
         ) :: GenServer.on_start()
 
   @doc """
@@ -174,74 +177,51 @@ defmodule CubDB do
     defaults to `false`. If set to `true`, write performance will be slower, but
     durability is strictly guaranteed. See `set_auto_file_sync/2` for details.
 
-  The `gen_server_options` are passed to `GenServer.start_link/3`.
+  `GenServer` options like `name` and `timeout` can also be given, and are
+  forwarded to `GenServer.start_link/3` as the third argument.
+
+  ## Examples
+
+      # Passing only the data dir
+      {:ok, db} = CubDB.start_link("some/data/dir")
+
+      # Passing data dir and other options
+      {:ok, db} = CubDB.start_link(data_dir: "some/data/dir", auto_compact: true, name: :db)
   """
-  def start_link(data_dir, options \\ [], gen_server_options \\ []) do
-    GenServer.start_link(__MODULE__, [data_dir, options], gen_server_options)
+  def start_link(data_dir_or_options) do
+    case split_options(data_dir_or_options) do
+      {:ok, {data_dir, options, gen_server_options}} ->
+        GenServer.start_link(__MODULE__, [data_dir, options], gen_server_options)
+
+      error ->
+        error
+    end
   end
 
-  @spec start(
-          binary,
-          [option],
-          GenServer.options()
-        ) :: GenServer.on_start()
+  def start_link(data_dir, options) do
+    start_link(Keyword.merge(options, data_dir: data_dir))
+  end
+
+  @spec start(String.t() | [option | {:data_dir, String.t()} | GenServer.option()]) ::
+          GenServer.on_start()
 
   @doc """
   Starts the `CubDB` database without a link.
 
-  See `start_link/2` for more informations.
+  See `start_link/2` for more information about options.
   """
-  def start(data_dir, options \\ [], gen_server_options \\ []) do
-    GenServer.start(__MODULE__, [data_dir, options], gen_server_options)
-  end
+  def start(data_dir_or_options) do
+    case split_options(data_dir_or_options) do
+      {:ok, {data_dir, options, gen_server_options}} ->
+        GenServer.start(__MODULE__, [data_dir, options], gen_server_options)
 
-  @spec child_spec([option | {:data_dir, binary | charlist}] | binary | charlist) ::
-          Supervisor.child_spec()
-
-  @doc """
-  Returns a specification to start this module under a supervisor.
-
-  The `arg` must be either the data directory (string or charlist), or a keyword
-  list of options including a `:data_dir` option. The keyword list of options
-  can include `CubDB` options and other `GenServer` options, which are sent
-  respectively as the second and third argument of `start_link/3`.
-
-  For more information, see the `Supervisor` module, the
-  `Supervisor.child_spec/2` function and the `Supervisor.child_spec/0` type.
-  """
-
-  def child_spec(arg) when is_binary(arg) do
-    %{
-      id: __MODULE__,
-      start: {__MODULE__, :start_link, [arg]}
-    }
-  end
-
-  def child_spec(arg) do
-    case Keyword.pop(arg, :data_dir) do
-      {nil, arg} ->
-        try do
-          %{
-            id: __MODULE__,
-            start: {__MODULE__, :start_link, [to_string(arg)]}
-          }
-        rescue
-          ArgumentError ->
-            raise(ArgumentError,
-              message:
-                "no data_dir given. CubDB.child_spec/1 must be given a keyword list including a :data_dir."
-            )
-        end
-
-      {data_dir, arg} ->
-        {gen_server_opts, opts} =
-          Keyword.split(arg, [:name, :timeout, :spawn_opt, :hibernate_after, :debug])
-
-        %{
-          id: __MODULE__,
-          start: {__MODULE__, :start_link, [data_dir, opts, gen_server_opts]}
-        }
+      error ->
+        error
     end
+  end
+
+  def start(data_dir, options) do
+    start(Keyword.merge(options, data_dir: data_dir))
   end
 
   @spec get(GenServer.server(), key, value) :: value
@@ -591,7 +571,7 @@ defmodule CubDB do
     result
   end
 
-  @spec compact(GenServer.server()) :: :ok | {:error, binary}
+  @spec compact(GenServer.server()) :: :ok | {:error, String.t()}
 
   @doc """
   Runs a database compaction.
@@ -617,7 +597,7 @@ defmodule CubDB do
   end
 
   @spec set_auto_compact(GenServer.server(), boolean | {integer, integer | float}) ::
-          :ok | {:error, binary}
+          :ok | {:error, String.t()}
 
   @doc """
   Configures whether to perform automatic compaction, and how.
@@ -683,7 +663,7 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_file_sync, bool})
   end
 
-  @spec data_dir(GenServer.server()) :: binary
+  @spec data_dir(GenServer.server()) :: String.t()
 
   @doc """
   Returns the path of the data directory, as given when the `CubDB` process was
@@ -701,7 +681,7 @@ defmodule CubDB do
     GenServer.call(db, :data_dir)
   end
 
-  @spec current_db_file(GenServer.server()) :: binary
+  @spec current_db_file(GenServer.server()) :: String.t()
 
   @doc """
   Returns the path of the current database file.
@@ -720,7 +700,7 @@ defmodule CubDB do
     GenServer.call(db, :current_db_file)
   end
 
-  @spec cubdb_file?(binary) :: boolean
+  @spec cubdb_file?(String.t()) :: boolean
 
   @doc false
   def cubdb_file?(file_name) do
@@ -731,7 +711,7 @@ defmodule CubDB do
       Regex.match?(~r/[\da-fA-F]+/, basename)
   end
 
-  @spec compaction_file?(binary) :: boolean
+  @spec compaction_file?(String.t()) :: boolean
 
   @doc false
   def compaction_file?(file_name) do
@@ -949,7 +929,7 @@ defmodule CubDB do
     check_in_reader(btree, state)
   end
 
-  @spec find_db_file(binary) :: binary | nil | {:error, any}
+  @spec find_db_file(String.t()) :: String.t() | nil | {:error, any}
 
   defp find_db_file(data_dir) do
     with :ok <- File.mkdir_p(data_dir),
@@ -989,7 +969,7 @@ defmodule CubDB do
     Btree.new(store)
   end
 
-  @spec new_compaction_store(binary) :: {:ok, Store.t()} | {:error, any}
+  @spec new_compaction_store(String.t()) :: {:ok, Store.t()} | {:error, any}
 
   defp new_compaction_store(data_dir) do
     with {:ok, file_names} <- File.ls(data_dir) do
@@ -1118,6 +1098,41 @@ defmodule CubDB do
     case parse_auto_compact(setting) do
       {:ok, setting} -> setting
       {:error, reason} -> raise(ArgumentError, message: reason)
+    end
+  end
+
+  @spec split_options(
+          [option | {:data_dir, String.t()} | GenServer.option()]
+          | String.t()
+        ) :: {:ok, {String.t(), [option], GenServer.options()}} | {:error, term}
+
+  defp split_options(data_dir) when is_binary(data_dir) do
+    {data_dir, [], []}
+  end
+
+  defp split_options(data_dir_or_options) do
+    case Keyword.pop(data_dir_or_options, :data_dir) do
+      {nil, data_dir_or_options} ->
+        try do
+          {:ok, {to_string(data_dir_or_options), [], []}}
+        rescue
+          ArgumentError ->
+            {:error, "Options must include :data_dir"}
+
+          Protocol.UndefinedError ->
+            {:error, "data_dir must be a string (or implement String.Chars)"}
+        end
+
+      {data_dir, options} ->
+        {gen_server_opts, opts} =
+          Keyword.split(options, [:name, :timeout, :spawn_opt, :hibernate_after, :debug])
+
+        try do
+          {:ok, {to_string(data_dir), opts, gen_server_opts}}
+        rescue
+          Protocol.UndefinedError ->
+            {:error, "data_dir must be a string (or implement String.Chars)"}
+        end
     end
   end
 end
