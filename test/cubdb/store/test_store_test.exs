@@ -1,5 +1,6 @@
 defmodule CubDB.Store.TestStoreTest do
-  use CubDB.StoreExamples, async: true
+  use ExUnit.Case, async: true
+  use CubDB.StoreExamples
 
   setup do: {:ok, store: CubDB.Store.TestStore.new()}
 

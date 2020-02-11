@@ -1,5 +1,6 @@
 defmodule CubDB.Store.FileTest do
-  use CubDB.StoreExamples, async: true
+  use ExUnit.Case, async: true
+  use CubDB.StoreExamples
 
   setup do
     tmp_path = :os.cmd('mktemp') |> List.to_string() |> String.trim()
