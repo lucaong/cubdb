@@ -243,19 +243,17 @@ defmodule CubDBTest do
   test "get_multi/3, put_multi/2 and delete_multi/2 work as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    entries = [a: 1, b: 2, c: 3, d: 4]
-    keys = Keyword.keys(entries)
-    values = Keyword.values(entries)
+    entries = %{a: 1, b: 2, c: 3, d: 4}
+    keys = Map.keys(entries)
 
     assert :ok = CubDB.put_multi(db, entries)
-    assert CubDB.size(db) == length(entries)
+    assert CubDB.size(db) == length(Map.to_list(entries))
 
-    assert ^values = CubDB.get_multi(db, keys)
-    assert [3, 2, nil] = CubDB.get_multi(db, [:c, :b, :x])
-    assert [3, 2, :not_found] = CubDB.get_multi(db, [:c, :b, :x], :not_found)
+    assert entries == CubDB.get_multi(db, keys)
+    assert %{c: 3, b: 2} == CubDB.get_multi(db, [:c, :b, :x])
 
     assert :ok = CubDB.delete_multi(db, keys)
-    assert [nil, nil, nil, nil] = CubDB.get_multi(db, keys)
+    assert %{} == CubDB.get_multi(db, keys)
     assert CubDB.size(db) == 0
   end
 

@@ -537,19 +537,18 @@ defmodule CubDB do
     GenServer.call(db, {:get_and_update_multi, keys_to_get, fun}, timeout)
   end
 
-  @spec get_multi(GenServer.server(), [key], value) :: [value]
+  @spec get_multi(GenServer.server(), [key]) :: %{key => value}
 
   @doc """
   Gets multiple entries corresponding by the given keys all at once, atomically.
 
-  The keys to get are passed as a list. The result is a list of values
-  corresponding to the given keys, or `default` for keys that are not present in
-  the database.
+  The keys to get are passed as a list. The result is a map of keys to values
+  corresponding to the given keys. Keys that are not present in
+  the database won't be in the result map.
   """
-  def get_multi(db, keys, default \\ nil) do
+  def get_multi(db, keys) do
     fun = fn entries ->
-      values = keys |> Enum.map(fn key -> Map.get(entries, key, default) end)
-      {values, %{}, []}
+      {entries, %{}, []}
     end
 
     {:ok, result} = GenServer.call(db, {:get_and_update_multi, keys, fun})
