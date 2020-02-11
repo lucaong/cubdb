@@ -162,23 +162,25 @@ defmodule CubDB do
   @doc """
   Starts the `CubDB` database process linked to the current process.
 
-  The `data_dir` argument is the directory path where the database files will be
-  stored. If it does not exist, it will be created. Only one `CubDB` instance
-  can run per directory, so if you run several databases, they should each use
-  their own separate data directory.
+  The argument is a keyword list of options:
 
-  The optional `options` argument is a keywork list that specifies configuration
-  options. The valid options are:
+    - `data_dir`: the directory path where the database files will be stored.
+    This option is required. If the directory does not exist, it will be
+    created. Only one `CubDB` instance can run per directory, so if you run
+    several databases, they should each use their own separate data directory.
 
-    - `auto_compact`: whether to perform auto-compaction. It defaults to false.
-    See `set_auto_compact/2` for the possible values
+    - `auto_compact`: whether to perform compaction automatically. It defaults
+    to `false`. See `set_auto_compact/2` for the possible values
 
     - `auto_file_sync`: whether to force flush the disk buffer on each write. It
-    defaults to `false`. If set to `true`, write performance will be slower, but
+    defaults to `false`. If set to `true`, write performance is slower, but
     durability is strictly guaranteed. See `set_auto_file_sync/2` for details.
 
   `GenServer` options like `name` and `timeout` can also be given, and are
   forwarded to `GenServer.start_link/3` as the third argument.
+
+  If only the `data_dir` is specified, it is possible to pass it as a single
+  string argument.
 
   ## Examples
 
@@ -522,9 +524,16 @@ defmodule CubDB do
   @doc """
   Gets multiple entries corresponding by the given keys all at once, atomically.
 
-  The keys to get are passed as a list. The result is a map of keys to values
-  corresponding to the given keys. Keys that are not present in
-  the database won't be in the result map.
+  The keys to get are passed as a list. The result is a map of key/value entries
+  corresponding to the given keys. Keys that are not present in the database
+  won't be in the result map.
+
+  ## Example
+
+      CubDB.put_multi(db, a: 1, b: 2, c: nil)
+
+      CubDB.get_multi(db, [:a, :b, :c, :x])
+      # => %{a: 1, b: 2, c: nil}
   """
   def get_multi(db, keys) do
     fun = fn entries ->
