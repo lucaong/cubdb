@@ -35,6 +35,10 @@ defmodule CubDB do
 
       {:ok, db} = CubDB.start_link(data_dir: "my/data/directory", auto_compact: true)
 
+  _Important: avoid starting multiple `CubDB` processes on the same data
+  directory. Only one `CubDB` process should use a specific data directory at any
+  time._
+
   `CubDB` functions can be called concurrently from different processes, but it
   is important that only one `CubDB` process is started on the same data
   directory.

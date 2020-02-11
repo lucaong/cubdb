@@ -36,8 +36,12 @@ Start `CubDB` by specifying a directory for its database file (if not existing,
 it will be created):
 
 ```elixir
-{:ok, db} = CubDB.start_link("my/data/directory")
+{:ok, db} = CubDB.start_link(data_dir: "my/data/directory")
 ```
+
+_Important: avoid starting multiple `CubDB` processes on the same data
+directory. Only one `CubDB` process should use a specific data directory at any
+time._
 
 `get`, `put`, and `delete` operations work as you probably expect:
 
