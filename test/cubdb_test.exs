@@ -17,11 +17,19 @@ defmodule CubDBTest do
   end
 
   test "start_link/1 starts and links the process", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
     assert Process.alive?(db) == true
 
     {:links, links} = Process.info(self(), :links)
     assert Enum.member?(links, db) == true
+  end
+
+  test "start_link/1 accepts data_dir as a single string or charlist argument", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    assert Process.alive?(db) == true
+
+    {:ok, db} = CubDB.start_link(List.to_string(tmp_dir))
+    assert Process.alive?(db) == true
   end
 
   test "start_link/1 accepts a keyword of options and GenServer options", %{tmp_dir: tmp_dir} do
@@ -53,11 +61,19 @@ defmodule CubDBTest do
   end
 
   test "start/1 starts the process without linking", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start(tmp_dir)
+    {:ok, db} = CubDB.start(data_dir: tmp_dir)
     assert Process.alive?(db) == true
 
     {:links, links} = Process.info(self(), :links)
     assert Enum.member?(links, db) == false
+  end
+
+  test "start/1 accepts data_dir as a single string or charlist argument", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start(tmp_dir)
+    assert Process.alive?(db) == true
+
+    {:ok, db} = CubDB.start(List.to_string(tmp_dir))
+    assert Process.alive?(db) == true
   end
 
   test "start/1 accepts a keyword of options and GenServer options", %{tmp_dir: tmp_dir} do

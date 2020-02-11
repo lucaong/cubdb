@@ -1115,7 +1115,7 @@ defmodule CubDB do
         ) :: {:ok, {String.t(), [option], GenServer.options()}} | {:error, term}
 
   defp split_options(data_dir) when is_binary(data_dir) do
-    {data_dir, [], []}
+    {:ok, {data_dir, [], []}}
   end
 
   defp split_options(data_dir_or_options) do
