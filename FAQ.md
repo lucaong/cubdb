@@ -20,7 +20,7 @@ context, `CubDB` is typically used for:
 
   * Local databases
 
-## Why is CubDB better than [other store]?
+## Why is CubDB better than X?
 
 `CubDB` is not jealous: it does its job well, without claiming to be better than
 others. There are many other great alternatives for storing data, and depending
@@ -67,8 +67,7 @@ If your use case is such that one of those alternatives is a better fit, by all
 means go for it: `CubDB` won't be sad :) But if you think that `CubDB` can fit
 your case, you'll enjoy its native Elixir feel and simple and versatile model.
 
-## I need to store several collections. Should I store each one in a separate
-database, or use the same one?
+## How to store ultiple collections?
 
 The main reason to use separate `CubDB` databases is if you need different
 configuration options for each database (like auto compaction or file sync).
@@ -139,7 +138,7 @@ all the data, `CubDB` will start using the new file and remove the old, obsolete
 one. This process is performed in the background, without blocking read or write
 operations.
 
-## Should I perform compaction manually, or use auto compaction?
+## Should I use auto compaction?
 
 Usually, letting `CubDB` perform compaction automatically is the most convenient
 choice: `CubDB` will keep track of its "dirt factor", which is an indicator of
