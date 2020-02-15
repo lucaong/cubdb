@@ -21,7 +21,7 @@ typically used for things like:
 
   * Local database for application data
 
-## Why is CubDB better than X?
+## How does it compare with X?
 
 First of all, `CubDB` is not jealous: it does its job well, without claiming to
 be better than others. There are many other great alternatives for storing data,
