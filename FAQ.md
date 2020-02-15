@@ -11,8 +11,9 @@ an Elixir collection, like maps or lists, but one that is stored to disk and
 persistent to restarts.
 
 Typical use-cases for `CubDB` are for single-instance applications or embedded
-software (for example, `CubDB` is a great fit for `Nerves` systems). In those
-context, `CubDB` is typically used for:
+software (for example, `CubDB` is a great fit for
+[Nerves](https://nerves-project.org) systems). In those context, `CubDB` is
+typically used for:
 
   * Persisting configuration and preferences
 

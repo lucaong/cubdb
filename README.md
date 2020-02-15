@@ -5,7 +5,7 @@
 `CubDB` is an embedded key-value database written in the Elixir language. It
 runs locally, it is schema-less, and backed by a single file.
 
-Head to the [API reference](https://hexdocs.pm/cubdb/CubDB.html) for usage details.
+Head to the [API reference](https://hexdocs.pm/cubdb/CubDB.html) for usage details, or to the [Frequently Asked Questions](https://hexdocs.pm/cubdb/faq.html).
 
 
 ## Features
