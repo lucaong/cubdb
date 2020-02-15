@@ -59,7 +59,7 @@ collection:
 This range selection works because `nil` is greater than all numbers, so `{:abc,
 nil}` is greater than `{:abc, 123}`, but smaller than `{:bcd, :123}`.
 
-# Save and restore a database backup
+## Save and restore a database backup
 
 `CubDB` stores its data in a single file with extension `.cub`, inside the
 configured data directory. The filename of the `.cub` file is a hexadecimal
