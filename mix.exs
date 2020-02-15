@@ -13,7 +13,9 @@ defmodule CubDB.Mixfile do
       package: package(),
       source_url: "https://github.com/lucaong/cubdb",
       docs: [
-        main: "CubDB"
+        main: "CubDB",
+        logo: "assets/cubdb_logo.png",
+        extras: ["FAQ.md"]
       ],
       dialyzer: [ignore_warnings: "dialyzer_ignore.exs"],
       test_coverage: [tool: ExCoveralls],
