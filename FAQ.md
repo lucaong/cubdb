@@ -68,7 +68,7 @@ If your use case is such that one of those alternatives is a better fit, by all
 means go for it: `CubDB` won't be sad :) But if you think that `CubDB` can fit
 your case, you'll enjoy its native Elixir feel and simple and versatile model.
 
-## How to store ultiple collections?
+## How to store multiple collections?
 
 The main reason to use separate `CubDB` databases is if you need different
 configuration options for each database (like auto compaction or file sync).
