@@ -151,7 +151,7 @@ manually. One example is if you are performing a one-off import of a lot of
 data: in this case, it makes sense to import all of it, and manually trigger a
 compaction only afterwards. This reduces disk contention during the import. Note
 that you can turn auto compaction on or off at runtime with
-`CubDB.set_auto_compaction/2`.
+`CubDB.set_auto_compact/2`.
 
 ## What is file sync?
 
