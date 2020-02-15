@@ -15,7 +15,7 @@ defmodule CubDB.Mixfile do
       docs: [
         main: "CubDB",
         logo: "assets/cubdb_logo.png",
-        extras: ["FAQ.md"]
+        extras: ["FAQ.md", "HOWTO.md"]
       ],
       dialyzer: [ignore_warnings: "dialyzer_ignore.exs"],
       test_coverage: [tool: ExCoveralls],
