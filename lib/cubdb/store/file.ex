@@ -29,9 +29,16 @@ defmodule CubDB.Store.File do
   end
 
   defp start(file_path) do
-    with {:ok, file} <- :file.open(file_path, [:read, :append, :raw, :binary]),
-         {:ok, pos} <- :file.position(file, :eof) do
-      {file, pos}
+    ensure_exclusive_access!(file_path)
+    {:ok, file} = :file.open(file_path, [:read, :append, :raw, :binary])
+    {:ok, pos} = :file.position(file, :eof)
+
+    {file, pos}
+  end
+
+  defp ensure_exclusive_access!(file_path) do
+    unless :global.set_lock({{__MODULE__, file_path}, self()}, [node()], 0) do
+      raise ArgumentError, message: "file \"#{file_path}\" is already in use by another CubDB.Store.File"
     end
   end
 end

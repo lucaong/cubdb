@@ -36,6 +36,7 @@ Benchee.run(
   end,
   after_scenario: fn {_value, db} ->
     IO.puts("#{CubDB.size(db)} entries written to database.")
+    CubDB.stop(db)
     cleanup.()
   end
 )

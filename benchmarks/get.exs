@@ -35,7 +35,8 @@ Benchee.run(
     key = :rand.uniform(n)
     {key, db}
   end,
-  after_scenario: fn _db ->
+  after_scenario: fn db ->
+    CubDB.stop(db)
     cleanup.()
   end
 )

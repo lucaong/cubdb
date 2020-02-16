@@ -13,8 +13,7 @@ defmodule CubDB.Store.FileTest do
     {:ok, store: store, file_path: tmp_path}
   end
 
-  test "new/1 returns a Store.File on the given file path", %{file_path: file_path} do
-    store = CubDB.Store.File.new(file_path)
+  test "new/1 returns a Store.File on the given file path", %{file_path: file_path, store: store} do
     assert %CubDB.Store.File{pid: pid, file_path: ^file_path} = store
     assert Process.alive?(pid)
   end
@@ -71,5 +70,10 @@ defmodule CubDB.Store.FileTest do
     CubDB.Store.close(store)
 
     assert Process.alive?(pid) == false
+  end
+
+  test "returns error if the same file is already in use by another store", %{file_path: file_path} do
+    assert {:error, {%ArgumentError{message: message}, _}} = CubDB.Store.File.new(file_path)
+    assert message == "file \"#{file_path}\" is already in use by another CubDB.Store.File"
   end
 end

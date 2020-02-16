@@ -27,6 +27,7 @@ defmodule CubDBTest do
   test "start_link/1 accepts data_dir as a single string or charlist argument", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     assert Process.alive?(db) == true
+    :ok = CubDB.stop(db)
 
     {:ok, db} = CubDB.start_link(List.to_string(tmp_dir))
     assert Process.alive?(db) == true
@@ -71,6 +72,7 @@ defmodule CubDBTest do
   test "start/1 accepts data_dir as a single string or charlist argument", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start(tmp_dir)
     assert Process.alive?(db) == true
+    :ok = CubDB.stop(db)
 
     {:ok, db} = CubDB.start(List.to_string(tmp_dir))
     assert Process.alive?(db) == true
