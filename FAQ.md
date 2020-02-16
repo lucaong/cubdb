@@ -115,12 +115,12 @@ with `CubDB.set_auto_compact/2`.
 
 When you write to a file, your operative system will often buffer writes in
 memory, and actually write them in the file system only later. This makes write
-operations faster, because file system access is expensive, and buffering makes
-it so several writes will be batched together in one single bigger write. The
-drawback is that, should a power failure happen before the buffer is written to
-the file system, data that was held in the buffer might be lost. When you want
-to be sure that data is safe in the file system, you have to tell the operative
-system to "file sync", which means to flush the buffer to disk.
+operations faster, because file system access is expensive, and buffering
+batches together several writes in one single operation. The drawback is that,
+should a power failure happen before the buffer is written to the file system,
+data that was held in the buffer might be lost. When you want to be sure that
+data is safe in the file system, you have to tell the operative system to "file
+sync", which means to flush the buffer to disk.
 
 With `CubDB`, you can chose to automatically sync each write operation, or to
 manually sync when you prefer. If you need faster write performance, but you are

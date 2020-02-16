@@ -24,6 +24,11 @@ defmodule CubDB do
   are never changed in-place, and read operations are performend on immutable
   snapshots.
 
+  More information can be found in the following sections:
+
+    - [Frequently Asked Questions](faq.html)
+    - [How To](howto.html)
+
   ## Usage
 
   Start `CubDB` by specifying a directory for its database file (if not existing,
@@ -56,6 +61,14 @@ defmodule CubDB do
 
       CubDB.get(db, :foo)
       #=> nil
+
+  Both keys and values can be any Elixir (or Erlang) term:
+
+      CubDB.put(db, {"some", 'tuple', :key}, %{foo: "a map value"})
+      #=> :ok
+
+      CubDB.get(db, {"some", 'tuple', :key})
+      #=> %{foo: "a map value"}
 
   Multiple operations can be performed as an atomic transaction with
   `put_multi/2`, `delete_multi/2`, and the other `[...]_multi` functions:
