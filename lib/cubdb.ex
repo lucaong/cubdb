@@ -230,6 +230,18 @@ defmodule CubDB do
     start(Keyword.merge(options, data_dir: data_dir))
   end
 
+  @spec stop(GenServer.server(), term(), timeout()) :: :ok
+
+  @doc """
+  Synchronously stops the `CubDB` database.
+
+  See `GenServer.stop/3` for details.
+  """
+
+  def stop(db, reason \\ :normal, timeout \\ :infinity) do
+    GenServer.stop(db, reason, timeout)
+  end
+
   @spec get(GenServer.server(), key, value) :: value
 
   @doc """
