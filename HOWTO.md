@@ -19,7 +19,6 @@ One common way to store separate collections in the same database is to use
 composite keys, usually tuples, leveraging the fact that the Erlang runtime
 defines a [total ordering of all
 terms](http://erlang.org/doc/reference_manual/expressions.html#term-comparisons).
-Here is how.
 
 Say that you want to store two collections: people and articles. You can
 structure your keys to be tuples like `{:people, person_id}` for people, and
@@ -35,7 +34,7 @@ structure your keys to be tuples like `{:people, person_id}` for people, and
 :ok = CubDB.put(db, {:articles, 2}, %{title: "Morphogenesis for the uninitiated", text: "..."})
 ```
 
-We used numeric IDs in our example, but you can use anything you want.
+We used numeric IDs in our example, but you can really use anything you want.
 
 Getting a specific person or article by ID is trivial:
 
@@ -51,27 +50,29 @@ element. Therefore, here is how you can select all members of a specific
 collection:
 
 ```elixir
+# Select all people
 {:ok, people} = CubDB.select(db, min_key: {:people, 0}, max_key: {:people, nil})
 
+# Select all articles
 {:ok, articles} = CubDB.select(db, min_key: {:articles, 0}, max_key: {:articles, nil})
 ```
 
 This range selection works because `nil` is greater than all numbers, so `{:abc,
 nil}` is greater than `{:abc, 123}`, but smaller than `{:bcd, :123}`.
 
-## Save and restore a database backup
+## Save and restore a backup
 
 `CubDB` stores its data in a single file with extension `.cub`, inside the
-configured data directory. The filename of the `.cub` file is a hexadecimal
-value (containing only lowercase letters from `a` to `f` and digits) and gets
-incremented by one upon each compaction. Backing up a database is as simple as
-copying its current data file. Note that, during a compaction, a file with
-extension `.compact` is created: you don't need to copy that file for your
-backup, as the `.cub` file already contains all data.
+configured data directory. The filename is a hexadecimal value (containing only
+lowercase letters from `a` to `f` and digits) and gets incremented by one upon
+each compaction. Backing up a database is as simple as copying its current data
+file (that can be found by calling `CubDB.current_db_file/1`). Note that, during
+a compaction, a file with extension `.compact` is also created: you don't need
+to copy that file for your backup, as the `.cub` file already contains all data.
 
-To recover from a saved backup, it is sufficient to copy the saved `.cub` file
-to a directory (make sure that no other `.cub` file is present in the same
-location, and that the filename is a valid hexadecimal number) and start `CubDB`
-using that as the data directory. Should more than one `.cub` files be present
-in the same data directory, the one with the greatest hexadecimal value is used,
-and the others will be removed upon the next compaction.
+To recover from a saved backup, it is sufficient to copy the backed-up `.cub`
+file to a directory and start `CubDB` on that data directory. Make sure that no
+other `.cub` file is present in the same directory, and that the filename is a
+valid hexadecimal number: should more than one `.cub` files be present in the
+same data directory, the one with the greatest hexadecimal value is used, and
+the others are deleted upon the next compaction.
