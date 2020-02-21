@@ -25,7 +25,7 @@ defmodule CubDB.Btree.KeyRangeTest do
       quuux: 8
     ]
 
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
     btree = make_btree(store, entries, 3)
 
     for {min, max} <- [
@@ -72,7 +72,7 @@ defmodule CubDB.Btree.KeyRangeTest do
       h: 8
     ]
 
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
     btree = make_btree(store, entries, 3)
 
     key_range = KeyRange.new(btree, {:b, true}, {:g, true}, true)
@@ -82,7 +82,7 @@ defmodule CubDB.Btree.KeyRangeTest do
 
   test "Enum.member/2 returns false if key is outside of range, or not in the btree, and true otherwise" do
     entries = [a: 1, b: 2, c: 3, d: 4]
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
     btree = make_btree(store, entries, 3)
 
     assert Enum.member?(KeyRange.new(btree, {:b, true}, {:c, true}), {:a, 1}) == false
@@ -100,7 +100,7 @@ defmodule CubDB.Btree.KeyRangeTest do
   end
 
   test "Enumerable.Btree.KeyRange.reduce/3 skips nodes marked as deleted" do
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
     tree = make_btree(store, [a: 1, b: 2, c: 3, d: 4], 3) |> Btree.mark_deleted(:b)
     key_range = KeyRange.new(tree, {:a, true}, {:d, false})
     assert Enum.to_list(key_range) == [a: 1, c: 3]

@@ -22,13 +22,15 @@ defmodule CubDB.Store.File do
   @enforce_keys [:pid, :file_path]
   defstruct [:pid, :file_path]
 
-  def new(file_path) do
-    with {:ok, pid} <- Agent.start_link(fn -> start(file_path) end) do
-      %Store.File{pid: pid, file_path: file_path}
+  @spec create(String.t()) :: {:ok, t} | {:error, term}
+
+  def create(file_path) do
+    with {:ok, pid} <- Agent.start_link(fn -> init(file_path) end) do
+      {:ok, %Store.File{pid: pid, file_path: file_path}}
     end
   end
 
-  defp start(file_path) do
+  defp init(file_path) do
     ensure_exclusive_access!(file_path)
     {:ok, file} = :file.open(file_path, [:read, :append, :raw, :binary])
     {:ok, pos} = :file.position(file, :eof)

@@ -6,7 +6,7 @@ defmodule CubDB.Store.CatchUpTest do
   alias CubDB.CatchUp
 
   test "start_link/4 catches up the compacted tree with the diff updates and reports result" do
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
 
     entries = [foo: 1, bar: 2]
 
@@ -22,7 +22,7 @@ defmodule CubDB.Store.CatchUpTest do
         Btree.insert(btree, key, value)
       end)
 
-    compacted_store = Store.TestStore.new()
+    {:ok, compacted_store} = Store.TestStore.create()
     compacted_btree = Btree.load(original_btree, compacted_store)
 
     {:ok, _pid} = CatchUp.start_link(self(), compacted_btree, original_btree, latest_btree)

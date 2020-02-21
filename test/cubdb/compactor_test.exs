@@ -21,13 +21,14 @@ defmodule CubDB.Store.CompactorTest do
 
   test "start_link/3 runs compaction on a Btree and sends back the result", %{tmp_dir: tmp_dir} do
     entries = [foo: 1, bar: 2, baz: 3]
+    {:ok, store} = Store.TestStore.create()
 
     btree =
-      Enum.reduce(entries, Btree.new(Store.TestStore.new()), fn {key, value}, btree ->
+      Enum.reduce(entries, Btree.new(store), fn {key, value}, btree ->
         Btree.insert(btree, key, value)
       end)
 
-    store = Store.File.new(Path.join(tmp_dir, "1.compact"))
+    {:ok, store} = Store.File.create(Path.join(tmp_dir, "1.compact"))
 
     {:ok, _pid} = Compactor.start_link(self(), btree, store)
 

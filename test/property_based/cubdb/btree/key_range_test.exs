@@ -28,7 +28,7 @@ defmodule PropertyBased.Btree.KeyRangeTest do
             max_included: bool()
           ],
           repeat_for: 50 do
-      store = Store.TestStore.new()
+      {:ok, store} = Store.TestStore.create()
       btree = make_btree(store, key_values, cap)
       min_key = {min, min_included}
       max_key = {max, max_included}

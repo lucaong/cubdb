@@ -97,6 +97,11 @@ defmodule CubDBTest do
     assert {:error, _} = CubDB.start(data_dir: {})
   end
 
+  test "start/1 returns error if another CubDB process is using the same data dir", %{tmp_dir: tmp_dir} do
+    {:ok, _pid} = CubDB.start_link(data_dir: tmp_dir)
+    assert {:error, _} = CubDB.start(data_dir: tmp_dir)
+  end
+
   test "start/2 accepts data_dir, and a keyword of options and GenServer options", %{
     tmp_dir: tmp_dir
   } do

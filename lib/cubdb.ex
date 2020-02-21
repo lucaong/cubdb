@@ -773,20 +773,18 @@ defmodule CubDB do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, false))
     auto_file_sync = Keyword.get(options, :auto_file_sync, false)
 
-    case find_db_file(data_dir) do
-      file_name when is_binary(file_name) or is_nil(file_name) ->
-        store = Store.File.new(Path.join(data_dir, file_name || "0#{@db_file_extension}"))
-        {:ok, clean_up} = CleanUp.start_link(data_dir)
-
-        {:ok,
-         %State{
-           btree: Btree.new(store),
-           data_dir: data_dir,
-           clean_up: clean_up,
-           auto_compact: auto_compact,
-           auto_file_sync: auto_file_sync
-         }}
-
+    with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
+         {:ok, store} <- Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
+         {:ok, clean_up} <- CleanUp.start_link(data_dir) do
+      {:ok,
+        %State{
+          btree: Btree.new(store),
+          data_dir: data_dir,
+          clean_up: clean_up,
+          auto_compact: auto_compact,
+          auto_file_sync: auto_file_sync
+        }}
+    else
       {:error, reason} ->
         {:stop, reason}
     end
@@ -1002,7 +1000,7 @@ defmodule CubDB do
     new_path = String.replace_suffix(file_path, @compaction_file_extension, @db_file_extension)
     :ok = File.rename(file_path, new_path)
 
-    store = Store.File.new(new_path)
+    {:ok, store} = Store.File.create(new_path)
     Btree.new(store)
   end
 
@@ -1020,8 +1018,7 @@ defmodule CubDB do
         |> Integer.to_string(16)
         |> (&(&1 <> @compaction_file_extension)).()
 
-      store = Store.File.new(Path.join(data_dir, new_filename))
-      {:ok, store}
+      Store.File.create(Path.join(data_dir, new_filename))
     end
   end
 

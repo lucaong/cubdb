@@ -22,7 +22,7 @@ defmodule PropertyBased.BtreeTest do
               )
           ],
           repeat_for: 200 do
-      store = Store.TestStore.new()
+      {:ok, store} = Store.TestStore.create()
       tree = Btree.new(store, cap)
       inserts = tuples |> Enum.map(fn tuple -> {:insert, tuple} end)
       deletes = tuples |> Enum.map(fn tuple -> {:delete, tuple} end)

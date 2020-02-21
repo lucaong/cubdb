@@ -17,7 +17,7 @@ defmodule CubDB.Btree.DiffTest do
   end
 
   test "new/2 returns a Diff" do
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
     from_btree = make_btree(store, [foo: 1, bar: 2, baz: 3], 3)
 
     to_btree =
@@ -29,8 +29,10 @@ defmodule CubDB.Btree.DiffTest do
   end
 
   test "new/2 raises an error if from_btree and to_btree do not share the same store" do
-    from_btree = make_btree(Store.TestStore.new(), [foo: 1, bar: 2, baz: 3], 3)
-    to_btree = make_btree(Store.TestStore.new(), [foo: 1, bar: 2, baz: 3, qux: 4], 3)
+    {:ok, from_store} = Store.TestStore.create()
+    {:ok, to_store} = Store.TestStore.create()
+    from_btree = make_btree(from_store, [foo: 1, bar: 2, baz: 3], 3)
+    to_btree = make_btree(to_store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
 
     assert_raise ArgumentError, fn ->
       Diff.new(from_btree, to_btree)
@@ -38,7 +40,7 @@ defmodule CubDB.Btree.DiffTest do
   end
 
   test "iterates through updates between from_btree and to_btree" do
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
     from_btree = make_btree(store, [foo: 1, bar: 2, baz: 3], 3)
 
     to_btree =
@@ -55,7 +57,7 @@ defmodule CubDB.Btree.DiffTest do
   end
 
   test "Enumerable.count, Enumerable.member?, and Enumerable.slice return {:error, __MODULE__}" do
-    store = Store.TestStore.new()
+    {:ok, store} = Store.TestStore.create()
     from_btree = make_btree(store, [foo: 1, bar: 2, baz: 3], 3)
 
     to_btree =

@@ -39,7 +39,7 @@ defmodule PropertyBased.Btree.DiffTest do
               )
           ],
           repeat_for: 50 do
-      store = Store.TestStore.new()
+      {:ok, store} = Store.TestStore.create()
       from_btree = make_btree(store, entries, cap)
 
       to_btree =

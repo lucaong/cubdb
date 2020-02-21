@@ -25,7 +25,7 @@ defmodule CubDB.Store.CleanUpTest do
     files = ["E.cub", "E.txt", "1.cub", "2.compact", "F.cub", "10.compact", "11.cub"]
     for file <- files, do: File.touch(Path.join(tmp_dir, file))
 
-    store = Store.File.new(Path.join(tmp_dir, "F.cub"))
+    {:ok, store} = Store.File.create(Path.join(tmp_dir, "F.cub"))
     btree = Btree.new(store)
 
     {:ok, pid} = CleanUp.start_link(tmp_dir)
@@ -44,7 +44,7 @@ defmodule CubDB.Store.CleanUpTest do
     files = ["0.cub", "0.txt", "1.compact", "2.compact", "4.compact"]
     for file <- files, do: File.touch(Path.join(tmp_dir, file))
 
-    store = Store.File.new(Path.join(tmp_dir, "2.compact"))
+    {:ok, store} = Store.File.create(Path.join(tmp_dir, "2.compact"))
 
     {:ok, pid} = CleanUp.start_link(tmp_dir)
     :ok = CleanUp.clean_up_old_compaction_files(pid, store)

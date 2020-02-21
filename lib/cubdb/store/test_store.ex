@@ -9,9 +9,13 @@ defmodule CubDB.Store.TestStore do
   defstruct agent: nil
   alias CubDB.Store.TestStore
 
-  def new do
+  @type t :: %TestStore{agent: pid}
+
+  @spec create() :: {:ok, t} | {:error, term}
+
+  def create() do
     with {:ok, pid} <- Agent.start_link(fn -> {%{}, nil} end) do
-      %TestStore{agent: pid}
+      {:ok, %TestStore{agent: pid}}
     end
   end
 end
