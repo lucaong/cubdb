@@ -429,6 +429,8 @@ defmodule CubDBTest do
     assert CubDB.size(db) == 5
     assert CubDB.get(db, :x) == 0
     assert CubDB.has_key?(db, :a) == false
+
+    assert :ok = CubDB.compact(db)
   end
 
   test "auto compaction triggers compaction when conditions are met", %{tmp_dir: tmp_dir} do
@@ -502,6 +504,24 @@ defmodule CubDBTest do
 
     send(db, {:check_out_reader, btree})
     assert_receive :clean_up_started
+  end
+
+  test "compact/1 does not crash if compaction task crashes", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
+    CubDB.subscribe(db)
+
+    assert :ok = CubDB.compact(db)
+
+    %{compactor: compactor} = :sys.get_state(db)
+    Process.exit(compactor, :kill)
+
+    refute Process.alive?(compactor)
+
+    Process.sleep(100)
+    assert Process.alive?(db)
   end
 
   test "set_auto_file_sync/1 configures auto file sync behavior", %{tmp_dir: tmp_dir} do

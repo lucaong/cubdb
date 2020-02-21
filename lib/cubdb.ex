@@ -151,6 +151,7 @@ defmodule CubDB do
             btree: Btree.t(),
             data_dir: String.t(),
             compactor: pid | nil,
+            catch_up: pid | nil,
             clean_up: pid,
             clean_up_pending: boolean,
             busy_files: %{required(String.t()) => pos_integer},
@@ -163,6 +164,7 @@ defmodule CubDB do
     defstruct btree: nil,
               data_dir: nil,
               compactor: nil,
+              catch_up: nil,
               clean_up: nil,
               clean_up_pending: false,
               busy_files: %{},
@@ -770,6 +772,8 @@ defmodule CubDB do
 
   @doc false
   def init([data_dir, options]) do
+    Process.flag(:trap_exit, true)
+
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, false))
     auto_file_sync = Keyword.get(options, :auto_file_sync, false)
 
@@ -832,12 +836,12 @@ defmodule CubDB do
   end
 
   def handle_call({:delete, key}, _, state) do
-    %State{btree: btree, compactor: compactor, auto_file_sync: auto_file_sync} = state
+    %State{btree: btree, auto_file_sync: auto_file_sync} = state
 
     btree =
-      case compactor do
-        nil -> Btree.delete(btree, key) |> Btree.commit()
-        _ -> Btree.mark_deleted(btree, key) |> Btree.commit()
+      case compaction_running?(state) do
+        false -> Btree.delete(btree, key) |> Btree.commit()
+        true -> Btree.mark_deleted(btree, key) |> Btree.commit()
       end
 
     btree = if auto_file_sync, do: Btree.sync(btree), else: btree
@@ -846,7 +850,7 @@ defmodule CubDB do
   end
 
   def handle_call({:get_and_update_multi, keys_to_get, fun}, _, state) do
-    %State{btree: btree, compactor: compactor, auto_file_sync: auto_file_sync} = state
+    %State{btree: btree, auto_file_sync: auto_file_sync} = state
 
     key_values =
       Enum.reduce(keys_to_get, %{}, fn key, map ->
@@ -865,9 +869,9 @@ defmodule CubDB do
 
     btree =
       Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
-        case compactor do
-          nil -> Btree.delete(btree, key)
-          _ -> Btree.mark_deleted(btree, key)
+        case compaction_running?(state) do
+          false -> Btree.delete(btree, key)
+          true -> Btree.mark_deleted(btree, key)
         end
       end)
 
@@ -933,12 +937,12 @@ defmodule CubDB do
 
     if latest_btree == original_btree do
       compacted_btree = finalize_compaction(compacted_btree)
-      state = %State{state | btree: compacted_btree, compactor: nil}
+      state = %State{state | btree: compacted_btree}
       for pid <- state.subs, do: send(pid, :catch_up_completed)
       {:noreply, trigger_clean_up(state)}
     else
-      CatchUp.start_link(self(), compacted_btree, original_btree, latest_btree)
-      {:noreply, state}
+      {:ok, pid} = CatchUp.start_link(self(), compacted_btree, original_btree, latest_btree)
+      {:noreply, %State{state | catch_up: pid}}
     end
   end
 
@@ -951,6 +955,22 @@ defmodule CubDB do
         else: state
 
     {:noreply, state}
+  end
+
+  def handle_info({:EXIT, from, _reason}, state = %State{compactor: from}) do
+    {:noreply, %State{state | compactor: nil}}
+  end
+
+  def handle_info({:EXIT, from, _reason}, state = %State{catch_up: from}) do
+    {:noreply, %State{state | catch_up: nil}}
+  end
+
+  def handle_info({:EXIT, _from, :normal}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:EXIT, _from, reason}, state) do
+    {:stop, reason, state}
   end
 
   # Only used for testing
@@ -981,15 +1001,15 @@ defmodule CubDB do
   @spec trigger_compaction(%State{}) :: {:ok, pid} | {:error, any}
 
   defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
-    case can_compact?(state) do
-      true ->
+    case compaction_running?(state) do
+      false ->
         for pid <- state.subs, do: send(pid, :compaction_started)
         {:ok, store} = new_compaction_store(data_dir)
         CleanUp.clean_up_old_compaction_files(clean_up, store)
         Compactor.start_link(self(), btree, store)
 
-      {false, reason} ->
-        {:error, reason}
+      true ->
+        {:error, :pending_compaction}
     end
   end
 
@@ -1023,14 +1043,11 @@ defmodule CubDB do
     end
   end
 
-  @spec can_compact?(%State{}) :: true | {false, any}
+  @spec compaction_running?(%State{}) :: boolean
 
-  defp can_compact?(%State{compactor: compactor}) do
-    case compactor do
-      nil -> true
-      _ -> {false, :pending_compaction}
-    end
-  end
+  defp compaction_running?(%State{compactor: nil, catch_up: nil}), do: false
+
+  defp compaction_running?(_), do: true
 
   @spec check_in_reader(Btree.t(), %State{}) :: %State{}
 
@@ -1088,8 +1105,11 @@ defmodule CubDB do
   defp maybe_auto_compact(state) do
     if should_auto_compact?(state) do
       case trigger_compaction(state) do
-        {:ok, compactor} -> %State{state | compactor: compactor}
-        {:error, _} -> state
+        {:ok, compactor} ->
+          %State{state | compactor: compactor}
+
+        {:error, _} ->
+          state
       end
     else
       state
