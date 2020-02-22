@@ -25,12 +25,12 @@ structure your keys to be tuples like `{:people, person_id}` for people, and
 `{:articles, article_id}` for articles:
 
 ```elixir
-# Add a few users:
+# Add a few people:
 :ok = CubDB.put(db, {:people, 1}, %{first_name: "Margaret", last_name: "Hamilton"})
 :ok = CubDB.put(db, {:people, 2}, %{first_name: "Alan", last_name: "Turing"})
 
-# Add a few articles
-:ok = CubDB.put(db, {:articles, 1}, %{title: "Spaceship Guidance for dummies", text: "..."})
+# Add a few articles:
+:ok = CubDB.put(db, {:articles, 1}, %{title: "Spaceship Guidance made easy", text: "..."})
 :ok = CubDB.put(db, {:articles, 2}, %{title: "Morphogenesis for the uninitiated", text: "..."})
 ```
 
@@ -51,10 +51,10 @@ collection:
 
 ```elixir
 # Select all people
-{:ok, people} = CubDB.select(db, min_key: {:people, 0}, max_key: {:people, nil})
+{:ok, people_wth_keys} = CubDB.select(db, min_key: {:people, 0}, max_key: {:people, nil})
 
 # Select all articles
-{:ok, articles} = CubDB.select(db, min_key: {:articles, 0}, max_key: {:articles, nil})
+{:ok, articles_with_keys} = CubDB.select(db, min_key: {:articles, 0}, max_key: {:articles, nil})
 ```
 
 This range selection works because `nil` is greater than all numbers, so `{:abc,
