@@ -40,7 +40,8 @@ defmodule CubDB.Store.File do
 
   defp ensure_exclusive_access!(file_path) do
     unless :global.set_lock({{__MODULE__, file_path}, self()}, [node()], 0) do
-      raise ArgumentError, message: "file \"#{file_path}\" is already in use by another CubDB.Store.File"
+      raise ArgumentError,
+        message: "file \"#{file_path}\" is already in use by another CubDB.Store.File"
     end
   end
 end

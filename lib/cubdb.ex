@@ -774,16 +774,17 @@ defmodule CubDB do
     auto_file_sync = Keyword.get(options, :auto_file_sync, false)
 
     with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
-         {:ok, store} <- Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
+         {:ok, store} <-
+           Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
          {:ok, clean_up} <- CleanUp.start_link(data_dir) do
       {:ok,
-        %State{
-          btree: Btree.new(store),
-          data_dir: data_dir,
-          clean_up: clean_up,
-          auto_compact: auto_compact,
-          auto_file_sync: auto_file_sync
-        }}
+       %State{
+         btree: Btree.new(store),
+         data_dir: data_dir,
+         clean_up: clean_up,
+         auto_compact: auto_compact,
+         auto_file_sync: auto_file_sync
+       }}
     else
       {:error, reason} ->
         {:stop, reason}
