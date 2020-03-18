@@ -188,7 +188,7 @@ defmodule CubDB do
       clean_up_pending: false,
       readers: %{},
       auto_compact: false,
-      auto_file_sync: false,
+      auto_file_sync: true,
       subs: []
     ]
   end
@@ -212,8 +212,9 @@ defmodule CubDB do
     to `false`. See `set_auto_compact/2` for the possible values
 
     - `auto_file_sync`: whether to force flush the disk buffer on each write. It
-    defaults to `false`. If set to `true`, write performance is slower, but
-    durability is strictly guaranteed. See `set_auto_file_sync/2` for details.
+    defaults to `true`. If set to `false`, write performance is faster, but
+    durability of writes is not strictly guaranteed. See `set_auto_file_sync/2`
+    for details.
 
   `GenServer` options like `name` and `timeout` can also be given, and are
   forwarded to `GenServer.start_link/3` as the third argument.
@@ -802,7 +803,7 @@ defmodule CubDB do
   @doc false
   def init([data_dir, options]) do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, false))
-    auto_file_sync = Keyword.get(options, :auto_file_sync, false)
+    auto_file_sync = Keyword.get(options, :auto_file_sync, true)
 
     with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
          {:ok, store} <-
