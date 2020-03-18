@@ -554,18 +554,24 @@ defmodule CubDBTest do
     assert Process.alive?(db)
   end
 
-  test "set_auto_file_sync/1 configures auto file sync behavior", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir, auto_file_sync: true)
+  test "auto_file_sync is true by default", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
 
     assert %CubDB.State{auto_file_sync: true} = :sys.get_state(db)
+  end
 
-    CubDB.set_auto_file_sync(db, false)
+  test "set_auto_file_sync/1 configures auto file sync behavior", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_file_sync: false)
 
     assert %CubDB.State{auto_file_sync: false} = :sys.get_state(db)
 
     CubDB.set_auto_file_sync(db, true)
 
     assert %CubDB.State{auto_file_sync: true} = :sys.get_state(db)
+
+    CubDB.set_auto_file_sync(db, false)
+
+    assert %CubDB.State{auto_file_sync: false} = :sys.get_state(db)
   end
 
   test "file_sync/1 returns :ok", %{tmp_dir: tmp_dir} do
