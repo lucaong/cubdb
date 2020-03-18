@@ -27,8 +27,8 @@ Benchee.run(
   },
   before_scenario: fn input ->
     cleanup.()
-    {:ok, db} = CubDB.start_link(data_dir, auto_file_sync: false)
-    for key <- (0..n), do: CubDB.put(db, key, input)
+    {:ok, db} = CubDB.start_link(data_dir, auto_file_sync: false, auto_compact: false)
+    for key <- 0..n, do: CubDB.put(db, key, input)
     db
   end,
   before_each: fn db ->

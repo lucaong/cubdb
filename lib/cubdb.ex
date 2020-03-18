@@ -109,16 +109,12 @@ defmodule CubDB do
       #=> {:ok, 18}
 
   Because `CubDB` uses an immutable data structure, write operations cause the
-  data file to grow. Occasionally, it is adviseable to run a compaction to
-  optimize the file size and reclaim disk space. Compaction can be started
-  manually by calling `compact/1`, and runs in the background, without blocking
-  other operations:
-
-      CubDB.compact(db)
-      #=> :ok
-
-  Alternatively, automatic compaction can be enabled, either passing the
-  `:auto_compact` option to `start_link/1`, or by calling `set_auto_compact/2`.
+  data file to grow. When necessary, `CubDB` runs a compaction operation to
+  optimize the file size and reclaim disk space. Compaction runs in the
+  background, without blocking other operations. By default, `CubDB` runs
+  compaction automatically when necessary (see documentation of
+  `set_auto_compact/2` for details). Alternatively, it can be started manually
+  by calling `compact/1`.
   """
 
   @doc """
@@ -187,7 +183,7 @@ defmodule CubDB do
       clean_up: nil,
       clean_up_pending: false,
       readers: %{},
-      auto_compact: false,
+      auto_compact: true,
       auto_file_sync: true,
       subs: []
     ]
@@ -209,7 +205,7 @@ defmodule CubDB do
     several databases, they should each use their own separate data directory.
 
     - `auto_compact`: whether to perform compaction automatically. It defaults
-    to `false`. See `set_auto_compact/2` for the possible values
+    to `true`. See `set_auto_compact/2` for the possible values
 
     - `auto_file_sync`: whether to force flush the disk buffer on each write. It
     defaults to `true`. If set to `false`, write performance is faster, but
@@ -802,7 +798,7 @@ defmodule CubDB do
 
   @doc false
   def init([data_dir, options]) do
-    auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, false))
+    auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, true))
     auto_file_sync = Keyword.get(options, :auto_file_sync, true)
 
     with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),

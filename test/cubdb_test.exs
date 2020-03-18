@@ -242,7 +242,7 @@ defmodule CubDBTest do
   end
 
   test "get_and_update_multi/4 works well during a compaction", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
 
     entries = [a: 1, b: 2, c: 3, d: 4]
 
@@ -392,7 +392,7 @@ defmodule CubDBTest do
     File.touch(Path.join(tmp_dir, "X.cub"))
     File.touch(Path.join(tmp_dir, "10.cub"))
 
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
 
     CubDB.subscribe(db)
 
@@ -406,7 +406,7 @@ defmodule CubDBTest do
   end
 
   test "compaction catches up on newer updates", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
 
     entries = [a: 1, b: 2, c: 3, d: 4, e: 5]
 
@@ -451,18 +451,24 @@ defmodule CubDBTest do
     refute_received :compaction_started
   end
 
-  test "set_auto_compact/1 configures auto compaction behavior", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: true)
+  test "auto compaction is active by default", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
 
     assert %CubDB.State{auto_compact: {100, 0.25}} = :sys.get_state(db)
+  end
 
-    :ok = CubDB.set_auto_compact(db, false)
+  test "set_auto_compact/1 configures auto compaction behavior", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
 
     assert %CubDB.State{auto_compact: false} = :sys.get_state(db)
 
     :ok = CubDB.set_auto_compact(db, true)
 
     assert %CubDB.State{auto_compact: {100, 0.25}} = :sys.get_state(db)
+
+    :ok = CubDB.set_auto_compact(db, false)
+
+    assert %CubDB.State{auto_compact: false} = :sys.get_state(db)
 
     :ok = CubDB.set_auto_compact(db, {10, 0.5})
 
@@ -474,7 +480,7 @@ defmodule CubDBTest do
   test "compact/1 returns :ok, or {:error, :pending_compaction} if already compacting", %{
     tmp_dir: tmp_dir
   } do
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
     CubDB.subscribe(db)
 
@@ -486,7 +492,7 @@ defmodule CubDBTest do
   end
 
   test "compact/1 postpones clean-up when old file is still referenced", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
     :ok = CubDB.put(db, :foo, 123)
 
     CubDB.subscribe(db)
@@ -539,7 +545,7 @@ defmodule CubDBTest do
   test "compact/1 does not crash if compaction task crashes", %{
     tmp_dir: tmp_dir
   } do
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
     CubDB.subscribe(db)
 
@@ -586,7 +592,7 @@ defmodule CubDBTest do
   end
 
   test "current_db_file/1 returns the path to the current database file", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
     expected_file_path = Path.join(tmp_dir, "0.cub")
     assert ^expected_file_path = CubDB.current_db_file(db)
 
