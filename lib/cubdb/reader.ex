@@ -13,52 +13,40 @@ defmodule CubDB.Reader do
   # after a compaction can be delayed until no more `Reader` processes reference
   # them.
 
-  use Task
-
   alias CubDB.Btree
 
   @type operation :: {:get, any, any} | {:fetch, any} | {:has_key?, any} | {:select, Keyword.t()}
 
-  @spec start_link(GenServer.from(), GenServer.server(), Btree.t(), operation) :: {:ok, pid}
+  @spec run(Btree.t(), GenServer.from(), operation) :: any
 
-  def start_link(caller, db, btree, read_operation) do
-    Task.start_link(__MODULE__, :run, [caller, db, btree, read_operation])
+  def run(btree, caller, operation) do
+    GenServer.reply(caller, perform(btree, operation))
   end
 
-  @spec run(GenServer.from(), GenServer.server(), Btree.t(), operation) :: :ok
+  @spec perform(Btree.t(), operation) :: any
 
-  def run(caller, db, btree, {:get, key, default}) do
+  def perform(btree, {:get, key, default}) do
     case Btree.fetch(btree, key) do
-      {:ok, value} -> GenServer.reply(caller, value)
-      :error -> GenServer.reply(caller, default)
+      {:ok, value} -> value
+      :error -> default
     end
-  after
-    send(db, {:check_out_reader, btree})
   end
 
-  def run(caller, db, btree, {:fetch, key}) do
-    reply = Btree.fetch(btree, key)
-    GenServer.reply(caller, reply)
-  after
-    send(db, {:check_out_reader, btree})
+  def perform(btree, {:fetch, key}) do
+    Btree.fetch(btree, key)
   end
 
-  def run(caller, db, btree, {:has_key?, key}) do
+  def perform(btree, {:has_key?, key}) do
     case Btree.fetch(btree, key) do
-      {:ok, _} -> GenServer.reply(caller, true)
-      :error -> GenServer.reply(caller, false)
+      {:ok, _} -> true
+      :error -> false
     end
-  after
-    send(db, {:check_out_reader, btree})
   end
 
-  def run(caller, db, btree, {:select, options}) do
-    reply = select(btree, options)
-    GenServer.reply(caller, {:ok, reply})
+  def perform(btree, {:select, options}) do
+    {:ok, select(btree, options)}
   rescue
-    error -> GenServer.reply(caller, {:error, error})
-  after
-    send(db, {:check_out_reader, btree})
+    error -> {:error, error}
   end
 
   @spec select(Btree.t(), Keyword.t()) :: any

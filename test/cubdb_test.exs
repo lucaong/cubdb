@@ -132,7 +132,7 @@ defmodule CubDBTest do
     assert CubDB.has_key?(db, key) == false
   end
 
-  test "select/3 works as expected", %{tmp_dir: tmp_dir} do
+  test "select/2 works as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
     entries = [
@@ -235,12 +235,10 @@ defmodule CubDBTest do
 
     assert CubDB.get(db, :b) == 1
 
-    assert {:error, error} =
+    assert {:error, :timeout} =
              CubDB.get_and_update_multi(db, [:a, :c], fn _ ->
-               raise(RuntimeError, message: "boom")
-             end)
-
-    assert %RuntimeError{message: "boom"} = error
+               Process.sleep(80)
+             end, timeout: 50)
   end
 
   test "get_and_update_multi/4 works well during a compaction", %{tmp_dir: tmp_dir} do
@@ -489,11 +487,28 @@ defmodule CubDBTest do
 
   test "compact/1 postpones clean-up when old file is still referenced", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
+    :ok = CubDB.put(db, :foo, 123)
 
     CubDB.subscribe(db)
 
-    %CubDB.State{btree: btree} = :sys.get_state(db)
-    send(db, {:_test_check_in_reader, btree})
+    caller = self()
+
+    # This blocks the reader until we send a :resume message
+    Task.start_link(fn ->
+      CubDB.select(db, timeout: :infinity, reduce: {0, fn _, a ->
+        if a == 0 do
+          send(caller, {:stopping, self()})
+          receive do
+            :resume -> nil
+          end
+        end
+        a + 1
+      end})
+    end)
+
+    reader = receive do
+      {:stopping, pid} -> pid
+    end
 
     :ok = CubDB.compact(db)
 
@@ -502,7 +517,22 @@ defmodule CubDBTest do
 
     assert %CubDB.State{clean_up_pending: true} = :sys.get_state(db)
 
-    send(db, {:check_out_reader, btree})
+    send(reader, :resume)
+    assert_receive :clean_up_started
+  end
+
+  test "compact/1 cleans up if a reader timeout elapses", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    CubDB.put(db, :foo, 123)
+    CubDB.subscribe(db)
+
+    assert {:timeout, _} = catch_exit(CubDB.select(db, timeout: 20, reduce: {nil, fn _, _ ->
+      Process.sleep(3000)
+    end}))
+
+    :ok = CubDB.compact(db)
+
+    assert_received :compaction_started
     assert_receive :clean_up_started
   end
 

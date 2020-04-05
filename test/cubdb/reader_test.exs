@@ -5,6 +5,27 @@ defmodule CubDB.Store.ReaderTest do
   alias CubDB.Store
   alias CubDB.Reader
 
+  defmodule TestCaller do
+    use GenServer
+
+    def start_link() do
+      GenServer.start_link(__MODULE__, [], [])
+    end
+
+    def run(pid, btree, operation) do
+      GenServer.call(pid, {:run, btree, operation})
+    end
+
+    def init(_) do
+      {:ok, nil}
+    end
+
+    def handle_call({:run, btree, operation}, from, state) do
+      Reader.run(btree, from, operation)
+      {:noreply, state}
+    end
+  end
+
   setup do
     {:ok, store} = Store.TestStore.create()
 
@@ -18,189 +39,93 @@ defmodule CubDB.Store.ReaderTest do
     {:ok, entries: entries, btree: btree}
   end
 
-  test "start_link/4 performs :get, and checks out", %{btree: btree} do
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:get, :d, 42})
-    assert_receive {:test_tag, 4}
-    assert_receive {:check_out_reader, ^btree}
-
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:get, :z, 42})
-    assert_receive {:test_tag, 42}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :get", %{btree: btree} do
+    assert 4 = Reader.perform(btree, {:get, :d, 42})
+    assert 42 = Reader.perform(btree, {:get, :z, 42})
 
     btree = Btree.insert(btree, :n, nil)
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:get, :n, 42})
-    assert_receive {:test_tag, nil}
-    assert_receive {:check_out_reader, ^btree}
+    assert Reader.perform(btree, {:get, :n, 42}) == nil
   end
 
-  test "start_link/4 performs :fetch, and checks out", %{btree: btree} do
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:fetch, :c})
-    assert_receive {:test_tag, {:ok, 3}}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :fetch", %{btree: btree} do
+    assert {:ok, 3} = Reader.perform(btree, {:fetch, :c})
 
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:fetch, :z})
-    assert_receive {:test_tag, :error}
-    assert_receive {:check_out_reader, ^btree}
+    assert :error = Reader.perform(btree, {:fetch, :z})
   end
 
-  test "start_link/4 performs :has_key?, and checks out", %{btree: btree} do
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:has_key?, :c})
-    assert_receive {:test_tag, true}
-    assert_receive {:check_out_reader, ^btree}
-
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:has_key?, :z})
-    assert_receive {:test_tag, false}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :has_key?", %{btree: btree} do
+    assert Reader.perform(btree, {:has_key?, :c})
+    refute Reader.perform(btree, {:has_key?, :z})
   end
 
-  test "start_link/4 performs :select, and checks out", %{btree: btree, entries: entries} do
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:select, []})
-    assert_receive {:test_tag, {:ok, ^entries}}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :select", %{btree: btree, entries: entries} do
+    assert {:ok, ^entries} = Reader.perform(btree, {:select, []})
   end
 
-  test "start_link/4 performs :select with :min_key and :max_key", %{btree: btree} do
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           min_key: :b,
-           max_key: :d
-         ]}
-      )
-
-    assert_receive {:test_tag, {:ok, [b: 2, c: 3, d: 4]}}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :select with :min_key and :max_key", %{btree: btree} do
+    assert {:ok, [b: 2, c: 3, d: 4]} = Reader.perform(btree, {:select, min_key: :b, max_key: :d})
   end
 
-  test "start_link/4 performs :select with :filter and :map", %{btree: btree} do
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           pipe: [
-             filter: fn {_, value} -> rem(value, 2) == 0 end,
-             map: fn {_, value} -> value end
-           ]
-         ]}
-      )
-
-    assert_receive {:test_tag, {:ok, [2, 4, 6]}}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :select with :filter and :map", %{btree: btree} do
+    assert {:ok, [2, 4, 6]} =
+             Reader.perform(
+               btree,
+               {:select,
+                pipe: [
+                  filter: fn {_, value} -> rem(value, 2) == 0 end,
+                  map: fn {_, value} -> value end
+                ]}
+             )
   end
 
-  test "start_link/4 performs :select with :reduce", %{btree: btree} do
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           pipe: [
-             map: fn {_, value} -> value end
-           ],
-           reduce: fn value, sum -> sum + value end
-         ]}
-      )
+  test "perform/2 performs :select with :reduce", %{btree: btree} do
+    assert {:ok, 28} =
+             Reader.perform(
+               btree,
+               {:select,
+                pipe: [map: fn {_, value} -> value end], reduce: fn value, sum -> sum + value end}
+             )
 
-    assert_receive {:test_tag, {:ok, 28}}
-    assert_receive {:check_out_reader, ^btree}
-
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           reduce: {0, fn {_, value}, sum -> sum + value end}
-         ]}
-      )
-
-    assert_receive {:test_tag, {:ok, 28}}
-    assert_receive {:check_out_reader, ^btree}
+    assert {:ok, 28} =
+             Reader.perform(
+               btree,
+               {:select, reduce: {0, fn {_, value}, sum -> sum + value end}}
+             )
   end
 
-  test "start_link/4 performs :select and reports errors", %{btree: btree} do
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           reduce: fn _, _ -> raise(ArithmeticError, message: "boom") end
-         ]}
-      )
-
-    assert_receive {:test_tag, {:error, %ArithmeticError{}}}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :select and reports errors", %{btree: btree} do
+    assert {:error, %ArithmeticError{}} =
+             Reader.perform(
+               btree,
+               {:select, reduce: fn _, _ -> raise(ArithmeticError, message: "boom") end}
+             )
   end
 
-  test "start_link/4 performs :select with :reverse", %{btree: btree, entries: entries} do
-    {:ok, _} = Reader.start_link({self(), :test_tag}, self(), btree, {:select, [reverse: true]})
+  test "perform/2 performs :select with :reverse", %{btree: btree, entries: entries} do
     reverse_entries = Enum.reverse(entries)
-    assert_receive {:test_tag, {:ok, ^reverse_entries}}
-    assert_receive {:check_out_reader, ^btree}
+
+    assert {:ok, ^reverse_entries} = Reader.perform(btree, {:select, [reverse: true]})
   end
 
-  test "start_link/4 performs :select with :take and :drop", %{btree: btree} do
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           pipe: [take: 4, drop: 2]
-         ]}
-      )
-
-    assert_receive {:test_tag, {:ok, [c: 3, d: 4]}}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :select with :take and :drop", %{btree: btree} do
+    assert {:ok, [c: 3, d: 4]} = Reader.perform(btree, {:select, pipe: [take: 4, drop: 2]})
   end
 
-  test "start_link/4 performs :select with :take_while and :drop_while", %{btree: btree} do
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           pipe: [
-             take_while: fn {_, v} -> v < 5 end,
-             drop_while: fn {_, v} -> v < 3 end
-           ]
-         ]}
-      )
-
-    assert_receive {:test_tag, {:ok, [c: 3, d: 4]}}
-    assert_receive {:check_out_reader, ^btree}
+  test "perform/2 performs :select with :take_while and :drop_while", %{btree: btree} do
+    assert {:ok, [c: 3, d: 4]} =
+             Reader.perform(
+               btree,
+               {:select,
+                pipe: [take_while: fn {_, v} -> v < 5 end, drop_while: fn {_, v} -> v < 3 end]}
+             )
   end
 
-  test "start_link/4 performs :select with invalid :pipe", %{btree: btree} do
-    {:ok, _} =
-      Reader.start_link(
-        {self(), :test_tag},
-        self(),
-        btree,
-        {:select,
-         [
-           pipe: [
-             xxx: 123
-           ]
-         ]}
-      )
+  test "perform/2 performs :select with invalid :pipe", %{btree: btree} do
+    assert {:error, _} = Reader.perform(btree, {:select, pipe: [xxx: 123]})
+  end
 
-    assert_receive {:test_tag, {:error, _}}
-    assert_receive {:check_out_reader, ^btree}
+  test "run/3 performs the read and replies to the caller GenServer", %{btree: btree} do
+    {:ok, pid} = TestCaller.start_link()
+    assert {:ok, [c: 3, d: 4]} = TestCaller.run(pid, btree, {:select, pipe: [take: 4, drop: 2]})
   end
 end
