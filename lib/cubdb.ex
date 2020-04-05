@@ -9,7 +9,7 @@ defmodule CubDB do
 
     - Simple `get/3`, `put/3`, and `delete/2` operations
 
-    - Arbitrary selection of ranges of entries sorted by key with `select/3`
+    - Arbitrary selection of ranges of entries sorted by key with `select/2`
 
     - Atomic transactions with `put_multi/2`, `get_and_update_multi/4`, etc.
 
@@ -76,12 +76,12 @@ defmodule CubDB do
       CubDB.put_multi(db, [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8])
       #=> :ok
 
-  Range of entries sorted by key are retrieved using `select/3`:
+  Range of entries sorted by key are retrieved using `select/2`:
 
       CubDB.select(db, min_key: :b, max_key: :e)
       #=> {:ok, [b: 2, c: 3, d: 4, e: 5]}
 
-  But `select/3` can do much more than that. It can apply a pipeline of operations
+  But `select/2` can do much more than that. It can apply a pipeline of operations
   (`map`, `filter`, `take`, `drop` and more) to the selected entries, it can
   select the entries in normal or reverse order, and it can `reduce` the result
   using an arbitrary function:
@@ -143,6 +143,22 @@ defmodule CubDB do
   @type value :: any
   @type entry :: {key, value}
   @type option :: {:auto_compact, {pos_integer, number} | boolean} | {:auto_file_sync, boolean}
+  @type pipe_operation ::
+          {:map, fun}
+          | {:filter, fun}
+          | {:take, non_neg_integer}
+          | {:drop, non_neg_integer}
+          | {:take_while, fun}
+          | {:drop_while, fun}
+  @type select_option ::
+          {:min_key, any}
+          | {:max_key, any}
+          | {:min_key_inclusive, boolean}
+          | {:max_key_inclusive, boolean}
+          | {:pipe, [pipe_operation]}
+          | {:reverse, boolean}
+          | {:reduce, fun | {any, fun}}
+          | {:timeout, timeout}
 
   defmodule State do
     @moduledoc false
@@ -155,7 +171,7 @@ defmodule CubDB do
             catch_up: pid | nil,
             clean_up: pid,
             clean_up_pending: boolean,
-            busy_files: %{required(String.t()) => pos_integer},
+            readers: %{required(reference) => {String.t(), reference}},
             auto_compact: {pos_integer, number} | false,
             auto_file_sync: boolean,
             subs: list(pid)
@@ -170,7 +186,7 @@ defmodule CubDB do
       catch_up: nil,
       clean_up: nil,
       clean_up_pending: false,
-      busy_files: %{},
+      readers: %{},
       auto_compact: false,
       auto_file_sync: false,
       subs: []
@@ -270,7 +286,7 @@ defmodule CubDB do
   unless specified otherwise).
   """
   def get(db, key, default \\ nil) do
-    GenServer.call(db, {:get, key, default})
+    perform_read(db, {:get, key, default})
   end
 
   @spec fetch(GenServer.server(), key) :: {:ok, value} | :error
@@ -282,7 +298,7 @@ defmodule CubDB do
   returns `{:ok, value}`. If `key` is not found, it returns `:error`.
   """
   def fetch(db, key) do
-    GenServer.call(db, {:fetch, key})
+    perform_read(db, {:fetch, key})
   end
 
   @spec has_key?(GenServer.server(), key) :: boolean
@@ -291,10 +307,10 @@ defmodule CubDB do
   Returns whether an entry with the given `key` exists in the database.
   """
   def has_key?(db, key) do
-    GenServer.call(db, {:has_key?, key})
+    perform_read(db, {:has_key?, key})
   end
 
-  @spec select(GenServer.server(), Keyword.t(), timeout) ::
+  @spec select(GenServer.server(), [select_option]) ::
           {:ok, any} | {:error, Exception.t()}
 
   @doc """
@@ -361,6 +377,9 @@ defmodule CubDB do
   tuple, the first element is the starting value of the reduction, and the
   second is the reducing function.
 
+  The `timeout` option specifies a timeout (in milliseconds or `:infinity`,
+  defaulting to `:infinity`) after which the operation will fail.
+
   ## Examples
 
   To select all entries with keys between `:a` and `:c` as a list of `{key,
@@ -392,8 +411,9 @@ defmodule CubDB do
         reduce: fn n, sum -> sum + n end # reduce to the sum of selected values
       )
   """
-  def select(db, options \\ [], timeout \\ 5000) when is_list(options) do
-    GenServer.call(db, {:select, options}, timeout)
+  def select(db, options \\ []) when is_list(options) do
+    timeout = Keyword.get(options, :timeout, :infinity)
+    perform_read(db, {:select, options}, timeout)
   end
 
   @spec size(GenServer.server()) :: pos_integer
@@ -402,7 +422,7 @@ defmodule CubDB do
   Returns the number of entries present in the database.
   """
   def size(db) do
-    GenServer.call(db, :size)
+    GenServer.call(db, :size, :infinity)
   end
 
   @spec dirt_factor(GenServer.server()) :: float
@@ -417,7 +437,7 @@ defmodule CubDB do
   can be cleaned up in a compaction operation.
   """
   def dirt_factor(db) do
-    GenServer.call(db, :dirt_factor)
+    GenServer.call(db, :dirt_factor, :infinity)
   end
 
   @spec put(GenServer.server(), key, value) :: :ok
@@ -428,7 +448,7 @@ defmodule CubDB do
   If `key` was already present, it is overwritten.
   """
   def put(db, key, value) do
-    GenServer.call(db, {:put, key, value})
+    GenServer.call(db, {:put, key, value}, :infinity)
   end
 
   @spec delete(GenServer.server(), key) :: :ok
@@ -439,7 +459,7 @@ defmodule CubDB do
   If `key` was not present in the database, nothing is done.
   """
   def delete(db, key) do
-    GenServer.call(db, {:delete, key})
+    GenServer.call(db, {:delete, key}, :infinity)
   end
 
   @spec update(GenServer.server(), key, value, (value -> value)) :: :ok
@@ -496,8 +516,9 @@ defmodule CubDB do
           GenServer.server(),
           [key],
           (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, [key] | nil}),
-          timeout
+          [opt]
         ) :: {:ok, any} | {:error, any}
+        when opt: {:timeout, timeout}
 
   @doc """
   Gets and updates or deletes multiple entries in an atomic transaction.
@@ -513,12 +534,16 @@ defmodule CubDB do
   to be returned, `entries_to_put` is a map of `%{key => value}` entries to be
   written to the database, and `keys_to_delete` is a list of keys to be deleted.
 
-  The optional `timeout` argument specifies a timeout in milliseconds, which is
-  `5000` (5 seconds) by default.
-
   The read and write operations are executed as an atomic transaction, so they
   will either all succeed, or all fail. Note that `get_and_update_multi/4`
   blocks other write operations until it completes.
+
+  The `options` argument is an optional keyword list of options, including:
+
+    - `:timeout` - a timeout (in milliseconds or `:infinite`, defaulting to
+    `5000`) for the operation, after which the function returns `{:error,
+    :timeout}`. This is useful to avoid blocking other write operations for too
+    long.
 
   ## Example
 
@@ -550,8 +575,8 @@ defmodule CubDB do
         {joy, %{"Joy" => joy}, ["Anna"]}
       end)
   """
-  def get_and_update_multi(db, keys_to_get, fun, timeout \\ 5000) do
-    GenServer.call(db, {:get_and_update_multi, keys_to_get, fun}, timeout)
+  def get_and_update_multi(db, keys_to_get, fun, options \\ []) do
+    GenServer.call(db, {:get_and_update_multi, keys_to_get, fun, options}, :infinity)
   end
 
   @spec get_multi(GenServer.server(), [key]) :: %{key => value}
@@ -575,7 +600,7 @@ defmodule CubDB do
       {entries, %{}, []}
     end
 
-    {:ok, result} = GenServer.call(db, {:get_and_update_multi, keys, fun})
+    {:ok, result} = GenServer.call(db, {:get_and_update_multi, keys, fun, []}, :infinity)
     result
   end
 
@@ -594,7 +619,7 @@ defmodule CubDB do
       {:ok, entries, []}
     end
 
-    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun})
+    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun, []}, :infinity)
     result
   end
 
@@ -610,7 +635,7 @@ defmodule CubDB do
       {:ok, %{}, keys}
     end
 
-    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun})
+    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun, []}, :infinity)
     result
   end
 
@@ -636,7 +661,7 @@ defmodule CubDB do
   unnecessarily often.
   """
   def compact(db) do
-    GenServer.call(db, :compact)
+    GenServer.call(db, :compact, :infinity)
   end
 
   @spec set_auto_compact(GenServer.server(), boolean | {integer, integer | float}) ::
@@ -660,7 +685,7 @@ defmodule CubDB do
   run compaction at the end of the import.
   """
   def set_auto_compact(db, setting) do
-    GenServer.call(db, {:set_auto_compact, setting})
+    GenServer.call(db, {:set_auto_compact, setting}, :infinity)
   end
 
   @spec file_sync(GenServer.server()) :: :ok
@@ -683,7 +708,7 @@ defmodule CubDB do
   """
 
   def file_sync(db) do
-    GenServer.call(db, :file_sync)
+    GenServer.call(db, :file_sync, :infinity)
   end
 
   @spec set_auto_file_sync(GenServer.server(), boolean) :: :ok
@@ -703,7 +728,7 @@ defmodule CubDB do
   decreasing write performance.
   """
   def set_auto_file_sync(db, bool) do
-    GenServer.call(db, {:set_auto_file_sync, bool})
+    GenServer.call(db, {:set_auto_file_sync, bool}, :infinity)
   end
 
   @spec data_dir(GenServer.server()) :: String.t()
@@ -721,7 +746,7 @@ defmodule CubDB do
   """
 
   def data_dir(db) do
-    GenServer.call(db, :data_dir)
+    GenServer.call(db, :data_dir, :infinity)
   end
 
   @spec current_db_file(GenServer.server()) :: String.t()
@@ -740,7 +765,7 @@ defmodule CubDB do
   """
 
   def current_db_file(db) do
-    GenServer.call(db, :current_db_file)
+    GenServer.call(db, :current_db_file, :infinity)
   end
 
   @spec cubdb_file?(String.t()) :: boolean
@@ -763,7 +788,7 @@ defmodule CubDB do
 
   @doc false
   def subscribe(db) do
-    GenServer.call(db, {:subscribe, self()})
+    GenServer.call(db, {:subscribe, self()}, :infinity)
   end
 
   @doc false
@@ -804,24 +829,21 @@ defmodule CubDB do
     Btree.stop(btree)
   end
 
-  def handle_call(operation = {:get, _, _}, from, state = %State{btree: btree}) do
-    state = read(from, btree, operation, state)
-    {:noreply, state}
-  end
+  def handle_call({:read, operation, timeout}, from, state) do
+    %State{btree: btree, readers: readers} = state
 
-  def handle_call(operation = {:fetch, _}, from, state = %State{btree: btree}) do
-    state = read(from, btree, operation, state)
-    {:noreply, state}
-  end
+    {:ok, pid} = Task.start_link(Reader, :run, [btree, from, operation])
+    ref = Process.monitor(pid)
 
-  def handle_call(operation = {:has_key?, _}, from, state = %State{btree: btree}) do
-    state = read(from, btree, operation, state)
-    {:noreply, state}
-  end
+    timer =
+      if timeout != :infinity do
+        Process.send_after(self(), {:reader_timeout, pid}, timeout)
+      else
+        nil
+      end
 
-  def handle_call(operation = {:select, _}, from, state = %State{btree: btree}) do
-    state = read(from, btree, operation, state)
-    {:noreply, state}
+    %Btree{store: %Store.File{file_path: file_path}} = btree
+    {:noreply, %State{state | readers: Map.put(readers, ref, {file_path, timer})}}
   end
 
   def handle_call(:size, _, state = %State{btree: btree}) do
@@ -853,41 +875,48 @@ defmodule CubDB do
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
   end
 
-  def handle_call({:get_and_update_multi, keys_to_get, fun}, _, state) do
+  def handle_call({:get_and_update_multi, keys_to_get, fun, options}, _, state) do
     %State{btree: btree, auto_file_sync: auto_file_sync} = state
+    timeout = Keyword.get(options, :timeout, 5000)
 
-    key_values =
-      Enum.reduce(keys_to_get, %{}, fn key, map ->
-        case Btree.fetch(btree, key) do
-          {:ok, value} -> Map.put(map, key, value)
-          :error -> map
-        end
-      end)
+    compute_update = fn ->
+      key_values =
+        Enum.reduce(keys_to_get, %{}, fn key, map ->
+          case Btree.fetch(btree, key) do
+            {:ok, value} -> Map.put(map, key, value)
+            :error -> map
+          end
+        end)
 
-    {result, entries_to_put, keys_to_delete} = fun.(key_values)
+      fun.(key_values)
+    end
 
-    btree =
-      Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
-        Btree.insert(btree, key, value)
-      end)
+    with {:ok, {result, entries_to_put, keys_to_delete}} <-
+           run_with_timeout(compute_update, timeout) do
+      btree =
+        Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
+          Btree.insert(btree, key, value)
+        end)
 
-    btree =
-      Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
-        case compaction_running?(state) do
-          false -> Btree.delete(btree, key)
-          true -> Btree.mark_deleted(btree, key)
-        end
-      end)
+      btree =
+        Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
+          case compaction_running?(state) do
+            false -> Btree.delete(btree, key)
+            true -> Btree.mark_deleted(btree, key)
+          end
+        end)
 
-    btree = Btree.commit(btree)
+      btree = Btree.commit(btree)
 
-    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
+      btree = if auto_file_sync, do: Btree.sync(btree), else: btree
 
-    state = %State{state | btree: btree}
+      state = %State{state | btree: btree}
 
-    {:reply, {:ok, result}, maybe_auto_compact(state)}
-  rescue
-    error -> {:reply, {:error, error}, state}
+      {:reply, {:ok, result}, maybe_auto_compact(state)}
+    else
+      {:error, cause} ->
+        {:reply, {:error, cause}, state}
+    end
   end
 
   def handle_call(:compact, _, state) do
@@ -958,14 +987,9 @@ defmodule CubDB do
     end
   end
 
-  def handle_info({:check_out_reader, btree}, state = %State{clean_up_pending: clean_up_pending}) do
-    state = check_out_reader(btree, state)
-
-    state =
-      if clean_up_pending == true,
-        do: trigger_clean_up(state),
-        else: state
-
+  def handle_info({:reader_timeout, reader}, state) do
+    Process.unlink(reader)
+    Process.exit(reader, :timeout)
     {:noreply, state}
   end
 
@@ -977,20 +1001,44 @@ defmodule CubDB do
     {:noreply, %State{state | catch_up: nil}}
   end
 
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
-    {:noreply, state}
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state = %State{readers: readers}) do
+    # Process _might_ be a reader, so we remove it from the readers
+    case Map.pop(readers, ref) do
+      {nil, _readers} ->
+        {:noreply, state}
+
+      {{_, timer}, readers} ->
+        if timer != nil, do: Process.cancel_timer(timer, async: true, info: false)
+
+        if state.clean_up_pending == true do
+          {:noreply, trigger_clean_up(%State{state | readers: readers})}
+        else
+          {:noreply, %State{state | readers: readers}}
+        end
+    end
   end
 
-  # Only used for testing
-  def handle_info({:_test_check_in_reader, btree}, state) do
-    {:noreply, check_in_reader(btree, state)}
+  @spec perform_read(GenServer.server(), Reader.operation(), timeout) :: any
+
+  defp perform_read(db, operation, timeout \\ 5000) do
+    GenServer.call(db, {:read, operation, timeout}, timeout)
   end
 
-  @spec read(GenServer.from(), Btree.t(), Reader.operation(), %State{}) :: %State{}
+  @spec run_with_timeout(fun, timeout) :: {:ok, any} | {:error, any}
 
-  defp read(from, btree, operation, state) do
-    Reader.start_link(from, self(), btree, operation)
-    check_in_reader(btree, state)
+  defp run_with_timeout(fun, timeout) do
+    task = Task.async(fun)
+
+    case Task.yield(task, timeout) || Task.shutdown(task) do
+      nil ->
+        {:error, :timeout}
+
+      {:exit, reason} ->
+        {:error, reason}
+
+      {:ok, result} ->
+        {:ok, result}
+    end
   end
 
   @spec find_db_file(String.t()) :: String.t() | nil | {:error, any}
@@ -1067,28 +1115,6 @@ defmodule CubDB do
 
   defp compaction_running?(_), do: true
 
-  @spec check_in_reader(Btree.t(), %State{}) :: %State{}
-
-  defp check_in_reader(%Btree{store: store}, state = %State{busy_files: busy_files}) do
-    %Store.File{file_path: file_path} = store
-    busy_files = Map.update(busy_files, file_path, 1, &(&1 + 1))
-    %State{state | busy_files: busy_files}
-  end
-
-  @spec check_out_reader(Btree.t(), %State{}) :: %State{}
-
-  defp check_out_reader(%Btree{store: store}, state = %State{busy_files: busy_files}) do
-    %Store.File{file_path: file_path} = store
-
-    busy_files =
-      case Map.get(busy_files, file_path) do
-        n when n > 1 -> Map.update!(busy_files, file_path, &(&1 - 1))
-        _ -> Map.delete(busy_files, file_path)
-      end
-
-    %State{state | busy_files: busy_files}
-  end
-
   @spec trigger_clean_up(%State{}) :: %State{}
 
   defp trigger_clean_up(state) do
@@ -1099,9 +1125,12 @@ defmodule CubDB do
 
   @spec can_clean_up?(%State{}) :: boolean
 
-  defp can_clean_up?(%State{btree: %Btree{store: store}, busy_files: busy_files}) do
+  defp can_clean_up?(%State{btree: %Btree{store: store}, readers: readers}) do
     %Store.File{file_path: file_path} = store
-    Enum.any?(busy_files, fn {file, _} -> file != file_path end) == false
+
+    Enum.all?(readers, fn {_reader, {file, _}} ->
+      file == file_path
+    end)
   end
 
   @spec clean_up_now(%State{}) :: %State{}
