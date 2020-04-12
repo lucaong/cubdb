@@ -43,10 +43,10 @@ defmodule CubDB.Mixfile do
   defp deps do
     [
       {:quixir, "~> 0.9", only: :test},
-      {:dialyxir, "~> 1.0.0-rc.6", only: [:dev], runtime: false},
-      {:ex_doc, "~> 0.20", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.0.0", only: [:dev], runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
-      {:excoveralls, "~> 0.10", only: :test}
+      {:excoveralls, "~> 0.12", only: :test}
     ]
   end
 
