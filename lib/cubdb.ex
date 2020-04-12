@@ -150,6 +150,7 @@ defmodule CubDB do
     @type t :: %CubDB.State{
             btree: Btree.t(),
             data_dir: String.t(),
+            task_supervisor: pid,
             compactor: pid | nil,
             catch_up: pid | nil,
             clean_up: pid,
@@ -161,16 +162,19 @@ defmodule CubDB do
           }
 
     @enforce_keys [:btree, :data_dir, :clean_up]
-    defstruct btree: nil,
-              data_dir: nil,
-              compactor: nil,
-              catch_up: nil,
-              clean_up: nil,
-              clean_up_pending: false,
-              busy_files: %{},
-              auto_compact: false,
-              auto_file_sync: false,
-              subs: []
+    defstruct [
+      :task_supervisor,
+      btree: nil,
+      data_dir: nil,
+      compactor: nil,
+      catch_up: nil,
+      clean_up: nil,
+      clean_up_pending: false,
+      busy_files: %{},
+      auto_compact: false,
+      auto_file_sync: false,
+      subs: []
+    ]
   end
 
   @spec start_link(
@@ -772,18 +776,18 @@ defmodule CubDB do
 
   @doc false
   def init([data_dir, options]) do
-    Process.flag(:trap_exit, true)
-
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, false))
     auto_file_sync = Keyword.get(options, :auto_file_sync, false)
 
     with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
          {:ok, store} <-
            Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
-         {:ok, clean_up} <- CleanUp.start_link(data_dir) do
+         {:ok, clean_up} <- CleanUp.start_link(data_dir),
+         {:ok, task_supervisor} <- Task.Supervisor.start_link() do
       {:ok,
        %State{
          btree: Btree.new(store),
+         task_supervisor: task_supervisor,
          data_dir: data_dir,
          clean_up: clean_up,
          auto_compact: auto_compact,
@@ -933,7 +937,7 @@ defmodule CubDB do
   end
 
   def handle_info({:catch_up, compacted_btree, original_btree}, state) do
-    %State{btree: latest_btree} = state
+    %State{btree: latest_btree, task_supervisor: supervisor} = state
 
     if latest_btree == original_btree do
       compacted_btree = finalize_compaction(compacted_btree)
@@ -941,7 +945,15 @@ defmodule CubDB do
       for pid <- state.subs, do: send(pid, :catch_up_completed)
       {:noreply, trigger_clean_up(state)}
     else
-      {:ok, pid} = CatchUp.start_link(self(), compacted_btree, original_btree, latest_btree)
+      {:ok, pid} =
+        Task.Supervisor.start_child(supervisor, CatchUp, :run, [
+          self(),
+          compacted_btree,
+          original_btree,
+          latest_btree
+        ])
+
+      Process.monitor(pid)
       {:noreply, %State{state | catch_up: pid}}
     end
   end
@@ -957,20 +969,16 @@ defmodule CubDB do
     {:noreply, state}
   end
 
-  def handle_info({:EXIT, from, _reason}, state = %State{compactor: from}) do
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, state = %State{compactor: pid}) do
     {:noreply, %State{state | compactor: nil}}
   end
 
-  def handle_info({:EXIT, from, _reason}, state = %State{catch_up: from}) do
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, state = %State{catch_up: pid}) do
     {:noreply, %State{state | catch_up: nil}}
   end
 
-  def handle_info({:EXIT, _from, :normal}, state) do
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     {:noreply, state}
-  end
-
-  def handle_info({:EXIT, _from, reason}, state) do
-    {:stop, reason, state}
   end
 
   # Only used for testing
@@ -1006,7 +1014,17 @@ defmodule CubDB do
         for pid <- state.subs, do: send(pid, :compaction_started)
         {:ok, store} = new_compaction_store(data_dir)
         CleanUp.clean_up_old_compaction_files(clean_up, store)
-        Compactor.start_link(self(), btree, store)
+
+        with result <-
+               Task.Supervisor.start_child(state.task_supervisor, Compactor, :run, [
+                 self(),
+                 btree,
+                 store
+               ]),
+             {:ok, pid} <- result do
+          Process.monitor(pid)
+          result
+        end
 
       true ->
         {:error, :pending_compaction}

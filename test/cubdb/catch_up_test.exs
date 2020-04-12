@@ -5,7 +5,7 @@ defmodule CubDB.Store.CatchUpTest do
   alias CubDB.Store
   alias CubDB.CatchUp
 
-  test "start_link/4 catches up the compacted tree with the diff updates and reports result" do
+  test "run/4 catches up the compacted tree with the diff updates and reports result" do
     {:ok, store} = Store.TestStore.create()
 
     entries = [foo: 1, bar: 2]
@@ -25,7 +25,7 @@ defmodule CubDB.Store.CatchUpTest do
     {:ok, compacted_store} = Store.TestStore.create()
     compacted_btree = Btree.load(original_btree, compacted_store)
 
-    {:ok, _pid} = CatchUp.start_link(self(), compacted_btree, original_btree, latest_btree)
+    CatchUp.run(self(), compacted_btree, original_btree, latest_btree)
 
     assert_receive {:catch_up, catched_up_btree, ^latest_btree}
     assert Enum.to_list(catched_up_btree) == Enum.to_list(latest_btree)
