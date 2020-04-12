@@ -19,7 +19,7 @@ defmodule CubDB.Store.CompactorTest do
     {:ok, tmp_dir: tmp_dir}
   end
 
-  test "start_link/3 runs compaction on a Btree and sends back the result", %{tmp_dir: tmp_dir} do
+  test "run/3 runs compaction on a Btree and sends back the result", %{tmp_dir: tmp_dir} do
     entries = [foo: 1, bar: 2, baz: 3]
     {:ok, store} = Store.TestStore.create()
 
@@ -30,10 +30,7 @@ defmodule CubDB.Store.CompactorTest do
 
     {:ok, store} = Store.File.create(Path.join(tmp_dir, "1.compact"))
 
-    {:ok, pid} = Compactor.start_link(self(), btree, store)
-
-    {:links, links} = Process.info(self(), :links)
-    assert Enum.member?(links, pid) == true
+    Compactor.run(self(), btree, store)
 
     assert_receive {:compaction_completed, ^btree, compacted_btree}, 1000
     assert compacted_btree.size == btree.size
