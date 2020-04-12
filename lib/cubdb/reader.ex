@@ -17,7 +17,7 @@ defmodule CubDB.Reader do
 
   @type operation :: {:get, any, any} | {:fetch, any} | {:has_key?, any} | {:select, Keyword.t()}
 
-  @spec run(Btree.t(), GenServer.from(), operation) :: any
+  @spec run(Btree.t(), GenServer.from(), operation) :: :ok
 
   def run(btree, caller, operation) do
     GenServer.reply(caller, perform(btree, operation))
