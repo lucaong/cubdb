@@ -34,7 +34,8 @@ structure your keys to be tuples like `{:people, person_id}` for people, and
 :ok = CubDB.put(db, {:articles, 2}, %{title: "Morphogenesis for the uninitiated", text: "..."})
 ```
 
-We used numeric IDs in our example, but you can really use anything you want.
+We used positive integers as IDs in our example, but you can really use anything
+you want.
 
 Getting a specific person or article by ID is trivial:
 
@@ -57,8 +58,9 @@ collection:
 {:ok, articles_with_keys} = CubDB.select(db, min_key: {:articles, 0}, max_key: {:articles, nil})
 ```
 
-This range selection works because `nil` is greater than all numbers, so `{:abc,
-nil}` is greater than `{:abc, 123}`, but smaller than `{:bcd, :123}`.
+This range selection works because our IDs are positive integers, and `nil` is
+greater than all numbers, so `{:abc, nil}` is greater than `{:abc, 123}`, but
+smaller than `{:bcd, :123}`.
 
 ## Save and restore a backup
 
