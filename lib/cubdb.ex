@@ -448,6 +448,18 @@ defmodule CubDB do
     GenServer.call(db, {:put, key, value}, :infinity)
   end
 
+  @spec put_new(GenServer.server(), key, value) :: :ok | :exists
+
+  @doc """
+  Writes an entry in the database, associating `key` to `value`, only if `key`
+  is not yet in the database.
+
+  If `key` is already present, it does not change it, and returns `:exists`.
+  """
+  def put_new(db, key, value) do
+    GenServer.call(db, {:put_new, key, value}, :infinity)
+  end
+
   @spec delete(GenServer.server(), key) :: :ok
 
   @doc """
@@ -850,6 +862,20 @@ defmodule CubDB do
     btree = Btree.insert(btree, key, value) |> Btree.commit()
     btree = if auto_file_sync, do: Btree.sync(btree), else: btree
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
+  end
+
+  def handle_call({:put_new, key, value}, _, state) do
+    %State{btree: btree, auto_file_sync: auto_file_sync} = state
+
+    case Btree.insert_new(btree, key, value) do
+      :exists ->
+        {:reply, :exists, state}
+
+      btree ->
+        btree = Btree.commit(btree)
+        btree = if auto_file_sync, do: Btree.sync(btree), else: btree
+        {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
+    end
   end
 
   def handle_call({:delete, key}, _, state) do

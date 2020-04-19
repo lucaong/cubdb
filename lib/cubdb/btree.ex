@@ -126,6 +126,15 @@ defmodule CubDB.Btree do
     insert_terminal_node(btree, key, value(val: value))
   end
 
+  @spec insert_new(Btree.t(), key, val) :: Btree.t() | :exists
+
+  # `insert_new/3` writes an entry in the Btree, only if it is not yet present
+  # in the database. It does not commit the operation, so `commit/1` must be
+  # explicitly called to commit the insertion.
+  def insert_new(btree, key, value) do
+    insert_terminal_node(btree, key, value(val: value), false)
+  end
+
   @spec delete(Btree.t(), key) :: Btree.t()
 
   # `delete/2` deletes the entry associated to `key` in the Btree, if existing.
@@ -230,35 +239,41 @@ defmodule CubDB.Btree do
   def __value__, do: @value
   def __deleted__, do: @deleted
 
-  @spec insert_terminal_node(Btree.t(), key, terminal_node) :: Btree.t()
+  @spec insert_terminal_node(Btree.t(), key, terminal_node, boolean) :: Btree.t() | :exists
 
-  defp insert_terminal_node(btree, key, terminal_node) do
+  defp insert_terminal_node(btree, key, terminal_node, overwrite \\ true) do
     %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
 
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
-    {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
+    was_set = child_is_set?(store, children, key)
 
-    size =
-      case {terminal_node, child_was_set?(store, children, key)} do
-        {{@value, _}, true} -> s
-        {{@value, _}, false} -> s + 1
-        {@deleted, true} -> s - 1
-        {@deleted, false} -> s
-      end
+    if overwrite == false && was_set do
+      :exists
+    else
+      {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
 
-    %Btree{
-      root: new_root,
-      root_loc: root_loc,
-      capacity: cap,
-      store: store,
-      size: size,
-      dirt: dirt + 1
-    }
+      size =
+        case {terminal_node, was_set} do
+          {{@value, _}, true} -> s
+          {{@value, _}, false} -> s + 1
+          {@deleted, true} -> s - 1
+          {@deleted, false} -> s
+        end
+
+      %Btree{
+        root: new_root,
+        root_loc: root_loc,
+        capacity: cap,
+        store: store,
+        size: size,
+        dirt: dirt + 1
+      }
+    end
   end
 
-  @spec child_was_set?(Store.t(), [child_pointer], key) :: boolean
+  @spec child_is_set?(Store.t(), [child_pointer], key) :: boolean
 
-  defp child_was_set?(store, children, key) do
+  defp child_is_set?(store, children, key) do
     case List.keyfind(children, key, 0) do
       nil -> false
       {_, pos} -> Store.get_node(store, pos) != @deleted
