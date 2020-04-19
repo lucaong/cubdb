@@ -576,6 +576,18 @@ defmodule CubDB do
     GenServer.call(db, {:get_and_update_multi, keys_to_get, fun, options}, :infinity)
   end
 
+  @spec put_and_delete_multi(GenServer.server(), %{key => value}, [key]) :: :ok
+
+  @doc """
+  Writes and deletes multiple entries all at once, atomically.
+
+  Entries to put are passed as a map of `%{key => value}` or a list of `{key,
+  value}`. Keys to delete are passed as a list of keys.
+  """
+  def put_and_delete_multi(db, entries_to_put, keys_to_delete) do
+    GenServer.call(db, {:put_and_delete_multi, entries_to_put, keys_to_delete})
+  end
+
   @spec get_multi(GenServer.server(), [key]) :: %{key => value}
 
   @doc """
@@ -603,16 +615,8 @@ defmodule CubDB do
 
   Entries are passed as a map of `%{key => value}` or a list of `{key, value}`.
   """
-  def put_multi(db, entries) when not is_map(entries),
-    do: put_multi(db, entries |> Enum.into(%{}))
-
   def put_multi(db, entries) do
-    fun = fn _ ->
-      {:ok, entries, []}
-    end
-
-    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun, []}, :infinity)
-    result
+    put_and_delete_multi(db, entries, [])
   end
 
   @spec delete_multi(GenServer.server(), [key]) :: :ok
@@ -623,12 +627,7 @@ defmodule CubDB do
   The `keys` to be deleted are passed as a list.
   """
   def delete_multi(db, keys) do
-    fun = fn _ ->
-      {:ok, %{}, keys}
-    end
-
-    {:ok, result} = GenServer.call(db, {:get_and_update_multi, [], fun, []}, :infinity)
-    result
+    put_and_delete_multi(db, %{}, keys)
   end
 
   @spec compact(GenServer.server()) :: :ok | {:error, String.t()}
@@ -868,47 +867,27 @@ defmodule CubDB do
   end
 
   def handle_call({:get_and_update_multi, keys_to_get, fun, options}, _, state) do
-    %State{btree: btree, auto_file_sync: auto_file_sync} = state
+    %State{btree: btree} = state
     timeout = Keyword.get(options, :timeout, 5000)
 
     compute_update = fn ->
-      key_values =
-        Enum.reduce(keys_to_get, %{}, fn key, map ->
-          case Btree.fetch(btree, key) do
-            {:ok, value} -> Map.put(map, key, value)
-            :error -> map
-          end
-        end)
-
+      key_values = Reader.perform(btree, {:get_multi, keys_to_get})
       fun.(key_values)
     end
 
     with {:ok, {result, entries_to_put, keys_to_delete}} <-
            run_with_timeout(compute_update, timeout) do
-      btree =
-        Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
-          Btree.insert(btree, key, value)
-        end)
-
-      btree =
-        Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
-          case compaction_running?(state) do
-            false -> Btree.delete(btree, key)
-            true -> Btree.mark_deleted(btree, key)
-          end
-        end)
-
-      btree = Btree.commit(btree)
-
-      btree = if auto_file_sync, do: Btree.sync(btree), else: btree
-
-      state = %State{state | btree: btree}
-
-      {:reply, {:ok, result}, maybe_auto_compact(state)}
+      state = do_put_and_delete_multi(state, entries_to_put, keys_to_delete)
+      {:reply, {:ok, result}, state}
     else
       {:error, cause} ->
         {:reply, {:error, cause}, state}
     end
+  end
+
+  def handle_call({:put_and_delete_multi, entries_to_put, keys_to_delete}, _, state) do
+    state = do_put_and_delete_multi(state, entries_to_put, keys_to_delete)
+    {:reply, :ok, state}
   end
 
   def handle_call(:compact, _, state) do
@@ -1014,6 +993,31 @@ defmodule CubDB do
 
   defp perform_read(db, operation, timeout \\ 5000) do
     GenServer.call(db, {:read, operation, timeout}, timeout)
+  end
+
+  @spec do_put_and_delete_multi(State.t(), [entry], [key]) :: State.t()
+
+  defp do_put_and_delete_multi(state, entries_to_put, keys_to_delete) do
+    %State{btree: btree, auto_file_sync: auto_file_sync} = state
+
+    btree =
+      Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
+        Btree.insert(btree, key, value)
+      end)
+
+    btree =
+      Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
+        case compaction_running?(state) do
+          false -> Btree.delete(btree, key)
+          true -> Btree.mark_deleted(btree, key)
+        end
+      end)
+
+    btree = Btree.commit(btree)
+
+    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
+
+    maybe_auto_compact(%State{state | btree: btree})
   end
 
   @spec run_with_timeout(fun, timeout) :: {:ok, any} | {:error, any}

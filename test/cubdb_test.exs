@@ -263,7 +263,7 @@ defmodule CubDBTest do
     assert CubDB.has_key?(db, :d) == false
   end
 
-  test "get_multi/3, put_multi/2 and delete_multi/2 work as expected", %{tmp_dir: tmp_dir} do
+  test "get_multi/3, put_multi/2, delete_multi/2 and put_and_delete_multi/3 work as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
     entries = %{a: 1, b: 2, c: 3, d: 4}
@@ -278,6 +278,11 @@ defmodule CubDBTest do
     assert :ok = CubDB.delete_multi(db, keys)
     assert %{} == CubDB.get_multi(db, keys)
     assert CubDB.size(db) == 0
+
+    :ok = CubDB.put_multi(db, %{a: 1, b: 2, c: 3})
+    assert :ok = CubDB.put_and_delete_multi(db, %{d: 4, e: 5}, [:a, :c])
+
+    assert {:ok, [b: 2, d: 4, e: 5]} = CubDB.select(db)
   end
 
   test "put/3 is persisted to disk", %{tmp_dir: tmp_dir} do
