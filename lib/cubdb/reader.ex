@@ -15,7 +15,12 @@ defmodule CubDB.Reader do
 
   alias CubDB.Btree
 
-  @type operation :: {:get, any, any} | {:fetch, any} | {:has_key?, any} | {:select, Keyword.t()}
+  @type operation ::
+          {:get, CubDB.key(), CubDB.value()}
+          | {:get_multi, [CubDB.key()]}
+          | {:fetch, CubDB.key()}
+          | {:has_key?, CubDB.key()}
+          | {:select, Keyword.t()}
 
   @spec run(Btree.t(), GenServer.from(), operation) :: :ok
 
@@ -30,6 +35,15 @@ defmodule CubDB.Reader do
       {:ok, value} -> value
       :error -> default
     end
+  end
+
+  def perform(btree, {:get_multi, keys}) do
+    Enum.reduce(keys, %{}, fn key, map ->
+      case Btree.fetch(btree, key) do
+        {:ok, value} -> Map.put(map, key, value)
+        :error -> map
+      end
+    end)
   end
 
   def perform(btree, {:fetch, key}) do

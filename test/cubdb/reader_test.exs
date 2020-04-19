@@ -47,6 +47,10 @@ defmodule CubDB.Store.ReaderTest do
     assert Reader.perform(btree, {:get, :n, 42}) == nil
   end
 
+  test "perform/2 performs :get_multi", %{btree: btree} do
+    assert %{c: 3, d: 4} = Reader.perform(btree, {:get_multi, [:c, :d, :z]})
+  end
+
   test "perform/2 performs :fetch", %{btree: btree} do
     assert {:ok, 3} = Reader.perform(btree, {:fetch, :c})
 

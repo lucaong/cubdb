@@ -593,12 +593,7 @@ defmodule CubDB do
       # => %{a: 1, b: 2, c: nil}
   """
   def get_multi(db, keys) do
-    fun = fn entries ->
-      {entries, %{}, []}
-    end
-
-    {:ok, result} = GenServer.call(db, {:get_and_update_multi, keys, fun, []}, :infinity)
-    result
+    perform_read(db, {:get_multi, keys})
   end
 
   @spec put_multi(GenServer.server(), %{key => value} | [entry]) :: :ok
