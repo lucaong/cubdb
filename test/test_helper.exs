@@ -68,6 +68,10 @@ defmodule TestHelper do
       {Store.put_node(store, node), node}
     end
 
+    defp load_node(store, @deleted) do
+      {Store.put_node(store, @deleted), @deleted}
+    end
+
     defp load_node(store, value) do
       node = {@value, value}
       {Store.put_node(store, node), node}

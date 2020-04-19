@@ -25,9 +25,16 @@ defmodule PropertyBased.BtreeTest do
       {:ok, store} = Store.TestStore.create()
       tree = Btree.new(store, cap)
       inserts = tuples |> Enum.map(fn tuple -> {:insert, tuple} end)
+      insert_news = tuples |> Enum.map(fn tuple -> {:insert_new, tuple} end)
       deletes = tuples |> Enum.map(fn tuple -> {:delete, tuple} end)
       delmarks = tuples |> Enum.map(fn tuple -> {:mark_deleted, tuple} end)
-      operations = inserts |> Enum.concat(deletes) |> Enum.concat(delmarks) |> Enum.shuffle()
+
+      operations =
+        inserts
+        |> Enum.concat(insert_news)
+        |> Enum.concat(deletes)
+        |> Enum.concat(delmarks)
+        |> Enum.shuffle()
 
       tree =
         Enum.reduce(operations, tree, fn {operation, {key, value}}, tree ->
@@ -36,6 +43,20 @@ defmodule PropertyBased.BtreeTest do
               tree = Btree.insert(tree, key, value)
               assert {:ok, ^value} = Btree.fetch(tree, key)
               tree
+
+            :insert_new ->
+              case Btree.fetch(tree, key) do
+                {:ok, existing_val} ->
+                  assert :exists = Btree.insert_new(tree, key, value)
+                  assert {:ok, ^existing_val} = Btree.fetch(tree, key)
+                  tree
+
+                :error ->
+                  tree = Btree.insert_new(tree, key, value)
+                  assert tree != :exists
+                  assert {:ok, ^value} = Btree.fetch(tree, key)
+                  tree
+              end
 
             :delete ->
               tree = Btree.delete(tree, key)
@@ -54,6 +75,12 @@ defmodule PropertyBased.BtreeTest do
           case operation do
             :insert ->
               Map.put(map, key, {:ok, value})
+
+            :insert_new ->
+              Map.update(map, key, {:ok, value}, fn
+                :error -> {:ok, value}
+                x -> x
+              end)
 
             :delete ->
               Map.put(map, key, :error)

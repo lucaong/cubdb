@@ -146,6 +146,32 @@ defmodule CubDB.BtreeTest do
     assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
   end
 
+  test "insert_new/3 does not overwrite existing entries" do
+    btree =
+      compose_btree({
+        @branch,
+        [
+          bar: {@leaf, [bar: 2, baz: 3]},
+          foo: {@leaf, [foo: 1, quux: 5, qux: 4]},
+          xxx: {@leaf, [xxx: 6, yyy: @deleted, zzz: 7]}
+        ]
+      })
+
+    assert :exists = Btree.insert_new(btree, :bar, 123)
+    assert :exists = Btree.insert_new(btree, :baz, 123)
+    assert :exists = Btree.insert_new(btree, :quux, 123)
+    assert ^btree = Btree.delete(btree, :quuux)
+
+    btree = Btree.insert_new(btree, :quuux, 123)
+    assert btree != :exists
+
+    btree = Btree.insert_new(btree, :yyy, 321)
+    assert btree != :exists
+
+    assert [bar: 2, baz: 3, foo: 1, quuux: 123, quux: 5, qux: 4, xxx: 6, yyy: 321, zzz: 7] =
+             btree |> Enum.into([])
+  end
+
   test "fetch/2 finds key and returns {:ok, value} or :error" do
     tiny_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
     assert {:ok, 1} = Btree.fetch(tiny_tree, :foo)
@@ -428,7 +454,7 @@ defmodule CubDB.BtreeTest do
     for elems <- [empty_list, tiny_list, larger_list] do
       sorted_elems = elems |> List.keysort(0)
 
-    {:ok, store} = Store.TestStore.create()
+      {:ok, store} = Store.TestStore.create()
       tree = make_btree(store, elems, 3)
 
       assert Enum.count(tree) == length(elems)

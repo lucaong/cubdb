@@ -111,7 +111,7 @@ defmodule CubDBTest do
     assert Process.alive?(pid)
   end
 
-  test "put/3, get/3, fetch/2, delete/3, and has_key?/2 work as expected", %{tmp_dir: tmp_dir} do
+  test "put/3, get/3, fetch/2, delete/3, has_key?/2, and put_new/3 work as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     key = {:some, arbitrary: "key"}
 
@@ -130,6 +130,14 @@ defmodule CubDBTest do
     assert CubDB.get(db, key) == nil
     assert :error = CubDB.fetch(db, key)
     assert CubDB.has_key?(db, key) == false
+
+    assert :ok = CubDB.put_new(db, key, 123)
+    assert :exists = CubDB.put_new(db, key, 321)
+    assert CubDB.get(db, key) == 123
+
+    CubDB.stop(db)
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    assert {:ok, [{^key, 123}]} = CubDB.select(db)
   end
 
   test "select/2 works as expected", %{tmp_dir: tmp_dir} do
