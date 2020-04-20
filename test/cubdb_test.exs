@@ -132,7 +132,7 @@ defmodule CubDBTest do
     assert CubDB.has_key?(db, key) == false
 
     assert :ok = CubDB.put_new(db, key, 123)
-    assert :exists = CubDB.put_new(db, key, 321)
+    assert {:error, :exists} = CubDB.put_new(db, key, 321)
     assert CubDB.get(db, key) == 123
 
     CubDB.stop(db)

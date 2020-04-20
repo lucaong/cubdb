@@ -448,13 +448,14 @@ defmodule CubDB do
     GenServer.call(db, {:put, key, value}, :infinity)
   end
 
-  @spec put_new(GenServer.server(), key, value) :: :ok | :exists
+  @spec put_new(GenServer.server(), key, value) :: :ok | {:error, :exists}
 
   @doc """
   Writes an entry in the database, associating `key` to `value`, only if `key`
   is not yet in the database.
 
-  If `key` is already present, it does not change it, and returns `:exists`.
+  If `key` is already present, it does not change it, and returns `{:error,
+  :exists}`.
   """
   def put_new(db, key, value) do
     GenServer.call(db, {:put_new, key, value}, :infinity)
@@ -868,8 +869,8 @@ defmodule CubDB do
     %State{btree: btree, auto_file_sync: auto_file_sync} = state
 
     case Btree.insert_new(btree, key, value) do
-      :exists ->
-        {:reply, :exists, state}
+      {:error, :exists} = reply ->
+        {:reply, reply, state}
 
       btree ->
         btree = Btree.commit(btree)

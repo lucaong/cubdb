@@ -157,16 +157,16 @@ defmodule CubDB.BtreeTest do
         ]
       })
 
-    assert :exists = Btree.insert_new(btree, :bar, 123)
-    assert :exists = Btree.insert_new(btree, :baz, 123)
-    assert :exists = Btree.insert_new(btree, :quux, 123)
+    assert {:error, :exists} = Btree.insert_new(btree, :bar, 123)
+    assert {:error, :exists} = Btree.insert_new(btree, :baz, 123)
+    assert {:error, :exists} = Btree.insert_new(btree, :quux, 123)
     assert ^btree = Btree.delete(btree, :quuux)
 
     btree = Btree.insert_new(btree, :quuux, 123)
-    assert btree != :exists
+    assert btree != {:error, :exists}
 
     btree = Btree.insert_new(btree, :yyy, 321)
-    assert btree != :exists
+    assert btree != {:error, :exists}
 
     assert [bar: 2, baz: 3, foo: 1, quuux: 123, quux: 5, qux: 4, xxx: 6, yyy: 321, zzz: 7] =
              btree |> Enum.into([])

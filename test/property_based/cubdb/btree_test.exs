@@ -47,13 +47,13 @@ defmodule PropertyBased.BtreeTest do
             :insert_new ->
               case Btree.fetch(tree, key) do
                 {:ok, existing_val} ->
-                  assert :exists = Btree.insert_new(tree, key, value)
+                  assert {:error, :exists} = Btree.insert_new(tree, key, value)
                   assert {:ok, ^existing_val} = Btree.fetch(tree, key)
                   tree
 
                 :error ->
                   tree = Btree.insert_new(tree, key, value)
-                  assert tree != :exists
+                  assert tree != {:error, :exists}
                   assert {:ok, ^value} = Btree.fetch(tree, key)
                   tree
               end

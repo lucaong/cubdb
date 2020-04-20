@@ -126,7 +126,7 @@ defmodule CubDB.Btree do
     insert_terminal_node(btree, key, value(val: value))
   end
 
-  @spec insert_new(Btree.t(), key, val) :: Btree.t() | :exists
+  @spec insert_new(Btree.t(), key, val) :: Btree.t() | {:error, :exists}
 
   # `insert_new/3` writes an entry in the Btree, only if it is not yet present
   # in the database. It does not commit the operation, so `commit/1` must be
@@ -239,7 +239,8 @@ defmodule CubDB.Btree do
   def __value__, do: @value
   def __deleted__, do: @deleted
 
-  @spec insert_terminal_node(Btree.t(), key, terminal_node, boolean) :: Btree.t() | :exists
+  @spec insert_terminal_node(Btree.t(), key, terminal_node, boolean) ::
+          Btree.t() | {:error, :exists}
 
   defp insert_terminal_node(btree, key, terminal_node, overwrite \\ true) do
     %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
@@ -248,7 +249,7 @@ defmodule CubDB.Btree do
     was_set = child_is_set?(store, children, key)
 
     if overwrite == false && was_set do
-      :exists
+      {:error, :exists}
     else
       {root_loc, new_root} = build_up(store, leaf, [{key, terminal_node}], [], path, cap)
 
