@@ -5,6 +5,7 @@ elixir:
   - 1.7.4
   - 1.8.2
   - 1.9.0
+  - 1.10.3
 dist: trusty
 env:
   - ASSERT_RECEIVE_TIMEOUT=300
