@@ -959,30 +959,11 @@ defmodule CubDB do
 
   def handle_info({:compaction_completed, original_btree, compacted_btree}, state) do
     for pid <- state.subs, do: send(pid, :compaction_completed)
-    send(self(), {:catch_up, compacted_btree, original_btree})
-    {:noreply, state}
+    {:noreply, catch_up(compacted_btree, original_btree, state)}
   end
 
   def handle_info({:catch_up, compacted_btree, original_btree}, state) do
-    %State{btree: latest_btree, task_supervisor: supervisor} = state
-
-    if latest_btree == original_btree do
-      compacted_btree = finalize_compaction(compacted_btree)
-      state = %State{state | btree: compacted_btree}
-      for pid <- state.subs, do: send(pid, :catch_up_completed)
-      {:noreply, trigger_clean_up(state)}
-    else
-      {:ok, pid} =
-        Task.Supervisor.start_child(supervisor, CatchUp, :run, [
-          self(),
-          compacted_btree,
-          original_btree,
-          latest_btree
-        ])
-
-      Process.monitor(pid)
-      {:noreply, %State{state | catch_up: pid}}
-    end
+    {:noreply, catch_up(compacted_btree, original_btree, state)}
   end
 
   def handle_info({:reader_timeout, reader}, state) do
@@ -1099,6 +1080,30 @@ defmodule CubDB do
 
       true ->
         {:error, :pending_compaction}
+    end
+  end
+
+  @spec catch_up(Btree.t(), Btree.t(), State.t()) :: State.t()
+
+  def catch_up(compacted_btree, original_btree, state) do
+    %State{btree: latest_btree, task_supervisor: supervisor} = state
+
+    if latest_btree == original_btree do
+      compacted_btree = finalize_compaction(compacted_btree)
+      state = %State{state | btree: compacted_btree}
+      for pid <- state.subs, do: send(pid, :catch_up_completed)
+      trigger_clean_up(state)
+    else
+      {:ok, pid} =
+        Task.Supervisor.start_child(supervisor, CatchUp, :run, [
+          self(),
+          compacted_btree,
+          original_btree,
+          latest_btree
+        ])
+
+      Process.monitor(pid)
+      %State{state | catch_up: pid}
     end
   end
 
