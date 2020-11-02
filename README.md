@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/lucaong/cubdb/workflows/Elixir%20CI/badge.svg)](https://github.com/lucaong/cubdb/actions) [![Coverage Status](https://coveralls.io/repos/github/lucaong/cubdb/badge.svg?branch=master)](https://coveralls.io/github/lucaong/cubdb?branch=master) [![Hex Version](https://img.shields.io/hexpm/v/cubdb.svg)](https://hex.pm/packages/cubdb) [![docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/cubdb/)
+[![Build Status](https://github.com/lucaong/cubdb/workflows/CI%20Build/badge.svg)](https://github.com/lucaong/cubdb/actions) [![Coverage Status](https://coveralls.io/repos/github/lucaong/cubdb/badge.svg?branch=master)](https://coveralls.io/github/lucaong/cubdb?branch=master) [![Hex Version](https://img.shields.io/hexpm/v/cubdb.svg)](https://hex.pm/packages/cubdb) [![docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/cubdb/)
 
 <p align="center"><img src="assets/cubdb_banner.png" width="80%"/></p>
 

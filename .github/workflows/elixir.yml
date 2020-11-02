@@ -1,4 +1,4 @@
-name: Elixir CI
+name: CI Build
 
 on:
   push:
