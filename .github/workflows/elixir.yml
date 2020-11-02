@@ -55,7 +55,7 @@ jobs:
       run: mix dialyzer --plt
 
     - name: Typecheck
-      run: mix dialyzer --halt-exit-status
+      run: mix dialyzer
 
     - name: Run tests
       run: mix coveralls.github --include property_based
