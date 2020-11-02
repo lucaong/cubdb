@@ -56,7 +56,7 @@ defmodule CubDBTest do
     tmp_dir: tmp_dir
   } do
     name = :"#{tmp_dir}"
-    assert {:ok, x} = CubDB.start_link(tmp_dir, name: name)
+    assert {:ok, _pid} = CubDB.start_link(tmp_dir, name: name)
     pid = Process.whereis(name)
     assert Process.alive?(pid)
   end
@@ -106,7 +106,7 @@ defmodule CubDBTest do
     tmp_dir: tmp_dir
   } do
     name = :"#{tmp_dir}"
-    assert {:ok, x} = CubDB.start(tmp_dir, name: name)
+    assert {:ok, _pid} = CubDB.start(tmp_dir, name: name)
     pid = Process.whereis(name)
     assert Process.alive?(pid)
   end

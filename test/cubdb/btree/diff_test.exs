@@ -25,7 +25,7 @@ defmodule CubDB.Btree.DiffTest do
         Btree.insert(btree, key, val)
       end)
 
-    assert %Diff{from_btree: from_btree, to_btree: to_btree} = Diff.new(from_btree, to_btree)
+    assert %Diff{from_btree: ^from_btree, to_btree: ^to_btree} = Diff.new(from_btree, to_btree)
   end
 
   test "new/2 raises an error if from_btree and to_btree do not share the same store" do
