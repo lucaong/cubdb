@@ -219,7 +219,7 @@ defmodule CubDBTest do
              end)
 
     assert result == 2
-    assert CubDB.get(db, :b) == 5
+    assert CubDB.get(db, :a) == 2
 
     assert {:ok, result} =
              CubDB.get_and_update(db, :b, fn _ ->
@@ -343,6 +343,18 @@ defmodule CubDBTest do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
     assert CubDB.get(db, :a) == 2
+  end
+
+  test "get_and_update/3 does not perform a write, if the value is unchanged", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put(db, :a, 1)
+
+    state = :sys.get_state(db)
+
+    {:ok, 123} = CubDB.get_and_update(db, :a, fn x -> {123, x} end)
+
+    assert ^state = :sys.get_state(db)
   end
 
   test "get_and_update_multi/4 is persisted to disk", %{tmp_dir: tmp_dir} do
