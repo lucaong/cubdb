@@ -515,6 +515,7 @@ defmodule CubDB do
              value = Map.get(entries, key, nil)
 
              case fun.(value) do
+               {result, ^value} -> {result, %{}, []}
                {result, new_value} -> {result, %{key => new_value}, []}
                :pop -> {value, %{}, [key]}
              end
