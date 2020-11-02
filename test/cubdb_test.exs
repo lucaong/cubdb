@@ -355,6 +355,7 @@ defmodule CubDBTest do
     {:ok, 123} = CubDB.get_and_update(db, :a, fn x -> {123, x} end)
 
     assert ^state = :sys.get_state(db)
+    assert 1 = CubDB.get(db, :a)
   end
 
   test "get_and_update_multi/4 is persisted to disk", %{tmp_dir: tmp_dir} do
