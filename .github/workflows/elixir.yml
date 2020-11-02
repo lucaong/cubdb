@@ -44,18 +44,15 @@ jobs:
     - name: Check format
       run: mix format --check-formatted lib/**/*.ex
 
-    - name: Restore PLT Cache
+    - name: Restore build Cache
       uses: actions/cache@v1
-      id: plt-cache
+      id: build-cache
       with:
-        path: priv/plts
-        key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-plts
+        path: _build
+        key: ${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-build
 
     - name: Create PLTs
-      if: steps.plt-cache.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p priv/plts
-        mix dialyzer --plt
+      run: mix dialyzer --plt
 
     - name: Typecheck
       run: mix dialyzer --halt-exit-status
