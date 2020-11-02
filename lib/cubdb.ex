@@ -504,10 +504,13 @@ defmodule CubDB do
 
   `fun` is called with the current value associated to `key` (or `nil` if not
   present), and must return a two element tuple: the result value to be
-  returned, and the new value to be associated to `key`. `fun` mayalso return
+  returned, and the new value to be associated to `key`. `fun` may also return
   `:pop`, in which case the current value is deleted and returned.
 
   The return value is `{:ok, result}`, or `{:error, reason}` in case an error occurs.
+
+  Note that in case the value to update returned by `fun` is the same as the
+  original value, no write is performed to disk.
   """
   def get_and_update(db, key, fun) do
     with {:ok, result} <-
