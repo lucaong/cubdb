@@ -17,7 +17,7 @@ defmodule CubDB.Mixfile do
         logo: "assets/cubdb_logo.png",
         extras: ["FAQ.md", "HOWTO.md"]
       ],
-      dialyzer: [ignore_warnings: "dialyzer_ignore.exs"],
+      dialyzer: dialyzer(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [coveralls: :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test, "coveralls.travis": :test]
     ]
@@ -62,4 +62,12 @@ defmodule CubDB.Mixfile do
 
   defp elixirc_paths(:test), do: ["lib", "test/shared_examples/"]
   defp elixirc_paths(_), do: ["lib"]
+
+  defp dialyzer do
+    [
+      plt_core_path: "priv/plts",
+      plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+      ignore_warnings: "dialyzer_ignore.exs"
+    ]
+  end
 end
