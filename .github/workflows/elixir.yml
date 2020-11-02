@@ -32,3 +32,5 @@ jobs:
       run: mix deps.get
     - name: Run tests
       run: mix test
+      env:
+        ASSERT_RECEIVE_TIMEOUT: 300
