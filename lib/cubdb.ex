@@ -518,9 +518,9 @@ defmodule CubDB do
              value = Map.get(entries, key, nil)
 
              case fun.(value) do
-               {result, ^value} -> {result, %{}, []}
+               {result, ^value} -> {result, [], []}
                {result, new_value} -> {result, %{key => new_value}, []}
-               :pop -> {value, %{}, [key]}
+               :pop -> {value, [], [key]}
              end
            end),
          do: {:ok, result}
@@ -1008,6 +1008,9 @@ defmodule CubDB do
   end
 
   @spec do_put_and_delete_multi(State.t(), [entry], [key]) :: State.t()
+
+  defp do_put_and_delete_multi(state, [], []), do: state
+  defp do_put_and_delete_multi(state, entries_to_put, []) when entries_to_put == %{}, do: state
 
   defp do_put_and_delete_multi(state, entries_to_put, keys_to_delete) do
     %State{btree: btree, auto_file_sync: auto_file_sync} = state
