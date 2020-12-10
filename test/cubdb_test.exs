@@ -351,10 +351,12 @@ defmodule CubDBTest do
     :ok = CubDB.put(db, :a, 1)
 
     {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
+    state = :sys.get_state(db)
 
     {:ok, 123} = CubDB.get_and_update(db, :a, fn x -> {123, x} end)
 
     assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
+    assert ^state = :sys.get_state(db)
     assert 1 = CubDB.get(db, :a)
   end
 
