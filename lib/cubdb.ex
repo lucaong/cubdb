@@ -602,7 +602,7 @@ defmodule CubDB do
   value}`. Keys to delete are passed as a list of keys.
   """
   def put_and_delete_multi(db, entries_to_put, keys_to_delete) do
-    GenServer.call(db, {:put_and_delete_multi, entries_to_put, keys_to_delete})
+    GenServer.call(db, {:put_and_delete_multi, entries_to_put, keys_to_delete}, :infinity)
   end
 
   @spec get_multi(GenServer.server(), [key]) :: %{key => value}
