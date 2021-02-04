@@ -554,7 +554,7 @@ defmodule CubDB do
 
   The `options` argument is an optional keyword list of options, including:
 
-    - `:timeout` - a timeout (in milliseconds or `:infinite`, defaulting to
+    - `:timeout` - a timeout (in milliseconds or `:infinity`, defaulting to
     `5000`) for the operation, after which the function returns `{:error,
     :timeout}`. This is useful to avoid blocking other write operations for too
     long.
