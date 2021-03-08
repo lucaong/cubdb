@@ -1003,7 +1003,7 @@ defmodule CubDB do
 
   @spec perform_read(GenServer.server(), Reader.operation(), timeout) :: any
 
-  defp perform_read(db, operation, timeout \\ 5000) do
+  defp perform_read(db, operation, timeout \\ :infinity) do
     GenServer.call(db, {:read, operation, timeout}, timeout)
   end
 

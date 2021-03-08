@@ -27,14 +27,14 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
     Agent.get_and_update(agent, fn {map, latest_header_loc} ->
       loc = Enum.count(map)
       {loc, {Map.put(map, loc, node), latest_header_loc}}
-    end)
+    end, :infinity)
   end
 
   def put_header(%TestStore{agent: agent}, header) do
     Agent.get_and_update(agent, fn {map, _} ->
       loc = Enum.count(map)
       {loc, {Map.put(map, loc, header), loc}}
-    end)
+    end, :infinity)
   end
 
   def sync(%TestStore{}), do: :ok
@@ -42,7 +42,7 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
   def get_node(%TestStore{agent: agent}, location) do
     case Agent.get(agent, fn {map, _} ->
            Map.fetch(map, location)
-         end) do
+         end, :infinity) do
       {:ok, value} -> value
       :error -> raise(ArgumentError, message: "End of file")
     end
@@ -52,17 +52,17 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
     Agent.get(agent, fn
       {_, nil} -> nil
       {map, header_loc} -> {header_loc, Map.get(map, header_loc)}
-    end)
+    end, :infinity)
   end
 
   def close(%TestStore{agent: agent}) do
-    Agent.stop(agent)
+    Agent.stop(agent, :normal, :infinity)
   end
 
   def blank?(%TestStore{agent: agent}) do
     Agent.get(agent, fn
       {_, nil} -> true
       _ -> false
-    end)
+    end, :infinity)
   end
 end

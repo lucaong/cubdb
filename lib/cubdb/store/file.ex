@@ -62,7 +62,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
           {:ok, pos} = :file.position(file, :eof)
           {{:error, "Write error"}, {file, pos}}
       end
-    end)
+    end, :infinity)
   end
 
   def put_header(%Store.File{pid: pid}, header) do
@@ -77,19 +77,19 @@ defimpl CubDB.Store, for: CubDB.Store.File do
           {:ok, pos} = :file.position(file, :eof)
           {{:error, "Write error"}, {file, pos}}
       end
-    end)
+    end, :infinity)
   end
 
   def sync(%Store.File{pid: pid}) do
     Agent.get(pid, fn {file, _} ->
       :file.sync(file)
-    end)
+    end, :infinity)
   end
 
   def get_node(%Store.File{pid: pid}, location) do
     case Agent.get(pid, fn {file, _} ->
            read_term(file, location)
-         end) do
+         end, :infinity) do
       {:ok, term} -> term
       {:error, error} -> raise(error)
     end
@@ -98,7 +98,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   def get_latest_header(%Store.File{pid: pid}) do
     Agent.get(pid, fn {file, pos} ->
       get_latest_good_header(file, pos)
-    end)
+    end, :infinity)
   end
 
   def close(%Store.File{pid: pid}) do
@@ -106,8 +106,8 @@ defimpl CubDB.Store, for: CubDB.Store.File do
            Agent.update(pid, fn {file, pos} ->
              :file.sync(file)
              {file, pos}
-           end) do
-      Agent.stop(pid)
+           end, :infinity) do
+      Agent.stop(pid, :normal, :infinity)
     end
   end
 
