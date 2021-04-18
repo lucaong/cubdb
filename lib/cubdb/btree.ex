@@ -237,7 +237,7 @@ defmodule CubDB.Btree do
   @spec alive?(Btree.t()) :: boolean
 
   def alive?(%Btree{store: store}) do
-    Store.alive?(store)
+    Store.open?(store)
   end
 
   def __leaf__, do: @leaf

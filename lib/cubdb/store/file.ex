@@ -118,7 +118,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end
   end
 
-  def alive?(%Store.File{pid: pid}) do
+  def open?(%Store.File{pid: pid}) do
     Process.alive?(pid)
   end
 

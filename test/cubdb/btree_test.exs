@@ -495,4 +495,13 @@ defmodule CubDB.BtreeTest do
     assert {^value_marker, nil} = Btree.value()
     assert {^value_marker, "hello"} = Btree.value(val: "hello")
   end
+
+  test "Btree.alive? returns true if the Store is open, otherwise false" do
+    {:ok, store} = Store.TestStore.create()
+    btree = Btree.new(store)
+    assert Btree.alive?(btree) == true
+
+    Store.close(store)
+    assert Btree.alive?(btree) == false
+  end
 end
