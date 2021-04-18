@@ -118,6 +118,10 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     end
   end
 
+  def alive?(%Store.File{pid: pid}) do
+    Process.alive?(pid)
+  end
+
   defp read_term(file, location) do
     with {:ok, <<length::32>>, len} <- read_blocks(file, location, 4),
          {:ok, bytes, _} <- read_blocks(file, location + len, length) do

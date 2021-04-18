@@ -459,6 +459,24 @@ defmodule CubDBTest do
     assert :ok = CubDB.compact(db)
   end
 
+  test "compaction stops the old Btree upon clean-up, releasing resources", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+
+    CubDB.subscribe(db)
+
+    %CubDB.State{btree: old_btree} = :sys.get_state(db)
+
+    :ok = CubDB.compact(db)
+
+    assert_receive :compaction_started
+    assert_receive :compaction_completed, 1000
+    assert_receive :catch_up_completed, 1000
+    assert_receive :clean_up_started, 1000
+
+    assert CubDB.Btree.alive?(old_btree) == false
+    assert %CubDB.State{old_btrees: []} = :sys.get_state(db)
+  end
+
   test "auto compaction triggers compaction when conditions are met", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: {3, 0.3})
 
