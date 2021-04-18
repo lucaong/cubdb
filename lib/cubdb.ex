@@ -1120,6 +1120,7 @@ defmodule CubDB do
     Btree.sync(btree)
 
     new_path = String.replace_suffix(file_path, @compaction_file_extension, @db_file_extension)
+    Store.File.close_file(file_path)
     :ok = File.rename(file_path, new_path)
 
     {:ok, store} = Store.File.create(new_path)

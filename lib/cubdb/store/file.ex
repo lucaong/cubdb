@@ -30,8 +30,37 @@ defmodule CubDB.Store.File do
     end
   end
 
+  @spec close_file(String.t()) :: :ok | {:error, String.t()}
+  def close_file(file_path) when is_bitstring(file_path) do
+    case :gproc.lookup_pids({:n, :l, [__MODULE__, file_path]}) do
+      [] -> {:error, "file \"#{file_path}\" is not open"}
+      [pid] -> Store.close(%Store.File{pid: pid, file_path: file_path})
+    end
+  end
+
+  @spec open_files() :: [t()]
+  def open_files() do
+    :gproc.lookup_pids({:p, :l, __MODULE__})
+    |> Enum.map(fn pid ->
+      file_path = get_path_from_registration(:gproc.info(pid, :gproc))
+      %Store.File{pid: pid, file_path: file_path}
+    end)
+  end
+
+  # this is hideous, but in short order, I couldn't remember how to make `:gproc.select/1` work right
+  defp get_path_from_registration({:gproc, list}) do
+    list
+    |> Enum.map(fn {{:n, :l, [__MODULE__, path]}, _} -> path
+                                                   _ -> nil
+       end)
+    |> Enum.reject(&is_nil/1)
+    |> hd()
+  end
+
   defp init(file_path) do
     ensure_exclusive_access!(file_path)
+    :gproc.reg({:n, :l, [__MODULE__, file_path]}) # will fail if another process has already registered this name
+    :gproc.reg({:p, :l, __MODULE__})
     {:ok, file} = :file.open(file_path, [:read, :append, :raw, :binary])
     {:ok, pos} = :file.position(file, :eof)
 

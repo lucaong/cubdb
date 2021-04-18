@@ -59,7 +59,9 @@ defmodule CubDB.CleanUp do
         CubDB.file_name_to_n(file_name) < latest_file_n
       end)
       |> Enum.reduce(:ok, fn file_name, _ ->
-        :ok = File.rm(Path.join(data_dir, file_name))
+        full_path = Path.join(data_dir, file_name)
+        _result = Store.File.close_file(full_path) # not concerned if closing fails- they may have been created on a previous run
+        :ok = File.rm(full_path)
       end)
     end
   end
@@ -70,7 +72,9 @@ defmodule CubDB.CleanUp do
       |> Enum.filter(&CubDB.compaction_file?/1)
       |> Enum.reject(&(&1 == file_name))
       |> Enum.reduce(:ok, fn file, _ ->
-        :ok = File.rm(Path.join(data_dir, file))
+        full_path = Path.join(data_dir, file)
+        _result = Store.File.close_file(full_path) # not concerned if closing fails- they may have been created on a previous run
+        :ok = File.rm(full_path)
       end)
     end
   end

@@ -633,4 +633,33 @@ defmodule CubDBTest do
     expected_file_path = Path.join(tmp_dir, "1.cub")
     assert ^expected_file_path = CubDB.current_db_file(db)
   end
+
+  test "compaction doesn't spawn tons of linked processes (i.e. lost file descriptors)", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+    CubDB.subscribe(db)
+    # do it once to identify the steady-state baseline
+    CubDB.put(db, 0,0)
+    CubDB.compact(db)
+    assert_receive :compaction_completed, 5000
+    initial_links = Process.info(db)[:links] |> length()
+    # now run many times to confirm we return to the baseline
+    for i <- 1..100 do
+      CubDB.put(db, i, i)
+      CubDB.compact(db)
+      assert_receive :compaction_completed, 5000
+    end
+    final_links = Process.info(db)[:links] |> length()
+    assert final_links == initial_links
+  end
+
+  @tag :skip # This is failing because of files still open from other test databases.
+  test "there should only be one file open after compaction", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+    CubDB.subscribe(db)
+    CubDB.put(db, :a, 1)
+    CubDB.compact(db)
+    assert_receive :compaction_completed, 5000
+    IO.inspect CubDB.Store.File.open_files
+    assert CubDB.Store.File.open_files() |> length == 1
+  end
 end
