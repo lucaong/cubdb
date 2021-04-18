@@ -473,6 +473,7 @@ defmodule CubDBTest do
     assert_receive :catch_up_completed, 1000
     assert_receive :clean_up_started, 1000
 
+    assert Process.alive?(old_btree.store.pid) == false
     assert CubDB.Btree.alive?(old_btree) == false
     assert %CubDB.State{old_btrees: []} = :sys.get_state(db)
   end
