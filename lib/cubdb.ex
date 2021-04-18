@@ -1118,11 +1118,18 @@ defmodule CubDB do
 
   @spec finalize_compaction(Btree.t()) :: Btree.t()
 
-  defp finalize_compaction(btree = %Btree{store: %Store.File{file_path: file_path}}) do
+  defp finalize_compaction(btree = %Btree{store: compacted_store}) do
     Btree.sync(btree)
+    Store.close(compacted_store)
 
-    new_path = String.replace_suffix(file_path, @compaction_file_extension, @db_file_extension)
-    :ok = File.rename(file_path, new_path)
+    new_path =
+      String.replace_suffix(
+        compacted_store.file_path,
+        @compaction_file_extension,
+        @db_file_extension
+      )
+
+    :ok = File.rename(compacted_store.file_path, new_path)
 
     {:ok, store} = Store.File.create(new_path)
     Btree.new(store)

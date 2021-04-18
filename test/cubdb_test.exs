@@ -473,9 +473,22 @@ defmodule CubDBTest do
     assert_receive :catch_up_completed, 1000
     assert_receive :clean_up_started, 1000
 
-    assert Process.alive?(old_btree.store.pid) == false
     assert CubDB.Btree.alive?(old_btree) == false
     assert %CubDB.State{old_btrees: []} = :sys.get_state(db)
+  end
+
+  test "compaction does not leak process links", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+
+    CubDB.subscribe(db)
+
+    links_before = Process.info(db)[:links]
+    :ok = CubDB.compact(db)
+
+    assert_receive :clean_up_started, 1000
+
+    links_after = Process.info(db)[:links]
+    assert length(links_before) == length(links_after)
   end
 
   test "auto compaction triggers compaction when conditions are met", %{tmp_dir: tmp_dir} do
