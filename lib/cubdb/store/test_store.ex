@@ -65,4 +65,8 @@ defimpl CubDB.Store, for: CubDB.Store.TestStore do
       _ -> false
     end, :infinity)
   end
+
+  def open?(%TestStore{agent: agent}) do
+    Process.alive?(agent)
+  end
 end

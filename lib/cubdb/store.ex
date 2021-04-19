@@ -27,4 +27,7 @@ defprotocol CubDB.Store do
 
   @spec blank?(t) :: boolean
   def blank?(store)
+
+  @spec open?(t) :: boolean
+  def open?(store)
 end

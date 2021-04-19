@@ -167,6 +167,7 @@ defmodule CubDB do
             catch_up: pid | nil,
             clean_up: pid,
             clean_up_pending: boolean,
+            old_btrees: [Btree.t()],
             readers: %{required(reference) => {String.t(), reference}},
             auto_compact: {pos_integer, number} | false,
             auto_file_sync: boolean,
@@ -182,6 +183,7 @@ defmodule CubDB do
       catch_up: nil,
       clean_up: nil,
       clean_up_pending: false,
+      old_btrees: [],
       readers: %{},
       auto_compact: true,
       auto_file_sync: true,
@@ -1092,12 +1094,12 @@ defmodule CubDB do
 
   @spec catch_up(Btree.t(), Btree.t(), State.t()) :: State.t()
 
-  def catch_up(compacted_btree, original_btree, state) do
-    %State{btree: latest_btree, task_supervisor: supervisor} = state
+  defp catch_up(compacted_btree, original_btree, state) do
+    %State{btree: latest_btree, task_supervisor: supervisor, old_btrees: old_btrees} = state
 
     if latest_btree == original_btree do
       compacted_btree = finalize_compaction(compacted_btree)
-      state = %State{state | btree: compacted_btree}
+      state = %State{state | btree: compacted_btree, old_btrees: [latest_btree | old_btrees]}
       for pid <- state.subs, do: send(pid, :catch_up_completed)
       trigger_clean_up(state)
     else
@@ -1116,11 +1118,18 @@ defmodule CubDB do
 
   @spec finalize_compaction(Btree.t()) :: Btree.t()
 
-  defp finalize_compaction(btree = %Btree{store: %Store.File{file_path: file_path}}) do
+  defp finalize_compaction(btree = %Btree{store: compacted_store}) do
     Btree.sync(btree)
+    Store.close(compacted_store)
 
-    new_path = String.replace_suffix(file_path, @compaction_file_extension, @db_file_extension)
-    :ok = File.rename(file_path, new_path)
+    new_path =
+      String.replace_suffix(
+        compacted_store.file_path,
+        @compaction_file_extension,
+        @db_file_extension
+      )
+
+    :ok = File.rename(compacted_store.file_path, new_path)
 
     {:ok, store} = Store.File.create(new_path)
     Btree.new(store)
@@ -1171,9 +1180,13 @@ defmodule CubDB do
   @spec clean_up_now(%State{}) :: %State{}
 
   defp clean_up_now(state = %State{btree: btree, clean_up: clean_up}) do
+    for old_btree <- state.old_btrees do
+      if Btree.alive?(old_btree), do: :ok = Btree.stop(old_btree)
+    end
+
     :ok = CleanUp.clean_up(clean_up, btree)
     for pid <- state.subs, do: send(pid, :clean_up_started)
-    %State{state | clean_up_pending: false}
+    %State{state | clean_up_pending: false, old_btrees: []}
   end
 
   @spec clean_up_when_possible(%State{}) :: %State{}

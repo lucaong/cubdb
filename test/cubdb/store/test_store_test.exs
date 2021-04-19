@@ -22,4 +22,12 @@ defmodule CubDB.Store.TestStoreTest do
 
     assert Process.alive?(pid) == false
   end
+
+  test "open?/1 returns true if the agent is alive, false otherwise", %{store: store} do
+    assert CubDB.Store.open?(store) == true
+
+    CubDB.Store.close(store)
+
+    assert CubDB.Store.open?(store) == false
+  end
 end

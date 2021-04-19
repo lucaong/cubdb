@@ -72,6 +72,14 @@ defmodule CubDB.Store.FileTest do
     assert Process.alive?(pid) == false
   end
 
+  test "open?/1 returns true if the agent is alive, false otherwise", %{store: store} do
+    assert CubDB.Store.open?(store) == true
+
+    CubDB.Store.close(store)
+
+    assert CubDB.Store.open?(store) == false
+  end
+
   test "returns error if the same file is already in use by another store", %{file_path: file_path} do
     assert {:error, {%ArgumentError{message: message}, _}} = CubDB.Store.File.create(file_path)
     assert message == "file \"#{file_path}\" is already in use by another CubDB.Store.File"
