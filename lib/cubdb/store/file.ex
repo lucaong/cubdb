@@ -51,62 +51,86 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   alias CubDB.Store.File.Blocks
 
   def put_node(%Store.File{pid: pid}, node) do
-    Agent.get_and_update(pid, fn {file, pos} ->
-      bytes = serialize(node)
+    Agent.get_and_update(
+      pid,
+      fn {file, pos} ->
+        bytes = serialize(node)
 
-      case append_blocks(file, bytes, pos) do
-        {:ok, written_size} ->
-          {pos, {file, pos + written_size}}
+        case append_blocks(file, bytes, pos) do
+          {:ok, written_size} ->
+            {pos, {file, pos + written_size}}
 
-        _ ->
-          {:ok, pos} = :file.position(file, :eof)
-          {{:error, "Write error"}, {file, pos}}
-      end
-    end, :infinity)
+          _ ->
+            {:ok, pos} = :file.position(file, :eof)
+            {{:error, "Write error"}, {file, pos}}
+        end
+      end,
+      :infinity
+    )
   end
 
   def put_header(%Store.File{pid: pid}, header) do
-    Agent.get_and_update(pid, fn {file, pos} ->
-      header_bytes = serialize(header)
+    Agent.get_and_update(
+      pid,
+      fn {file, pos} ->
+        header_bytes = serialize(header)
 
-      case append_header(file, header_bytes, pos) do
-        {:ok, loc, written_size} ->
-          {loc, {file, pos + written_size}}
+        case append_header(file, header_bytes, pos) do
+          {:ok, loc, written_size} ->
+            {loc, {file, pos + written_size}}
 
-        _ ->
-          {:ok, pos} = :file.position(file, :eof)
-          {{:error, "Write error"}, {file, pos}}
-      end
-    end, :infinity)
+          _ ->
+            {:ok, pos} = :file.position(file, :eof)
+            {{:error, "Write error"}, {file, pos}}
+        end
+      end,
+      :infinity
+    )
   end
 
   def sync(%Store.File{pid: pid}) do
-    Agent.get(pid, fn {file, _} ->
-      :file.sync(file)
-    end, :infinity)
+    Agent.get(
+      pid,
+      fn {file, _} ->
+        :file.sync(file)
+      end,
+      :infinity
+    )
   end
 
   def get_node(%Store.File{pid: pid}, location) do
-    case Agent.get(pid, fn {file, _} ->
-           read_term(file, location)
-         end, :infinity) do
+    case Agent.get(
+           pid,
+           fn {file, _} ->
+             read_term(file, location)
+           end,
+           :infinity
+         ) do
       {:ok, term} -> term
       {:error, error} -> raise(error)
     end
   end
 
   def get_latest_header(%Store.File{pid: pid}) do
-    Agent.get(pid, fn {file, pos} ->
-      get_latest_good_header(file, pos)
-    end, :infinity)
+    Agent.get(
+      pid,
+      fn {file, pos} ->
+        get_latest_good_header(file, pos)
+      end,
+      :infinity
+    )
   end
 
   def close(%Store.File{pid: pid}) do
     with :ok <-
-           Agent.update(pid, fn {file, pos} ->
-             :file.sync(file)
-             {file, pos}
-           end, :infinity) do
+           Agent.update(
+             pid,
+             fn {file, pos} ->
+               :file.sync(file)
+               {file, pos}
+             end,
+             :infinity
+           ) do
       Agent.stop(pid, :normal, :infinity)
     end
   end

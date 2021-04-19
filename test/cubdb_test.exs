@@ -24,7 +24,9 @@ defmodule CubDBTest do
     assert Enum.member?(links, db) == true
   end
 
-  test "start_link/1 accepts data_dir as a single string or charlist argument", %{tmp_dir: tmp_dir} do
+  test "start_link/1 accepts data_dir as a single string or charlist argument", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, db} = CubDB.start_link(tmp_dir)
     assert Process.alive?(db) == true
     :ok = CubDB.stop(db)
@@ -97,7 +99,9 @@ defmodule CubDBTest do
     assert {:error, _} = CubDB.start(data_dir: {})
   end
 
-  test "start/1 returns error if another CubDB process is using the same data dir", %{tmp_dir: tmp_dir} do
+  test "start/1 returns error if another CubDB process is using the same data dir", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, _pid} = CubDB.start_link(data_dir: tmp_dir)
     assert {:error, _} = CubDB.start(data_dir: tmp_dir)
   end
@@ -111,7 +115,9 @@ defmodule CubDBTest do
     assert Process.alive?(pid)
   end
 
-  test "put/3, get/3, fetch/2, delete/3, has_key?/2, and put_new/3 work as expected", %{tmp_dir: tmp_dir} do
+  test "put/3, get/3, fetch/2, delete/3, has_key?/2, and put_new/3 work as expected", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, db} = CubDB.start_link(tmp_dir)
     key = {:some, arbitrary: "key"}
 
@@ -244,9 +250,14 @@ defmodule CubDBTest do
     assert CubDB.get(db, :b) == 1
 
     assert {:error, :timeout} =
-             CubDB.get_and_update_multi(db, [:a, :c], fn _ ->
-               Process.sleep(80)
-             end, timeout: 50)
+             CubDB.get_and_update_multi(
+               db,
+               [:a, :c],
+               fn _ ->
+                 Process.sleep(80)
+               end,
+               timeout: 50
+             )
   end
 
   test "get_and_update_multi/4 works well during a compaction", %{tmp_dir: tmp_dir} do
@@ -271,7 +282,9 @@ defmodule CubDBTest do
     assert CubDB.has_key?(db, :d) == false
   end
 
-  test "get_multi/3, put_multi/2, delete_multi/2 and put_and_delete_multi/3 work as expected", %{tmp_dir: tmp_dir} do
+  test "get_multi/3, put_multi/2, delete_multi/2 and put_and_delete_multi/3 work as expected", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
     entries = %{a: 1, b: 2, c: 3, d: 4}
@@ -561,20 +574,28 @@ defmodule CubDBTest do
 
     # This blocks the reader until we send a :resume message
     Task.start_link(fn ->
-      CubDB.select(db, timeout: :infinity, reduce: {0, fn _, a ->
-        if a == 0 do
-          send(caller, {:stopping, self()})
-          receive do
-            :resume -> nil
-          end
-        end
-        a + 1
-      end})
+      CubDB.select(db,
+        timeout: :infinity,
+        reduce:
+          {0,
+           fn _, a ->
+             if a == 0 do
+               send(caller, {:stopping, self()})
+
+               receive do
+                 :resume -> nil
+               end
+             end
+
+             a + 1
+           end}
+      )
     end)
 
-    reader = receive do
-      {:stopping, pid} -> pid
-    end
+    reader =
+      receive do
+        {:stopping, pid} -> pid
+      end
 
     :ok = CubDB.compact(db)
 
@@ -592,9 +613,17 @@ defmodule CubDBTest do
     CubDB.put(db, :foo, 123)
     CubDB.subscribe(db)
 
-    assert {:timeout, _} = catch_exit(CubDB.select(db, timeout: 20, reduce: {nil, fn _, _ ->
-      Process.sleep(3000)
-    end}))
+    assert {:timeout, _} =
+             catch_exit(
+               CubDB.select(db,
+                 timeout: 20,
+                 reduce:
+                   {nil,
+                    fn _, _ ->
+                      Process.sleep(3000)
+                    end}
+               )
+             )
 
     :ok = CubDB.compact(db)
 
