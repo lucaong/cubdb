@@ -695,25 +695,28 @@ defmodule CubDBTest do
     assert ^expected_file_path = CubDB.current_db_file(db)
   end
 
-  test "cubdb_file? returns false for non-cubdb named files" do
+  test "cubdb_file?/1 returns false for non-cubdb named files" do
     bad_filenames = [
-        "",
-        "./db/5432 (copy).cub",
-        "1234",
-        "/opt/data/db/11111.cubb", 
-    ] 
+      "",
+      "./db/5432 (copy).cub",
+      "1234",
+      "/opt/data/db/11111.cubb"
+    ]
+
     for filename <- bad_filenames do
       refute CubDB.cubdb_file?(filename)
     end
   end
-  test "cubdb_file? returns true for cubdb named files" do
+
+  test "cubdb_file?/1 returns true for cubdb named files" do
     good_filenames = [
-        "0.cub",
-        "0.compact",
-        "./db/5432.cub",
-        "1234.compact",
-        "/opt/data/db/11111.cub", 
-    ] 
+      "0.cub",
+      "0.compact",
+      "./db/5432.cub",
+      "1234.compact",
+      "/opt/data/db/11111.cub"
+    ]
+
     for filename <- good_filenames do
       assert CubDB.cubdb_file?(filename)
     end
