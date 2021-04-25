@@ -115,7 +115,7 @@ For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.ht
 
 ```elixir
 def deps do
-  [{:cubdb, "~> 1.0.0-rc.9"}]
+  [{:cubdb, "~> 1.0.0-rc.10"}]
 end
 ```
 
