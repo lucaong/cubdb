@@ -694,4 +694,38 @@ defmodule CubDBTest do
     expected_file_path = Path.join(tmp_dir, "1.cub")
     assert ^expected_file_path = CubDB.current_db_file(db)
   end
+
+  test "cubdb_file? returns false for non-cubdb named files" do
+    bad_filenames = [
+        "",
+        "./db/5432 (copy).cub",
+        "1234",
+        "/opt/data/db/11111.cubb", 
+    ] 
+    for filename <- bad_filenames do
+      refute CubDB.cubdb_file?(filename)
+    end
+  end
+  test "cubdb_file? returns true for cubdb named files" do
+    good_filenames = [
+        "0.cub",
+        "0.compact",
+        "./db/5432.cub",
+        "1234.compact",
+        "/opt/data/db/11111.cub", 
+    ] 
+    for filename <- good_filenames do
+      assert CubDB.cubdb_file?(filename)
+    end
+  end
+
+  test "bad filenames don't cause a crash", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+    Path.join(tmp_dir, "blah.cub") |> File.touch()
+
+    CubDB.subscribe(db)
+    CubDB.compact(db)
+    assert_receive :compaction_completed
+    assert Process.alive?(db)
+  end
 end

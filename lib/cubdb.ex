@@ -786,7 +786,7 @@ defmodule CubDB do
     basename = Path.basename(file_name, Path.extname(file_name))
 
     Enum.member?(file_extensions, Path.extname(file_name)) &&
-      Regex.match?(~r/[\da-fA-F]+/, basename)
+      Regex.match?(~r/^[\da-fA-F]+$/, basename)
   end
 
   @spec compaction_file?(String.t()) :: boolean
