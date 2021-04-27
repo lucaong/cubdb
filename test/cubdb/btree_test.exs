@@ -1,9 +1,9 @@
 defmodule CubDB.BtreeTest do
   use ExUnit.Case, async: true
 
+  alias CubDB.Btree
   alias CubDB.Store
   alias TestHelper.Btree.Utils
-  alias CubDB.Btree
 
   import TestHelper
 
@@ -13,7 +13,7 @@ defmodule CubDB.BtreeTest do
   @branch Btree.__branch__()
   @deleted Btree.__deleted__()
 
-  def compose_btree() do
+  def compose_btree do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, 0, Btree.leaf()})
     %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0}

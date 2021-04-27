@@ -41,8 +41,8 @@ defmodule CubDB.Btree do
   @type btree_header :: {btree_size, location, dirt}
   @type node_type :: :l | :b | :v | :d
 
-  alias CubDB.Store
   alias CubDB.Btree
+  alias CubDB.Store
 
   @type t :: %Btree{
           root: branch_node | leaf_node,

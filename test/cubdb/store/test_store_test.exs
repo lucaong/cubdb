@@ -2,19 +2,21 @@ defmodule CubDB.Store.TestStoreTest do
   use ExUnit.Case, async: true
   use CubDB.StoreExamples
 
+  alias CubDB.Store.TestStore
+
   setup do
-    {:ok, store} = CubDB.Store.TestStore.create()
+    {:ok, store} = TestStore.create()
     {:ok, store: store}
   end
 
   test "start_link/0 starts a Store.TestStore" do
-    {:ok, store} = CubDB.Store.TestStore.create()
-    assert %CubDB.Store.TestStore{agent: pid} = store
+    {:ok, store} = TestStore.create()
+    assert %TestStore{agent: pid} = store
     assert Process.alive?(pid)
   end
 
   test "close/1 stops the agent", %{store: store} do
-    %CubDB.Store.TestStore{agent: pid} = store
+    %TestStore{agent: pid} = store
 
     assert Process.alive?(pid) == true
 

@@ -2,11 +2,12 @@ defmodule CubDB.Store.CompactorTest do
   use ExUnit.Case
 
   alias CubDB.Btree
-  alias CubDB.Store
   alias CubDB.Compactor
+  alias CubDB.Store
 
   setup do
-    tmp_dir = :os.cmd('mktemp -d') |> List.to_string() |> String.trim() |> String.to_charlist()
+    {tmp_dir, 0} = System.cmd("mktemp", ["-d"])
+    tmp_dir = tmp_dir |> String.trim() |> String.to_charlist()
 
     on_exit(fn ->
       with {:ok, files} <- File.ls(tmp_dir) do

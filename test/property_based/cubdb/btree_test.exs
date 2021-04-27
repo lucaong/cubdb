@@ -2,8 +2,8 @@ defmodule PropertyBased.BtreeTest do
   use ExUnit.Case
   use Quixir
 
-  alias CubDB.Store
   alias CubDB.Btree
+  alias CubDB.Store
 
   @tag property_based: true
   test "a Btree gets updated as expected" do

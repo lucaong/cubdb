@@ -1,4 +1,6 @@
 defmodule CubDB.StoreExamples do
+  @moduledoc false
+
   import SharedExamples
 
   shared_examples do
