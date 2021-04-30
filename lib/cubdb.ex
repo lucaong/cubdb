@@ -125,11 +125,11 @@ defmodule CubDB do
   use GenServer
 
   alias CubDB.Btree
-  alias CubDB.Store
-  alias CubDB.Reader
-  alias CubDB.Compactor
   alias CubDB.CatchUp
   alias CubDB.CleanUp
+  alias CubDB.Compactor
+  alias CubDB.Reader
+  alias CubDB.Store
 
   @db_file_extension ".cub"
   @compaction_file_extension ".compact"
@@ -908,11 +908,11 @@ defmodule CubDB do
       fun.(key_values)
     end
 
-    with {:ok, {result, entries_to_put, keys_to_delete}} <-
-           run_with_timeout(compute_update, timeout) do
-      state = do_put_and_delete_multi(state, entries_to_put, keys_to_delete)
-      {:reply, {:ok, result}, state}
-    else
+    case run_with_timeout(compute_update, timeout) do
+      {:ok, {result, entries_to_put, keys_to_delete}} ->
+        state = do_put_and_delete_multi(state, entries_to_put, keys_to_delete)
+        {:reply, {:ok, result}, state}
+
       {:error, cause} ->
         {:reply, {:error, cause}, state}
     end

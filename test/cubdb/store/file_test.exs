@@ -3,7 +3,9 @@ defmodule CubDB.Store.FileTest do
   use CubDB.StoreExamples
 
   setup do
-    tmp_path = :os.cmd('mktemp') |> List.to_string() |> String.trim()
+    {tmp_path, 0} = System.cmd("mktemp", [])
+    tmp_path = tmp_path |> String.trim()
+
     {:ok, store} = CubDB.Store.File.create(tmp_path)
 
     on_exit(fn ->

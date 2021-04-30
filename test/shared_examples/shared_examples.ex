@@ -1,4 +1,6 @@
 defmodule SharedExamples do
+  @moduledoc false
+
   defmacro shared_examples(do: block) do
     quote do
       defmacro __using__(options) do

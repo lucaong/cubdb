@@ -2,9 +2,9 @@ defmodule PropertyBased.Btree.DiffTest do
   use ExUnit.Case
   use Quixir
 
-  alias CubDB.Store
   alias CubDB.Btree
   alias CubDB.Btree.Diff
+  alias CubDB.Store
 
   @value Btree.__value__()
   @deleted Btree.__deleted__()

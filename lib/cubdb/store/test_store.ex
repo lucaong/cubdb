@@ -13,7 +13,7 @@ defmodule CubDB.Store.TestStore do
 
   @spec create() :: {:ok, t} | {:error, term}
 
-  def create() do
+  def create do
     with {:ok, pid} <- Agent.start_link(fn -> {%{}, nil} end) do
       {:ok, %TestStore{agent: pid}}
     end

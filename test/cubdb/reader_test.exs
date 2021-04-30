@@ -2,13 +2,13 @@ defmodule CubDB.Store.ReaderTest do
   use ExUnit.Case, async: true
 
   alias CubDB.Btree
-  alias CubDB.Store
   alias CubDB.Reader
+  alias CubDB.Store
 
   defmodule TestCaller do
     use GenServer
 
-    def start_link() do
+    def start_link do
       GenServer.start_link(__MODULE__, [], [])
     end
 

@@ -22,8 +22,8 @@ defmodule TestHelper do
   defmodule Btree.Utils do
     @moduledoc false
 
-    alias CubDB.Store
     alias CubDB.Btree
+    alias CubDB.Store
 
     @value Btree.__value__()
     @deleted Btree.__deleted__()

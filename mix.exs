@@ -46,7 +46,8 @@ defmodule CubDB.Mixfile do
       {:dialyxir, "~> 1.1", only: [:dev], runtime: false},
       {:ex_doc, "~> 0.24", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
-      {:excoveralls, "~> 0.14", only: :test}
+      {:excoveralls, "~> 0.14", only: :test},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false}
     ]
   end
 

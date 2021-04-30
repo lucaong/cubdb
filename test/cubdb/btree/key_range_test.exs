@@ -1,9 +1,9 @@
 defmodule CubDB.Btree.KeyRangeTest do
   use ExUnit.Case
 
-  alias CubDB.Store
   alias CubDB.Btree
   alias CubDB.Btree.KeyRange
+  alias CubDB.Store
 
   import TestHelper
 

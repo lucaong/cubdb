@@ -1,9 +1,9 @@
 defmodule CubDB.Btree.DiffTest do
   use ExUnit.Case
 
-  alias CubDB.Store
   alias CubDB.Btree
   alias CubDB.Btree.Diff
+  alias CubDB.Store
 
   import TestHelper
 

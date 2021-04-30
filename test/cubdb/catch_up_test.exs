@@ -2,8 +2,8 @@ defmodule CubDB.Store.CatchUpTest do
   use ExUnit.Case, async: true
 
   alias CubDB.Btree
-  alias CubDB.Store
   alias CubDB.CatchUp
+  alias CubDB.Store
 
   test "run/4 catches up the compacted tree with the diff updates and reports result" do
     {:ok, store} = Store.TestStore.create()

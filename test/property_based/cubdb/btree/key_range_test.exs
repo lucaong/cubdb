@@ -2,8 +2,8 @@ defmodule PropertyBased.Btree.KeyRangeTest do
   use ExUnit.Case
   use Quixir
 
-  alias CubDB.Store
   alias CubDB.Btree.KeyRange
+  alias CubDB.Store
 
   import TestHelper
 
