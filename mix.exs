@@ -1,22 +1,21 @@
 defmodule CubDB.Mixfile do
   use Mix.Project
 
+  @version "1.0.0-rc.10"
+  @source_url "https://github.com/lucaong/cubdb"
+
   def project do
     [
       app: :cubdb,
-      version: "1.0.0-rc.10",
+      version: @version,
       elixir: "~> 1.7",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       elixirc_paths: elixirc_paths(Mix.env),
       deps: deps(),
       package: package(),
-      source_url: "https://github.com/lucaong/cubdb",
-      docs: [
-        main: "CubDB",
-        logo: "assets/cubdb_logo.png",
-        extras: ["FAQ.md", "HOWTO.md"]
-      ],
+      source_url: @source_url,
+      docs: docs(),
       dialyzer: dialyzer(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [coveralls: :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test, "coveralls.travis": :test]
@@ -57,7 +56,9 @@ defmodule CubDB.Mixfile do
       files: ["lib", "LICENSE", "mix.exs"],
       maintainers: ["Luca Ongaro"],
       licenses: ["Apache-2.0"],
-      links: %{}
+      links: %{
+        "GitHub" => @source_url
+      }
     ]
   end
 
@@ -67,6 +68,17 @@ defmodule CubDB.Mixfile do
   defp dialyzer do
     [
       ignore_warnings: "dialyzer_ignore.exs"
+    ]
+  end
+
+  defp docs() do
+    [
+      main: "CubDB",
+      logo: "assets/cubdb_logo.png",
+      extras: ["FAQ.md", "HOWTO.md"],
+      canonical: "http://hexdocs.pm/cubdb",
+      source_ref: "v#{@version}",
+      source_url: @source_url
     ]
   end
 end
