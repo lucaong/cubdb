@@ -1,7 +1,7 @@
 defmodule CubDB.Mixfile do
   use Mix.Project
 
-  @version "1.0.0-rc.10"
+  @version "1.0.0"
   @source_url "https://github.com/lucaong/cubdb"
 
   def project do
