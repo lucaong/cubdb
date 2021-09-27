@@ -1,8 +1,8 @@
 defmodule CubDB.Mixfile do
   use Mix.Project
 
-  @version "1.0.0"
   @source_url "https://github.com/lucaong/cubdb"
+  @version "1.0.0"
 
   def project do
     [
@@ -18,7 +18,13 @@ defmodule CubDB.Mixfile do
       docs: docs(),
       dialyzer: dialyzer(),
       test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [coveralls: :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test, "coveralls.travis": :test]
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.travis": :test
+      ]
     ]
   end
 
@@ -43,7 +49,7 @@ defmodule CubDB.Mixfile do
     [
       {:quixir, "~> 0.9", only: :test},
       {:dialyxir, "~> 1.1", only: [:dev], runtime: false},
-      {:ex_doc, "~> 0.24", only: :dev, runtime: false},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
       {:excoveralls, "~> 0.14", only: :test},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false}
@@ -57,6 +63,7 @@ defmodule CubDB.Mixfile do
       maintainers: ["Luca Ongaro"],
       licenses: ["Apache-2.0"],
       links: %{
+        "Changelog" => "https://hexdocs.pm/cubdb/changelog.html",
         "GitHub" => @source_url
       }
     ]
@@ -73,12 +80,20 @@ defmodule CubDB.Mixfile do
 
   defp docs() do
     [
-      main: "CubDB",
+      extras: [
+        "CHANGELOG.md": [],
+        "LICENSE": [title: "License"],
+        "README.md": [title: "Overview"],
+        "FAQ.md": [],
+        "HOWTO.md": []
+      ],
+      main: "readme",
       logo: "assets/cubdb_logo.png",
-      extras: ["FAQ.md", "HOWTO.md"],
+      assets: "assets",
       canonical: "http://hexdocs.pm/cubdb",
+      source_url: @source_url,
       source_ref: "v#{@version}",
-      source_url: @source_url
+      formatters: ["html"]
     ]
   end
 end

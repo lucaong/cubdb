@@ -17,7 +17,7 @@ typically used for things like:
 
   * Persisting configuration and preferences
 
-  * Data logging and storage of metrics or time serieses
+  * Data logging and storage of metrics or time series
 
   * Local database for application data
 
@@ -125,7 +125,7 @@ which means to flush the buffer to disk.
 
 With `CubDB`, you can chose to automatically sync each write operation, or to
 manually sync when you prefer. If you need faster write performance, but you are
-ok with a small chance of loosing recently written data in case of a power loss
+ok with a small chance of losing recently written data in case of a power loss
 (for example if you use `CubDB` to log large quantity of data), you might choose
 to not perform automatic file sync. Note that the operative system will still
 sync data periodically, and upon clean shutdown. If instead you want to be sure

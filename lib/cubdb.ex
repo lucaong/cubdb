@@ -691,7 +691,7 @@ defmodule CubDB do
   Compaction is performed in the background and does not block other operations,
   but can create disk contention, so it should not be performed unnecessarily
   often. When writing a lot into the database, such as when importing data from
-  an external source, it is adviseable to turn off auto compaction, and manually
+  an external source, it is advisable to turn off auto compaction, and manually
   run compaction at the end of the import.
   """
   def set_auto_compact(db, setting) do

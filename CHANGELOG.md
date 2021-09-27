@@ -6,7 +6,7 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
-## v1.0.0
+## v1.0.0 (2021-06-24)
 
 ### Breaking changes from v0.17.0:
 
