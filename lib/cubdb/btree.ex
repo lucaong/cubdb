@@ -185,6 +185,16 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec clear(Btree.t()) :: Btree.t()
+
+  def clear(btree) do
+    %Btree{store: store, capacity: cap, dirt: dirt} = btree
+
+    root = leaf()
+    loc = Store.put_node(store, root)
+    %Btree{root: root, root_loc: loc, size: 0, dirt: dirt + 1, capacity: cap, store: store}
+  end
+
   @spec commit(Btree.t()) :: Btree.t()
 
   # `commit/1` writes the header to the store, committing all updates performed

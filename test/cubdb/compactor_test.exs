@@ -33,7 +33,8 @@ defmodule CubDB.Store.CompactorTest do
 
     Compactor.run(self(), btree, store)
 
-    assert_receive {:compaction_completed, ^btree, compacted_btree}, 1000
+    assert_receive {:compaction_completed, pid, ^btree, compacted_btree}, 1000
+    assert pid == self()
     assert compacted_btree.size == btree.size
     assert Enum.to_list(compacted_btree) == Enum.to_list(btree)
   end

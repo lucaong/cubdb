@@ -28,12 +28,14 @@ defmodule PropertyBased.BtreeTest do
       insert_news = tuples |> Enum.map(fn tuple -> {:insert_new, tuple} end)
       deletes = tuples |> Enum.map(fn tuple -> {:delete, tuple} end)
       delmarks = tuples |> Enum.map(fn tuple -> {:mark_deleted, tuple} end)
+      clears = [{:clear, {nil, nil}}, {:clear, {nil, nil}}]
 
       operations =
         inserts
         |> Enum.concat(insert_news)
         |> Enum.concat(deletes)
         |> Enum.concat(delmarks)
+        |> Enum.concat(clears)
         |> Enum.shuffle()
 
       tree =
@@ -67,6 +69,11 @@ defmodule PropertyBased.BtreeTest do
               tree = Btree.mark_deleted(tree, key)
               assert :error = Btree.fetch(tree, key)
               tree
+
+            :clear ->
+              tree = Btree.clear(tree)
+              assert %Btree{size: 0} = tree
+              tree
           end
         end)
 
@@ -87,6 +94,9 @@ defmodule PropertyBased.BtreeTest do
 
             :mark_deleted ->
               Map.put(map, key, :error)
+
+            :clear ->
+              %{}
           end
         end)
         |> Enum.to_list()
