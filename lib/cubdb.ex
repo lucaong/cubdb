@@ -1200,14 +1200,10 @@ defmodule CubDB do
 
   defp halt_compaction(%State{compactor: nil, catch_up: nil} = state), do: state
 
-  defp halt_compaction(%State{compactor: pid, catch_up: nil} = state) do
-    Process.exit(pid, :halt)
-    %State{state | compactor: nil}
-  end
-
-  defp halt_compaction(%State{compactor: nil, catch_up: pid} = state) do
-    Process.exit(pid, :halt)
-    %State{state | catch_up: nil}
+  defp halt_compaction(%State{compactor: pid1, catch_up: pid2} = state) do
+    if pid1 != nil, do: Process.exit(pid1, :halt)
+    if pid2 != nil, do: Process.exit(pid2, :halt)
+    %State{state | compactor: nil, catch_up: nil}
   end
 
   @spec trigger_clean_up(%State{}) :: %State{}
