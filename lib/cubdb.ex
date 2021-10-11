@@ -1000,14 +1000,20 @@ defmodule CubDB do
     {:reply, file_path, state}
   end
 
-  def handle_info({:compaction_completed, pid, original_btree, compacted_btree}, state = %State{compactor: pid}) do
+  def handle_info(
+        {:compaction_completed, pid, original_btree, compacted_btree},
+        state = %State{compactor: pid}
+      ) do
     for pid <- state.subs, do: send(pid, :compaction_completed)
     {:noreply, catch_up(compacted_btree, original_btree, state)}
   end
 
   def handle_info({:compaction_completed, _, _, _}, state), do: state
 
-  def handle_info({:catch_up, pid, compacted_btree, original_btree}, state = %State{catch_up: pid}) do
+  def handle_info(
+        {:catch_up, pid, compacted_btree, original_btree},
+        state = %State{catch_up: pid}
+      ) do
     {:noreply, catch_up(compacted_btree, original_btree, state)}
   end
 
