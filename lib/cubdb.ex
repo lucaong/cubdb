@@ -661,6 +661,10 @@ defmodule CubDB do
   operations. For example, if a `select` operation started before the call to
   `clear/1` and is running concurrently, the `select` will still see all the
   entries.
+
+  If a compaction is in progress when `clear/1` is called, the compaction is
+  halted, and a new one started immediately after. The new compaction should be
+  very fast, as the database is empty as a result of the `clear/1` call.
   """
 
   def clear(db) do
