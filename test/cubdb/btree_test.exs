@@ -359,6 +359,33 @@ defmodule CubDB.BtreeTest do
     assert {:Btree, 0, {@leaf, [foo: @deleted]}} = Utils.debug(tree.store)
   end
 
+  test "clear/1 deletes all entries" do
+    tree = compose_btree({@leaf, [foo: 1, bar: 2, baz: 3]})
+    tree = Btree.clear(tree) |> Btree.commit()
+
+    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+  end
+
+  test "clear/1 does not write the header" do
+    tree = Btree.clear(compose_btree({@leaf, [foo: 1]}))
+
+    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+
+    tree = Btree.commit(tree)
+
+    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+  end
+
+  test "clear/1 result in a size of 0 but increases the dirt" do
+    {:ok, store} = Store.TestStore.create()
+    tree = make_btree(store, [foo: 1, bar: 2, baz: 3, qux: 4], 3)
+    %Btree{dirt: original_dirt} = tree
+
+    tree = Btree.clear(tree) |> Btree.commit()
+    expected_dirt = original_dirt + 1
+    assert %Btree{size: 0, dirt: ^expected_dirt} = tree
+  end
+
   test "load/3 creates a Btree from a sorted enumerable of key/values" do
     {:ok, store} = Store.TestStore.create()
     key_vals = Stream.map(0..19, &{&1, &1})
@@ -442,6 +469,9 @@ defmodule CubDB.BtreeTest do
 
     btree = Btree.delete(btree, :foo)
     assert Btree.dirt_factor(btree) == 2 / 3
+
+    btree = Btree.clear(btree)
+    assert Btree.dirt_factor(btree) == 3 / 4
   end
 
   test "Btree implements Enumerable" do

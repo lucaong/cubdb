@@ -27,7 +27,8 @@ defmodule CubDB.Store.CatchUpTest do
 
     CatchUp.run(self(), compacted_btree, original_btree, latest_btree)
 
-    assert_receive {:catch_up, catched_up_btree, ^latest_btree}
+    assert_receive {:catch_up, pid, catched_up_btree, ^latest_btree}
+    assert pid == self()
     assert Enum.to_list(catched_up_btree) == Enum.to_list(latest_btree)
     assert catched_up_btree.store == compacted_store
   end
