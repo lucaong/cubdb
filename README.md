@@ -1,6 +1,12 @@
-[![Build Status](https://github.com/lucaong/cubdb/workflows/CI%20Build/badge.svg)](https://github.com/lucaong/cubdb/actions) [![Coverage Status](https://coveralls.io/repos/github/lucaong/cubdb/badge.svg?branch=master)](https://coveralls.io/github/lucaong/cubdb?branch=master) [![Hex Version](https://img.shields.io/hexpm/v/cubdb.svg)](https://hex.pm/packages/cubdb) [![docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/cubdb/)
-
 <p align="center"><img src="assets/cubdb_banner.png" width="80%"/></p>
+
+[![Build Status](https://github.com/lucaong/cubdb/workflows/CI%20Build/badge.svg)](https://github.com/lucaong/cubdb/actions)
+[![Coverage Status](https://coveralls.io/repos/github/lucaong/cubdb/badge.svg?branch=master)](https://coveralls.io/github/lucaong/cubdb?branch=master)
+[![Module Version](https://img.shields.io/hexpm/v/cubdb.svg)](https://hex.pm/packages/cubdb)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/cubdb/)
+[![Total Download](https://img.shields.io/hexpm/dt/cubdb.svg)](https://hex.pm/packages/cubdb)
+[![License](https://img.shields.io/hexpm/l/cubdb.svg)](https://github.com/lucaong/cubdb/blob/master/LICENSE)
+[![Last Updated](https://img.shields.io/github/last-commit/lucaong/cubdb.svg)](https://github.com/lucaong/cubdb/commits/master)
 
 `CubDB` is an embedded key-value database written in the Elixir language. It
 runs locally, it is schema-less, and backed by a single file.
@@ -110,12 +116,14 @@ For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.ht
 
 ## Installation
 
-`CubDB` can be installed by adding `cubdb` to your list of dependencies in
+`CubDB` can be installed by adding `:cubdb` to your list of dependencies in
 `mix.exs`:
 
 ```elixir
 def deps do
-  [{:cubdb, "~> 1.0.0"}]
+  [
+    {:cubdb, "~> 1.0.0"}
+  ]
 end
 ```
 
@@ -124,3 +132,17 @@ end
 The file data structure used by `CubDB` is inspired by
 [CouchDB](http://couchdb.apache.org). A big thanks goes to the CouchDB
 maintainers for the readable codebase and extensive documentation.
+
+## Copyright and License
+
+Copyright (c) 2020 Luca Ongaro
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
