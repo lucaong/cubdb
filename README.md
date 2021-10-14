@@ -120,7 +120,7 @@ For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.ht
 ```elixir
 def deps do
   [
-    {:cubdb, "~> 1.0.0"}
+    {:cubdb, "~> 1.1.0"}
   ]
 end
 ```
