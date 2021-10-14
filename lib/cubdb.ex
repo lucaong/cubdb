@@ -649,6 +649,27 @@ defmodule CubDB do
     put_and_delete_multi(db, %{}, keys)
   end
 
+  @spec clear(GenServer.server()) :: :ok
+
+  @doc """
+  Deletes all entries, resulting in an empty database.
+
+  The deletion is atomic, and is much more performant than deleating each entry
+  manually.
+
+  The operation respects all the guarantees of consistency of other concurrent
+  operations. For example, if `select\2` was called before the call to `clear/1`
+  and is running concurrently, the `select\2` will still see all the entries.
+
+  If a compaction is in progress when `clear/1` is called, the compaction is
+  halted, and a new one started immediately after. The new compaction should be
+  very fast, as the database is empty as a result of the `clear/1` call.
+  """
+
+  def clear(db) do
+    GenServer.call(db, :clear, :infinity)
+  end
+
   @spec compact(GenServer.server()) :: :ok | {:error, String.t()}
 
   @doc """
@@ -923,6 +944,21 @@ defmodule CubDB do
     {:reply, :ok, state}
   end
 
+  def handle_call(:clear, _, state) do
+    %State{btree: btree, auto_file_sync: auto_file_sync} = state
+    btree = Btree.clear(btree) |> Btree.commit()
+    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
+    state = %State{state | btree: btree}
+
+    if compaction_running?(state) do
+      state = halt_compaction(state)
+      {:ok, compactor} = trigger_compaction(state)
+      {:reply, :ok, %State{state | compactor: compactor}}
+    else
+      {:reply, :ok, maybe_auto_compact(state)}
+    end
+  end
+
   def handle_call(:compact, _, state) do
     case trigger_compaction(state) do
       {:ok, compactor} ->
@@ -963,14 +999,24 @@ defmodule CubDB do
     {:reply, file_path, state}
   end
 
-  def handle_info({:compaction_completed, original_btree, compacted_btree}, state) do
+  def handle_info(
+        {:compaction_completed, pid, original_btree, compacted_btree},
+        state = %State{compactor: pid}
+      ) do
     for pid <- state.subs, do: send(pid, :compaction_completed)
     {:noreply, catch_up(compacted_btree, original_btree, state)}
   end
 
-  def handle_info({:catch_up, compacted_btree, original_btree}, state) do
+  def handle_info({:compaction_completed, _, _, _}, state), do: state
+
+  def handle_info(
+        {:catch_up, pid, compacted_btree, original_btree},
+        state = %State{catch_up: pid}
+      ) do
     {:noreply, catch_up(compacted_btree, original_btree, state)}
   end
+
+  def handle_info({:catch_up, _, _, _}, state), do: state
 
   def handle_info({:reader_timeout, reader}, state) do
     Process.unlink(reader)
@@ -1158,6 +1204,16 @@ defmodule CubDB do
   defp compaction_running?(%State{compactor: nil, catch_up: nil}), do: false
 
   defp compaction_running?(_), do: true
+
+  @spec halt_compaction(%State{}) :: %State{}
+
+  defp halt_compaction(state = %State{compactor: nil, catch_up: nil} ), do: state
+
+  defp halt_compaction(state = %State{compactor: pid1, catch_up: pid2}) do
+    if pid1 != nil, do: Process.exit(pid1, :halt)
+    if pid2 != nil, do: Process.exit(pid2, :halt)
+    %State{state | compactor: nil, catch_up: nil}
+  end
 
   @spec trigger_clean_up(%State{}) :: %State{}
 

@@ -551,6 +551,26 @@ defmodule CubDBTest do
     assert {:error, _} = CubDB.set_auto_compact(db, {:x, 100})
   end
 
+  test "compact/1 performs compaction and catch up", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
+    CubDB.subscribe(db)
+
+    original_file = CubDB.current_db_file(db)
+
+    assert :ok = CubDB.compact(db)
+    :ok = CubDB.put(db, :f, 6)
+
+    assert_received :compaction_started
+    assert_receive :compaction_completed, 100
+    assert_receive :catch_up_completed, 100
+
+    assert CubDB.select(db) == {:ok, [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6]}
+    refute CubDB.current_db_file(db) == original_file
+  end
+
   test "compact/1 returns :ok, or {:error, :pending_compaction} if already compacting", %{
     tmp_dir: tmp_dir
   } do
@@ -563,6 +583,9 @@ defmodule CubDBTest do
 
     assert {:error, :pending_compaction} = CubDB.compact(db)
     refute_received :compaction_started
+
+    assert_receive :compaction_completed, 200
+    assert :ok = CubDB.compact(db)
   end
 
   test "compact/1 postpones clean-up when old file is still referenced", %{tmp_dir: tmp_dir} do
@@ -731,5 +754,58 @@ defmodule CubDBTest do
     CubDB.compact(db)
     assert_receive :compaction_completed
     assert Process.alive?(db)
+  end
+
+  test "clear/1 deletes all entries", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
+
+    :ok = CubDB.clear(db)
+
+    assert CubDB.size(db) == 0
+
+    for key <- [:a, :b, :c] do
+      assert CubDB.has_key?(db, key) == false
+    end
+  end
+
+  test "clear/1 is persisted", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
+
+    :ok = CubDB.clear(db)
+
+    GenServer.stop(db)
+
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert CubDB.size(db) == 0
+
+    for key <- [:a, :b, :c] do
+      assert CubDB.has_key?(db, key) == false
+    end
+  end
+
+  test "clear/1 behaves well during compaction", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    CubDB.subscribe(db)
+
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
+    :ok = CubDB.compact(db)
+
+    assert_received :compaction_started
+
+    :ok = CubDB.clear(db)
+
+    assert_receive :compaction_completed, 1000
+    assert_receive :catch_up_completed, 1000
+
+    assert CubDB.size(db) == 0
+
+    for key <- [:a, :b, :c] do
+      assert CubDB.has_key?(db, key) == false
+    end
   end
 end

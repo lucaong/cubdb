@@ -23,7 +23,7 @@ defmodule CubDB.CatchUp do
 
   def run(caller, compacted_btree, original_btree, latest_btree) do
     compacted_btree = catch_up(compacted_btree, original_btree, latest_btree)
-    send(caller, {:catch_up, compacted_btree, latest_btree})
+    send(caller, {:catch_up, self(), compacted_btree, latest_btree})
   end
 
   defp catch_up(compacted_btree, original_btree, latest_btree) do
