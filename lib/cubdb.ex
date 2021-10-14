@@ -658,9 +658,8 @@ defmodule CubDB do
   manually.
 
   The operation respects all the guarantees of consistency of other concurrent
-  operations. For example, if a `select` operation started before the call to
-  `clear/1` and is running concurrently, the `select` will still see all the
-  entries.
+  operations. For example, if `select\2` was called before the call to `clear/1`
+  and is running concurrently, the `select\2` will still see all the entries.
 
   If a compaction is in progress when `clear/1` is called, the compaction is
   halted, and a new one started immediately after. The new compaction should be
