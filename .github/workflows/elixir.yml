@@ -43,7 +43,7 @@ jobs:
       run: mix deps.get
 
     - name: Check format
-      run: mix format --check-formatted lib/**/*.ex
+      run: mix format --check-formatted
 
     - name: Restore build Cache
       uses: actions/cache@v1

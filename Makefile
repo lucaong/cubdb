@@ -3,7 +3,7 @@ VERSION_TAG = v$(VERSION)
 
 .PHONY: test
 test:
-	mix format --check-formatted lib/**/*.ex
+	mix format --check-formatted
 	mix dialyzer
 	mix coveralls --include property_based
 
