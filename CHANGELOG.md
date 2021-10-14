@@ -6,6 +6,10 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
+## v1.1.0
+
+  - Add `clear/1` function to atomically delete all entries in the database
+
 ## v1.0.0
 
 ### Breaking changes from v0.17.0:
