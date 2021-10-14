@@ -74,7 +74,8 @@ defmodule CubDB.Mixfile do
 
   defp dialyzer do
     [
-      ignore_warnings: "dialyzer_ignore.exs"
+      ignore_warnings: "dialyzer_ignore.exs",
+      plt_core_path: "_build/#{Mix.env()}"
     ]
   end
 
