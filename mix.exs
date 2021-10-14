@@ -9,9 +9,9 @@ defmodule CubDB.Mixfile do
       app: :cubdb,
       version: @version,
       elixir: "~> 1.7",
-      build_embedded: Mix.env == :prod,
-      start_permanent: Mix.env == :prod,
-      elixirc_paths: elixirc_paths(Mix.env),
+      build_embedded: Mix.env() == :prod,
+      start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       package: package(),
       source_url: @source_url,
@@ -82,7 +82,7 @@ defmodule CubDB.Mixfile do
     [
       extras: [
         "CHANGELOG.md": [],
-        "LICENSE": [title: "License"],
+        LICENSE: [title: "License"],
         "README.md": [title: "Overview"],
         "FAQ.md": [],
         "HOWTO.md": []
