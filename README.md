@@ -135,7 +135,7 @@ maintainers for the readable codebase and extensive documentation.
 
 ## Copyright and License
 
-Copyright (c) 2020 Luca Ongaro
+Copyright 2021 Luca Ongaro
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
