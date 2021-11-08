@@ -7,11 +7,10 @@ defmodule CubDB.Reader do
   # the Btree representing a snapshot of the database at the time the read
   # operation was invoked.
   #
-  # At the end of each read operation, a `{:check_out_reader, btree}` message is
-  # sent to the main `db` process. That allows the main process to keep track of
-  # which files are still referenced by readers, so that clean-up of old files
-  # after a compaction can be delayed until no more `Reader` processes reference
-  # them.
+  # The Reader processes are monitored by the main db process. That allows the
+  # main process to keep track of which files are still referenced by readers,
+  # so that clean-up of old files after a compaction can be delayed until no
+  # more `Reader` processes reference them.
 
   alias CubDB.Btree
 
