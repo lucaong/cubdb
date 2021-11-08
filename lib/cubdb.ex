@@ -719,6 +719,35 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_compact, setting}, :infinity)
   end
 
+  @spec halt_compaction(GenServer.server()) :: :ok | {:error, :no_compaction_running}
+
+  @doc """
+  Stops a running compaction.
+
+  If a compaction operation is running, it is halted, and the function returns
+  `:ok`. Otherwise it returns `{:error, :no_compaction_running}`. If a new
+  compaction is started (manually or automatically), it will start from scratch,
+  the halted compaction is completely discarded.
+
+  This function can be useful if one wants to make sure that no compaction
+  operation is running in a certain moment, for example to perform some
+  write-intensive workload without incurring in additional load. In this case
+  one can pause auto compaction, and call `halt_compaction/1` to stop any
+  running compaction.
+  """
+  def halt_compaction(db) do
+    GenServer.call(db, :halt_compaction, :infinity)
+  end
+
+  @spec compacting?(GenServer.server()) :: boolean
+
+  @doc """
+  Returns true if a compaction operation is currently running, false otherwise.
+  """
+  def compacting?(db) do
+    GenServer.call(db, :compacting?, :infinity)
+  end
+
   @spec file_sync(GenServer.server()) :: :ok
 
   @doc """
@@ -951,7 +980,7 @@ defmodule CubDB do
     state = %State{state | btree: btree}
 
     if compaction_running?(state) do
-      state = halt_compaction(state)
+      state = do_halt_compaction(state)
       {:ok, compactor} = trigger_compaction(state)
       {:reply, :ok, %State{state | compactor: compactor}}
     else
@@ -997,6 +1026,19 @@ defmodule CubDB do
     %Btree{store: store} = btree
     %Store.File{file_path: file_path} = store
     {:reply, file_path, state}
+  end
+
+  def handle_call(:halt_compaction, _, state) do
+    if compaction_running?(state) do
+      state = state |> do_halt_compaction() |> trigger_clean_up()
+      {:reply, :ok, state}
+    else
+      {:reply, {:error, :no_compaction_running}, state}
+    end
+  end
+
+  def handle_call(:compacting?, _, state) do
+    {:reply, compaction_running?(state), state}
   end
 
   def handle_info(
@@ -1205,11 +1247,11 @@ defmodule CubDB do
 
   defp compaction_running?(_), do: true
 
-  @spec halt_compaction(%State{}) :: %State{}
+  @spec do_halt_compaction(%State{}) :: %State{}
 
-  defp halt_compaction(state = %State{compactor: nil, catch_up: nil}), do: state
+  defp do_halt_compaction(state = %State{compactor: nil, catch_up: nil}), do: state
 
-  defp halt_compaction(state = %State{compactor: pid1, catch_up: pid2}) do
+  defp do_halt_compaction(state = %State{compactor: pid1, catch_up: pid2}) do
     if pid1 != nil, do: Process.exit(pid1, :halt)
     if pid2 != nil, do: Process.exit(pid2, :halt)
     %State{state | compactor: nil, catch_up: nil}
