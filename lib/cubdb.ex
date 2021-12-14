@@ -21,7 +21,7 @@ defmodule CubDB do
 
   To ensure consistency, performance, and robustness to data corruption, `CubDB`
   database file uses an append-only, immutable B-tree data structure. Entries
-  are never changed in-place, and read operations are performend on immutable
+  are never changed in-place, and read operations are performed on immutable
   snapshots.
 
   More information can be found in the following sections:
