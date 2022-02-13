@@ -2,7 +2,7 @@ defmodule CubDB.Store.CleanUpTest do
   use ExUnit.Case, async: true
 
   alias CubDB.Btree
-  alias CubDB.CleanUp
+  alias CubDB.Store.File.CleanUp
   alias CubDB.Store
 
   setup do
