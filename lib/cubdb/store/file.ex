@@ -32,7 +32,7 @@ defmodule CubDB.Store.File do
 
   defp init(file_path) do
     ensure_exclusive_access!(file_path)
-    {:ok, file} = :file.open(file_path, [:read, :append, :raw, :binary])
+    {:ok, file} = :file.open(file_path, [:read, :append, :raw, :binary, :delayed_write])
     {:ok, pos} = :file.position(file, :eof)
 
     {file, pos}
@@ -49,6 +49,45 @@ end
 defimpl CubDB.Store, for: CubDB.Store.File do
   alias CubDB.Store
   alias CubDB.Store.File.Blocks
+  alias CubDB.Store.File.CleanUp
+
+  @compaction_file_extension ".compact"
+
+  def identifier(%Store.File{file_path: file_path}) do
+    file_path
+  end
+
+  def clean_up(_store, cpid, btree) do
+    CleanUp.clean_up(cpid, btree)
+  end
+
+  def clean_up_old_compaction_files(store, pid) do
+    CleanUp.clean_up_old_compaction_files(pid, store)
+  end
+
+  def start_cleanup(%Store.File{file_path: file_path}) do
+    data_dir = Path.dirname(file_path)
+
+    CleanUp.start_link(data_dir)
+  end
+
+  def next_compaction_store(%Store.File{file_path: file_path}) do
+    data_dir = Path.dirname(file_path)
+
+    with {:ok, file_names} <- File.ls(data_dir) do
+      new_filename =
+        file_names
+        |> Enum.filter(&CubDB.cubdb_file?/1)
+        |> Enum.map(&CubDB.file_name_to_n/1)
+        |> Enum.sort()
+        |> List.last()
+        |> (&(&1 + 1)).()
+        |> Integer.to_string(16)
+        |> (&(&1 <> @compaction_file_extension)).()
+
+      Store.File.create(Path.join(data_dir, new_filename))
+    end
+  end
 
   def put_node(%Store.File{pid: pid}, node) do
     Agent.get_and_update(

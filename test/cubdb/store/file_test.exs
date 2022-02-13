@@ -30,6 +30,7 @@ defmodule CubDB.Store.FileTest do
     CubDB.Store.put_header(store, good_header)
 
     CubDB.Store.put_header(store, {0, 0, 0})
+    CubDB.Store.sync(store)
 
     # corrupt the last header
     {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])
@@ -46,6 +47,7 @@ defmodule CubDB.Store.FileTest do
     CubDB.Store.put_header(store, good_header)
 
     CubDB.Store.put_header(store, {0, 0, 0})
+    CubDB.Store.sync(store)
 
     # truncate the last header
     {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])

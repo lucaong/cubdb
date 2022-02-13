@@ -23,6 +23,26 @@ end
 defimpl CubDB.Store, for: CubDB.Store.TestStore do
   alias CubDB.Store.TestStore
 
+  def identifier(%TestStore{agent: pid}) do
+    "#{pid}"
+  end
+
+  def clean_up(_store, cpid, btree) do
+    :ok
+  end
+
+  def clean_up_old_compaction_files(store, pid) do
+    :ok
+  end
+
+  def start_cleanup(%TestStore{}) do
+    {:ok, nil}
+  end
+
+  def next_compaction_store(%TestStore{}) do
+    Store.TestStore.create()
+  end
+
   def put_node(%TestStore{agent: agent}, node) do
     Agent.get_and_update(
       agent,

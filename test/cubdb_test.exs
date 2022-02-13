@@ -701,7 +701,7 @@ defmodule CubDBTest do
   test "data_dir/1 returns the path to the data directory", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     tmp_dir_string = to_string(tmp_dir)
-    assert ^tmp_dir_string = CubDB.data_dir(db)
+    assert ^tmp_dir_string = to_string(CubDB.data_dir(db))
   end
 
   test "current_db_file/1 returns the path to the current database file", %{tmp_dir: tmp_dir} do

@@ -28,7 +28,7 @@ defmodule CubDB.Btree do
   @type val :: CubDB.value()
   @type btree_size :: non_neg_integer
   @type dirt :: non_neg_integer
-  @type location :: non_neg_integer
+  @type location :: any
   @type capacity :: pos_integer
   @type child_pointer :: {key, location}
   @type leaf_node :: record(:leaf, children: [child_pointer])
