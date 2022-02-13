@@ -1,4 +1,4 @@
-defmodule CubDB.CleanUp do
+defmodule CubDB.Store.File.CleanUp do
   @moduledoc false
 
   # The `CubDB.CleanUp` module takes care of cleaning up obsolete files, like

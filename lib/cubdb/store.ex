@@ -7,6 +7,21 @@ defprotocol CubDB.Store do
 
   alias CubDB.Btree
 
+  @spec identifier(t) :: String.t()
+  def identifier(store)
+
+  @spec next_compaction_store(t) :: t
+  def next_compaction_store(store)
+
+  @spec start_cleanup(t) :: {:ok, pid} | {:error, String.t()}
+  def start_cleanup(t)
+
+  @spec clean_up_old_compaction_files(t, pid) :: :ok | {:error, String.t()}
+  def clean_up_old_compaction_files(t, cleanup)
+
+  @spec clean_up(t, pid, Btree.btree_node()) :: :ok | {:error, String.t()}
+  def clean_up(t, cleanup, btree)
+
   @spec put_node(t, Btree.btree_node()) :: Btree.location()
   def put_node(store, node)
 

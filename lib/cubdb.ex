@@ -126,7 +126,6 @@ defmodule CubDB do
 
   alias CubDB.Btree
   alias CubDB.CatchUp
-  alias CubDB.CleanUp
   alias CubDB.Compactor
   alias CubDB.Reader
   alias CubDB.Store
@@ -410,12 +409,20 @@ defmodule CubDB do
         reduce: fn n, sum -> sum + n end # reduce to the sum of selected values
       )
   """
+
   def select(db, options \\ []) when is_list(options) do
     timeout = Keyword.get(options, :timeout, :infinity)
     perform_read(db, {:select, options}, timeout)
   end
 
   @spec size(GenServer.server()) :: pos_integer
+
+  @doc """
+  Returns the root location of the current store.
+  """
+  def root_loc(db) do
+    GenServer.call(db, :root_loc, :infinity)
+  end
 
   @doc """
   Returns the number of entries present in the database.
@@ -835,23 +842,43 @@ defmodule CubDB do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, true))
     auto_file_sync = Keyword.get(options, :auto_file_sync, true)
 
-    with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
-         {:ok, store} <-
-           Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
-         {:ok, clean_up} <- CleanUp.start_link(data_dir),
-         {:ok, task_supervisor} <- Task.Supervisor.start_link() do
-      {:ok,
-       %State{
-         btree: Btree.new(store),
-         task_supervisor: task_supervisor,
-         data_dir: data_dir,
-         clean_up: clean_up,
-         auto_compact: auto_compact,
-         auto_file_sync: auto_file_sync
-       }}
-    else
-      {:error, reason} ->
-        {:stop, reason}
+    case data_dir do
+      store when is_map(store) ->
+        with {:ok, clean_up} <- Store.start_cleanup(store),
+             {:ok, task_supervisor} <- Task.Supervisor.start_link() do
+          {:ok,
+           %State{
+             btree: Btree.new(store),
+             task_supervisor: task_supervisor,
+             data_dir: data_dir,
+             clean_up: clean_up,
+             auto_compact: auto_compact,
+             auto_file_sync: auto_file_sync
+           }}
+        else
+          {:error, reason} ->
+            {:stop, reason}
+        end
+
+      _ ->
+        with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
+             {:ok, store} <-
+               Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
+             {:ok, clean_up} <- Store.start_cleanup(store),
+             {:ok, task_supervisor} <- Task.Supervisor.start_link() do
+          {:ok,
+           %State{
+             btree: Btree.new(store),
+             task_supervisor: task_supervisor,
+             data_dir: data_dir,
+             clean_up: clean_up,
+             auto_compact: auto_compact,
+             auto_file_sync: auto_file_sync
+           }}
+        else
+          {:error, reason} ->
+            {:stop, reason}
+        end
     end
   end
 
@@ -873,8 +900,13 @@ defmodule CubDB do
         nil
       end
 
-    %Btree{store: %Store.File{file_path: file_path}} = btree
-    {:noreply, %State{state | readers: Map.put(readers, ref, {file_path, timer})}}
+    %Btree{store: store} = btree
+    {:noreply, %State{state | readers: Map.put(readers, ref, {Store.identifier(store), timer})}}
+  end
+
+  def handle_call(:root_loc, _, state = %State{btree: btree}) do
+    %Btree{root_loc: loc, store: store} = btree
+    {:reply, {Store.identifier(store), loc}, state}
   end
 
   def handle_call(:size, _, state = %State{btree: btree}) do
@@ -1115,12 +1147,14 @@ defmodule CubDB do
 
   @spec trigger_compaction(%State{}) :: {:ok, pid} | {:error, any}
 
-  defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
+  defp trigger_compaction(state = %State{btree: btree, clean_up: clean_up}) do
+    %Btree{store: store} = btree
+
     case compaction_running?(state) do
       false ->
         for pid <- state.subs, do: send(pid, :compaction_started)
-        {:ok, store} = new_compaction_store(data_dir)
-        CleanUp.clean_up_old_compaction_files(clean_up, store)
+        {:ok, store} = new_compaction_store(store)
+        Store.clean_up_old_compaction_files(store, clean_up)
 
         with result <-
                Task.Supervisor.start_child(state.task_supervisor, Compactor, :run, [
@@ -1181,22 +1215,10 @@ defmodule CubDB do
     Btree.new(store)
   end
 
-  @spec new_compaction_store(String.t()) :: {:ok, Store.t()} | {:error, any}
+  @spec new_compaction_store(Store.t()) :: {:ok, Store.t()} | {:error, any}
 
-  defp new_compaction_store(data_dir) do
-    with {:ok, file_names} <- File.ls(data_dir) do
-      new_filename =
-        file_names
-        |> Enum.filter(&cubdb_file?/1)
-        |> Enum.map(&file_name_to_n/1)
-        |> Enum.sort()
-        |> List.last()
-        |> (&(&1 + 1)).()
-        |> Integer.to_string(16)
-        |> (&(&1 <> @compaction_file_extension)).()
-
-      Store.File.create(Path.join(data_dir, new_filename))
-    end
+  defp new_compaction_store(store) do
+    Store.next_compaction_store(store)
   end
 
   @spec compaction_running?(%State{}) :: boolean
@@ -1236,11 +1258,13 @@ defmodule CubDB do
   @spec clean_up_now(%State{}) :: %State{}
 
   defp clean_up_now(state = %State{btree: btree, clean_up: clean_up}) do
+    %Btree{store: store} = btree
+
     for old_btree <- state.old_btrees do
       if Btree.alive?(old_btree), do: :ok = Btree.stop(old_btree)
     end
 
-    :ok = CleanUp.clean_up(clean_up, btree)
+    :ok = Store.clean_up(store, clean_up, btree)
     for pid <- state.subs, do: send(pid, :clean_up_started)
     %State{state | clean_up_pending: false, old_btrees: []}
   end
@@ -1319,26 +1343,13 @@ defmodule CubDB do
   defp split_options(data_dir_or_options) do
     case Keyword.pop(data_dir_or_options, :data_dir) do
       {nil, data_dir_or_options} ->
-        try do
-          {:ok, {to_string(data_dir_or_options), [], []}}
-        rescue
-          ArgumentError ->
-            {:error, "Options must include :data_dir"}
-
-          Protocol.UndefinedError ->
-            {:error, "data_dir must be a string (or implement String.Chars)"}
-        end
+        {:ok, {data_dir_or_options, [], []}}
 
       {data_dir, options} ->
         {gen_server_opts, opts} =
           Keyword.split(options, [:name, :timeout, :spawn_opt, :hibernate_after, :debug])
 
-        try do
-          {:ok, {to_string(data_dir), opts, gen_server_opts}}
-        rescue
-          Protocol.UndefinedError ->
-            {:error, "data_dir must be a string (or implement String.Chars)"}
-        end
+        {:ok, {data_dir, opts, gen_server_opts}}
     end
   end
 end
