@@ -660,7 +660,6 @@ defmodule CubDBTest do
   } do
     {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
-    CubDB.subscribe(db)
 
     assert :ok = CubDB.compact(db)
 
@@ -671,6 +670,40 @@ defmodule CubDBTest do
 
     Process.sleep(100)
     assert Process.alive?(db)
+  end
+
+  test "halt_compaction/1 returns {:error, :no_compaction_running} if no compaction is running",
+       %{
+         tmp_dir: tmp_dir
+       } do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+
+    assert {:error, :no_compaction_running} = CubDB.halt_compaction(db)
+  end
+
+  test "halt_compaction/1 stops running compactions and cleans up", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
+
+    CubDB.subscribe(db)
+
+    assert :ok = CubDB.compact(db)
+    assert :ok = CubDB.halt_compaction(db)
+    refute CubDB.compacting?(db)
+    assert_receive :clean_up_started
+  end
+
+  test "compacting?/1 returns true if a compaction is running, otherwise false", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
+
+    refute CubDB.compacting?(db)
+    assert :ok = CubDB.compact(db)
+    assert CubDB.compacting?(db)
   end
 
   test "auto_file_sync is true by default", %{tmp_dir: tmp_dir} do
