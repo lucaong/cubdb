@@ -156,6 +156,25 @@ defmodule CubDB do
           | {:reduce, fun | {any, fun}}
           | {:timeout, timeout}
 
+  defmodule Snapshot do
+    @moduledoc false
+
+    @type t :: %CubDB.Snapshot{
+            db: GenServer.server(),
+            btree: Btree.t(),
+            reader_ref: reference
+          }
+
+    @enforce_keys [:db, :btree, :reader_ref]
+    defstruct [
+      :db,
+      :btree,
+      :reader_ref
+    ]
+  end
+
+  @opaque snapshot :: %Snapshot{}
+
   defmodule State do
     @moduledoc false
 
@@ -276,7 +295,7 @@ defmodule CubDB do
     GenServer.stop(db, reason, timeout)
   end
 
-  @spec get(GenServer.server(), key, value) :: value
+  @spec get(GenServer.server() | snapshot, key, value) :: value
 
   @doc """
   Gets the value associated to `key` from the database.
@@ -285,10 +304,10 @@ defmodule CubDB do
   unless specified otherwise).
   """
   def get(db, key, default \\ nil) do
-    perform_read(db, {:get, key, default})
+    read_operation(db, {:get, key, default})
   end
 
-  @spec fetch(GenServer.server(), key) :: {:ok, value} | :error
+  @spec fetch(GenServer.server() | snapshot, key) :: {:ok, value} | :error
 
   @doc """
   Fetches the value for the given `key` in the database, or return `:error` if `key` is not present.
@@ -297,19 +316,19 @@ defmodule CubDB do
   returns `{:ok, value}`. If `key` is not found, it returns `:error`.
   """
   def fetch(db, key) do
-    perform_read(db, {:fetch, key})
+    read_operation(db, {:fetch, key})
   end
 
-  @spec has_key?(GenServer.server(), key) :: boolean
+  @spec has_key?(GenServer.server() | snapshot, key) :: boolean
 
   @doc """
   Returns whether an entry with the given `key` exists in the database.
   """
   def has_key?(db, key) do
-    perform_read(db, {:has_key?, key})
+    read_operation(db, {:has_key?, key})
   end
 
-  @spec select(GenServer.server(), [select_option]) ::
+  @spec select(GenServer.server() | snapshot, [select_option]) ::
           {:ok, any} | {:error, Exception.t()}
 
   @doc """
@@ -412,7 +431,7 @@ defmodule CubDB do
   """
   def select(db, options \\ []) when is_list(options) do
     timeout = Keyword.get(options, :timeout, :infinity)
-    perform_read(db, {:select, options}, timeout)
+    read_operation(db, {:select, options}, timeout)
   end
 
   @spec size(GenServer.server()) :: pos_integer
@@ -422,6 +441,108 @@ defmodule CubDB do
   """
   def size(db) do
     GenServer.call(db, :size, :infinity)
+  end
+
+  @spec snapshot(GenServer.server(), timeout) :: snapshot
+
+  @doc """
+  Get the current snapshot of the database.
+
+  A snapshot is an immutable representation of the state of the database at a
+  specific time.
+
+  Getting a snapshot is basically zero-cost: nothing needs to be copied or
+  written, apart from some small in-memory bookkeeping. The only cost of a
+  snapshot is that it delays cleanup of old files after compaction for as long
+  as it is in use. For this reason, a snapshot has a timeout, configurable as
+  the optional second argument of `snapshot/2` (defaulting to 5000, or 5
+  seconds, if not specified). After such timeout elapses, the snapshot cannot be
+  used anymore, and any pending cleanup is performed.
+
+  It is possible to pass `:infinity` as the timeout, but then one must manually
+  call `release_snapshot/1` to release the snapshot after use.
+
+  Alternatively, using `with_snapshot/1` is often a better alternative, as it
+  does not require to choose an arbitrary timeout, and also automatically
+  releases the snapshot after use.
+
+  After obtaining a snapshot, it is possible to read from it using the same
+  functions used to read from the live database, such as `get/3`, get_multi/2`,
+  `fetch/2`, `has_key?/2`.
+
+  ## Example
+
+      CubDB.put(db, :a, 123)
+      snap = CubDB.snapshot(db)
+
+      CubDB.put(db, :a, 0)
+
+      # Getting a value from the snapshot returns the value of the entry at the
+      # time the snapshot was obtained, even if the entry has changed in the
+      # meanwhile
+      CubDB.get(snap, :a)
+      # => 123
+
+      # Getting the same value from the database returns the latest value
+      CubDB.get(db, :a)
+      # => 0
+  """
+  def snapshot(db, timeout \\ 5000) do
+    GenServer.call(db, {:snapshot, timeout}, :infinity)
+  end
+
+  @spec release_snapshot(snapshot) :: :ok
+
+  @doc """
+  Releases a snapshot when it is not needed anymore, releasing related resources
+
+  This allows `CubDB` to perform cleanup operations after compaction that are
+  otherwise blocked by the snapshot. When creating a snapshot with a timeout, it
+  is not necessary to call `release_snapshot/1`, as it will be automatically
+  released after the timeout elapses. When getting a snapshot with a timeout of
+  `:infinity` though, one has to manually call `release_snapshot/1` once the
+  snapshot is not needed anymore.
+  """
+  def release_snapshot(snapshot = %Snapshot{db: db}) do
+    GenServer.call(db, {:release_snapshot, snapshot}, :infinity)
+  end
+
+  @spec with_snapshot(GenServer.server(), (snapshot -> any)) :: any
+
+  @doc """
+  Calls `fun` passing a snapshot, and automatically releases the snapshot when
+  the function returns
+
+  It returns the value returned by calling the function `fun`.
+
+  This is equivalent to obtaining a snapshot with `snapshot/2` and a timeout of
+  `:infinity`, performing the operations in the body of the function, then
+  manually releasing the snapshot with `release_snapshot/1`, but by using
+  `with_snapshot/2` one does not have to choose an arbitrary timeout value, or
+  remember to release the snapshot.
+
+  ## Example
+
+  Assume that we have two entries in the database, and the key of the second
+  entry depends on the value of the first (so the value of the first entry
+  "points" to the other entry). In this case, we might want to get both entries
+  from the same snapshot, to avoid inconsistencies. Here's how that can be done
+  with `with_snapshot/2`:
+
+      {x, y} = CubDB.with_snapshot(db, fn snap ->
+        x = CubDB.get(snap, :x)
+        y = CubDB.get(snap, x)
+        {x, y}
+      end)
+  """
+  def with_snapshot(db, fun) do
+    snap = CubDB.snapshot(db, :infinity)
+
+    try do
+      fun.(snap)
+    after
+      CubDB.release_snapshot(snap)
+    end
   end
 
   @spec dirt_factor(GenServer.server()) :: float
@@ -624,7 +745,7 @@ defmodule CubDB do
       # => %{a: 1, b: 2, c: nil}
   """
   def get_multi(db, keys) do
-    perform_read(db, {:get_multi, keys})
+    read_operation(db, {:get_multi, keys})
   end
 
   @spec put_multi(GenServer.server(), %{key => value} | [entry]) :: :ok
@@ -890,20 +1011,41 @@ defmodule CubDB do
   end
 
   def handle_call({:read, operation, timeout}, from, state) do
+    %State{btree: btree} = state
+    {:noreply, read(btree, operation, timeout, from, state)}
+  end
+
+  def handle_call({:read, operation, timeout, snapshot = %Snapshot{}}, from, state) do
+    %Snapshot{btree: btree, reader_ref: reader_ref} = snapshot
+    %State{readers: readers} = state
+
+    if reader_ref && Map.has_key?(readers, reader_ref) do
+      {:noreply, read(btree, operation, timeout, from, state)}
+    else
+      raise "Invalid or expired snapshot given"
+    end
+  end
+
+  def handle_call({:snapshot, ttl}, _, state) do
     %State{btree: btree, readers: readers} = state
-
-    {:ok, pid} = Task.start_link(Reader, :run, [btree, from, operation])
-    ref = Process.monitor(pid)
-
-    timer =
-      if timeout != :infinity do
-        Process.send_after(self(), {:reader_timeout, pid}, timeout)
-      else
-        nil
-      end
-
     %Btree{store: %Store.File{file_path: file_path}} = btree
-    {:noreply, %State{state | readers: Map.put(readers, ref, {file_path, timer})}}
+
+    ref = make_ref()
+    snapshot = %Snapshot{db: self(), btree: btree, reader_ref: ref}
+
+    case ttl do
+      :infinity ->
+        {:reply, snapshot, %State{state | readers: Map.put(readers, ref, {file_path, nil})}}
+
+      ttl when is_integer(ttl) ->
+        Process.send_after(self(), {:snapshot_timeout, ref}, ttl)
+        {:reply, snapshot, %State{state | readers: Map.put(readers, ref, {file_path, nil})}}
+    end
+  end
+
+  def handle_call({:release_snapshot, snapshot}, _, state) do
+    %Snapshot{reader_ref: ref} = snapshot
+    {:reply, :ok, checkout_reader(ref, state)}
   end
 
   def handle_call(:size, _, state = %State{btree: btree}) do
@@ -1066,6 +1208,10 @@ defmodule CubDB do
     {:noreply, state}
   end
 
+  def handle_info({:snapshot_timeout, ref}, state) do
+    {:noreply, checkout_reader(ref, state)}
+  end
+
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state = %State{compactor: pid}) do
     {:noreply, %State{state | compactor: nil}}
   end
@@ -1074,27 +1220,61 @@ defmodule CubDB do
     {:noreply, %State{state | catch_up: nil}}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, state = %State{readers: readers}) do
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
     # Process _might_ be a reader, so we remove it from the readers
+    {:noreply, checkout_reader(ref, state)}
+  end
+
+  @spec checkout_reader(reference, State.t()) :: State.t()
+
+  defp checkout_reader(ref, state) do
+    %State{readers: readers} = state
+
     case Map.pop(readers, ref) do
       {nil, _readers} ->
-        {:noreply, state}
+        state
 
       {{_, timer}, readers} ->
         if timer != nil, do: Process.cancel_timer(timer, async: true, info: false)
 
         if state.clean_up_pending == true do
-          {:noreply, trigger_clean_up(%State{state | readers: readers})}
+          trigger_clean_up(%State{state | readers: readers})
         else
-          {:noreply, %State{state | readers: readers}}
+          %State{state | readers: readers}
         end
     end
   end
 
-  @spec perform_read(GenServer.server(), Reader.operation(), timeout) :: any
+  @spec read_operation(GenServer.server() | snapshot, Reader.operation(), timeout) :: any
 
-  defp perform_read(db, operation, timeout \\ :infinity) do
+  defp read_operation(db_or_snapshot, operation),
+    do: read_operation(db_or_snapshot, operation, :infinity)
+
+  defp read_operation(db, operation, timeout) when is_pid(db) do
     GenServer.call(db, {:read, operation, timeout}, timeout)
+  end
+
+  defp read_operation(snapshot = %Snapshot{db: db}, operation, timeout) do
+    GenServer.call(db, {:read, operation, timeout, snapshot}, timeout)
+  end
+
+  @spec read(Btree.t(), Reader.operation(), timeout, GenServer.server(), State.t()) :: State.t()
+
+  defp read(btree, operation, timeout, from, state) do
+    %State{readers: readers} = state
+
+    {:ok, pid} = Task.start_link(Reader, :run, [btree, from, operation])
+    ref = Process.monitor(pid)
+
+    timer =
+      if timeout != :infinity do
+        Process.send_after(self(), {:reader_timeout, pid}, timeout)
+      else
+        nil
+      end
+
+    %Btree{store: %Store.File{file_path: file_path}} = btree
+    %State{state | readers: Map.put(readers, ref, {file_path, timer})}
   end
 
   @spec do_put_and_delete_multi(State.t(), [entry], [key]) :: State.t()
