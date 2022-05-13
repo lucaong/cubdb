@@ -865,6 +865,60 @@ defmodule CubDBTest do
     assert :ok = CubDB.file_sync(db)
   end
 
+  describe "back_up/2" do
+    setup do
+      {backup_dir, 0} = System.cmd("mktemp", ["-d"])
+      backup_dir = String.trim(backup_dir)
+
+      on_exit(fn ->
+        File.rm_rf!(backup_dir)
+      end)
+
+      {:ok, backup_dir: backup_dir}
+    end
+
+    test "returns error tuple if the target directory already exists", %{
+      tmp_dir: tmp_dir,
+      backup_dir: backup_dir
+    } do
+      {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+      assert {:error, :eexist} = CubDB.back_up(db, backup_dir)
+    end
+
+    test "creates a backup of the current state of the database", %{
+      tmp_dir: tmp_dir,
+      backup_dir: backup_dir
+    } do
+      File.rm_rf!(backup_dir)
+      {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+      :ok = CubDB.put_multi(db, foo: 1, bar: 2, baz: 3)
+
+      assert :ok = CubDB.back_up(db, backup_dir)
+
+      {:ok, copy} = CubDB.start_link(data_dir: backup_dir)
+
+      assert CubDB.select(db) == CubDB.select(copy)
+    end
+
+    test "creates a backup of the given snapshot", %{tmp_dir: tmp_dir, backup_dir: backup_dir} do
+      File.rm_rf!(backup_dir)
+      {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+      :ok = CubDB.put_multi(db, foo: 1, bar: 2, baz: 3)
+
+      snap = CubDB.snapshot(db, :infinity)
+      :ok = CubDB.put_multi(db, foo: 0, qux: 4)
+
+      assert :ok = CubDB.back_up(snap, backup_dir)
+
+      {:ok, copy} = CubDB.start_link(data_dir: backup_dir)
+
+      assert CubDB.select(snap) == CubDB.select(copy)
+
+      CubDB.release_snapshot(snap)
+    end
+  end
+
   test "data_dir/1 returns the path to the data directory", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     tmp_dir_string = to_string(tmp_dir)
