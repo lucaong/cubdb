@@ -278,7 +278,8 @@ defmodule CubDBTest do
       assert_receive :clean_up_started, timeout
     end
 
-    test "read operations extend the validity of the snapshot until the end of the read operation", %{tmp_dir: tmp_dir} do
+    test "read operations extend the validity of the snapshot until the end of the read operation",
+         %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir)
       CubDB.subscribe(db)
 
@@ -287,12 +288,15 @@ defmodule CubDBTest do
       snap = CubDB.snapshot(db, 50)
       :ok = CubDB.compact(db)
 
-      {:ok, result} = CubDB.select(snap, pipe: [
-        map: fn x ->
-          Process.sleep(20)
-          x
-        end
-      ])
+      {:ok, result} =
+        CubDB.select(snap,
+          pipe: [
+            map: fn x ->
+              Process.sleep(20)
+              x
+            end
+          ]
+        )
 
       assert result == [a: 1, b: 2, c: 3, d: 4, e: 5]
       assert_receive :clean_up_started, 1000
