@@ -485,7 +485,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec size(snapshot | GenServer.server()) :: pos_integer
+  @spec size(GenServer.server() | snapshot) :: pos_integer
 
   @doc """
   Returns the number of entries present in the database or snapshot.
@@ -1016,6 +1016,43 @@ defmodule CubDB do
 
   def current_db_file(db) do
     GenServer.call(db, :current_db_file, :infinity)
+  end
+
+  @spec back_up(GenServer.server() | snapshot, Path.t()) :: :ok | {:error, term}
+
+  @doc """
+  Creates a backup of the database or snapshot into the target directory path
+
+  The directory is created upon calling `back_up/2`, and an error tuple is
+  returned if it already exists.
+
+  The function will block until the backup is completed, then return :ok. The
+  backup does not block other readers or writers, and reflects the database
+  state at the time it was started, without any later write.
+
+  After the backup completes successfully, it is possible to open it by starting
+  a `CubDB` process using the target path as its data directory.
+  """
+  def back_up(%Snapshot{} = snapshot, target_path) do
+    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
+      perform_back_up(btree, target_path)
+    end)
+  end
+
+  def back_up(db, target_path) do
+    with_snapshot(db, fn %Snapshot{btree: btree} ->
+      perform_back_up(btree, target_path)
+    end)
+  end
+
+  @spec perform_back_up(Btree.t(), Path.t()) :: :ok | {:error, term}
+
+  defp perform_back_up(btree, target_path) do
+    with :ok <- File.mkdir(target_path),
+         {:ok, store} <- Store.File.create(Path.join(target_path, "0#{@db_file_extension}")) do
+      Btree.load(btree, store) |> Btree.sync()
+      Store.close(store)
+    end
   end
 
   @spec cubdb_file?(String.t()) :: boolean

@@ -64,17 +64,14 @@ smaller than `{:bcd, :123}`.
 
 ## Save and restore a backup
 
-`CubDB` stores its data in a single file with extension `.cub`, inside the
-configured data directory. The filename is a hexadecimal value (containing only
-lowercase letters from `a` to `f` and digits) and gets incremented by one upon
-each compaction. Backing up a database is as simple as copying its current data
-file (that can be found by calling `CubDB.current_db_file/1`). Note that, during
-a compaction, a file with extension `.compact` is also created: you don't need
-to copy that file for your backup, as the `.cub` file already contains all data.
+Use the `CubDB.back_up/2` function to create a backup of the current state of
+the database. Once the backup is completed, it can be opened by starting a new
+`CubDB` process using the target directory of the backup as its data directory:
 
-To recover from a saved backup, it is sufficient to copy the backed-up `.cub`
-file to a directory and start `CubDB` on that data directory. Make sure that no
-other `.cub` file is present in the same directory, and that the filename is a
-valid hexadecimal number: should more than one `.cub` files be present in the
-same data directory, the one with the greatest hexadecimal value is used, and
-the others are deleted upon the next compaction.
+```elixir
+# Backup the current state of the database
+:ok = CubDB.back_up(db, "some/target/path")
+
+# Open the backup as another CubDB process
+{:ok, copy} = CubDB.start_link(data_dir: "some/target/path")
+```

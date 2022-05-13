@@ -17,6 +17,8 @@ reports changes here.
   - Add the possibility to get zero-cost snapshots of the database, and perform
     reads on them to ensure consistency of dependent reads. This is done via the
     functions `snapshot/2`, `with_snapshot/1` and `release_snapshot/1`
+  - Add `back_up/2` to produce a database backup. The backup process does not
+    block readers or writers, and is isolated from concurrent writes.
   - Add `halt_compaction/1` to stop any running compaction operation
   - Add `compacting?/1` to check if a compaction is currently running
 
