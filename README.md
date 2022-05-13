@@ -27,6 +27,8 @@ section](https://hexdocs.pm/cubdb/howto.html) for more information.
 
   - Concurrent read operations, that do not block nor are blocked by writes
 
+  - Zero cost snapshots
+
   - Unexpected shutdowns won't corrupt the database or break atomicity
 
   - Manual or automatic compaction to optimize space usage
@@ -108,6 +110,23 @@ CubDB.select(db,
   reduce: fn n, sum -> sum + n end
 )
 #=> {:ok, 18}
+```
+
+Zero cost snapshots are a useful feature when one needs to perform several reads
+or selects, ensuring isolation from concurrent writes, but without blocking
+writers. This is useful, for example, when reading imultiple keys depending on
+each other. Snapshots come at no cost: nothing is actually copied or written on
+disk or in memory, apart from some small bookkeeping:
+
+```elixir
+# the key of y depends on the value of x, so we ensure consistency by getting
+# them from the same snapshot, isolating from the effects of concurrent writes
+{x, y} = CubDB.with_snapshot(db, fn snap ->
+  x = CubDB.get(snap, :x)
+  y = CubDB.get(snap, x)
+
+  {x, y}
+end)
 ```
 
 For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.html).

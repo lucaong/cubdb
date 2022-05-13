@@ -6,7 +6,7 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
-## next
+## v2.0.0 (unreleased)
 
   - [breaking] Remove the `:timeout` option on `select/2`. This is part of a
     refactoring and improvement that moves read operations from an

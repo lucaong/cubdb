@@ -108,6 +108,22 @@ defmodule CubDB do
       )
       #=> {:ok, 18}
 
+
+  Zero cost snapshots are a useful feature when one needs to perform several reads
+  or selects, ensuring isolation from concurrent writes, but without blocking
+  writers. This is useful, for example, when reading imultiple keys depending on
+  each other. Snapshots come at no cost: nothing is actually copied or written on
+  disk or in memory, apart from some small bookkeeping:
+
+      # the key of y depends on the value of x, so we ensure consistency by getting
+      # them from the same snapshot, isolating from the effects of concurrent writes
+      {x, y} = CubDB.with_snapshot(db, fn snap ->
+        x = CubDB.get(snap, :x)
+        y = CubDB.get(snap, x)
+
+        {x, y}
+      end)
+
   Because `CubDB` uses an immutable data structure, write operations cause the
   data file to grow. When necessary, `CubDB` runs a compaction operation to
   optimize the file size and reclaim disk space. Compaction runs in the
