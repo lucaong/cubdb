@@ -5,27 +5,6 @@ defmodule CubDB.Store.ReaderTest do
   alias CubDB.Reader
   alias CubDB.Store
 
-  defmodule TestCaller do
-    use GenServer
-
-    def start_link do
-      GenServer.start_link(__MODULE__, [], [])
-    end
-
-    def run(pid, btree, operation) do
-      GenServer.call(pid, {:run, btree, operation})
-    end
-
-    def init(_) do
-      {:ok, nil}
-    end
-
-    def handle_call({:run, btree, operation}, from, state) do
-      Reader.run(btree, from, operation)
-      {:noreply, state}
-    end
-  end
-
   setup do
     {:ok, store} = Store.TestStore.create()
 
@@ -126,10 +105,5 @@ defmodule CubDB.Store.ReaderTest do
 
   test "perform/2 performs :select with invalid :pipe", %{btree: btree} do
     assert {:error, _} = Reader.perform(btree, {:select, pipe: [xxx: 123]})
-  end
-
-  test "run/3 performs the read and replies to the caller GenServer", %{btree: btree} do
-    {:ok, pid} = TestCaller.start_link()
-    assert {:ok, [c: 3, d: 4]} = TestCaller.run(pid, btree, {:select, pipe: [take: 4, drop: 2]})
   end
 end
