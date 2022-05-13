@@ -322,9 +322,10 @@ defmodule CubDB do
     get(db_or_snapshot, key, nil)
   end
 
-  def get(%Snapshot{btree: btree} = snapshot, key, default) do
-    validate_snapshot!(snapshot)
-    Reader.perform(btree, {:get, key, default})
+  def get(%Snapshot{} = snapshot, key, default) do
+    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
+      Reader.perform(btree, {:get, key, default})
+    end)
   end
 
   def get(db, key, default) do
@@ -342,9 +343,10 @@ defmodule CubDB do
   If the database contains an entry with the given `key` and value `value`, it
   returns `{:ok, value}`. If `key` is not found, it returns `:error`.
   """
-  def fetch(%Snapshot{btree: btree} = snapshot, key) do
-    validate_snapshot!(snapshot)
-    Reader.perform(btree, {:fetch, key})
+  def fetch(%Snapshot{} = snapshot, key) do
+    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
+      Reader.perform(btree, {:fetch, key})
+    end)
   end
 
   def fetch(db, key) do
@@ -359,9 +361,10 @@ defmodule CubDB do
   Returns whether an entry with the given `key` exists in the database or
   snapshot.
   """
-  def has_key?(%Snapshot{btree: btree} = snapshot, key) do
-    validate_snapshot!(snapshot)
-    Reader.perform(btree, {:has_key?, key})
+  def has_key?(%Snapshot{} = snapshot, key) do
+    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
+      Reader.perform(btree, {:has_key?, key})
+    end)
   end
 
   def has_key?(db, key) do
@@ -470,9 +473,10 @@ defmodule CubDB do
   """
   def select(db_or_snapshot), do: select(db_or_snapshot, [])
 
-  def select(%Snapshot{btree: btree} = snapshot, options) when is_list(options) do
-    validate_snapshot!(snapshot)
-    Reader.perform(btree, {:select, options})
+  def select(%Snapshot{} = snapshot, options) when is_list(options) do
+    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
+      Reader.perform(btree, {:select, options})
+    end)
   end
 
   def select(db, options) when is_list(options) do
@@ -486,9 +490,10 @@ defmodule CubDB do
   @doc """
   Returns the number of entries present in the database or snapshot.
   """
-  def size(%Snapshot{btree: btree} = snapshot) do
-    validate_snapshot!(snapshot)
-    Enum.count(btree)
+  def size(%Snapshot{} = snapshot) do
+    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
+      Enum.count(btree)
+    end)
   end
 
   def size(db) do
@@ -800,9 +805,10 @@ defmodule CubDB do
       CubDB.get_multi(db, [:a, :b, :c, :x])
       # => %{a: 1, b: 2, c: nil}
   """
-  def get_multi(%Snapshot{btree: btree} = snapshot, keys) do
-    validate_snapshot!(snapshot)
-    Reader.perform(btree, {:get_multi, keys})
+  def get_multi(%Snapshot{} = snapshot, keys) do
+    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
+      Reader.perform(btree, {:get_multi, keys})
+    end)
   end
 
   def get_multi(db, keys) do
@@ -1041,11 +1047,19 @@ defmodule CubDB do
     String.to_integer(base_name, 16)
   end
 
-  @spec validate_snapshot!(snapshot) :: nil
+  @spec extend_snapshot(snapshot, (snapshot -> result)) :: result when result: term
 
-  defp validate_snapshot!(snapshot = %Snapshot{db: db}) do
-    unless GenServer.call(db, {:snapshot_valid?, snapshot}, :infinity) do
-      raise "Attempt to use CubDB snapshot after it was released or it timed out"
+  defp extend_snapshot(snapshot = %Snapshot{db: db}, fun) do
+    case GenServer.call(db, {:extend_snapshot, snapshot}, :infinity) do
+      {:ok, snap} ->
+        try do
+          fun.(snap)
+        after
+          CubDB.release_snapshot(snap)
+        end
+
+      _ ->
+        raise "Attempt to use CubDB snapshot after it was released or it timed out"
     end
   end
 
@@ -1103,11 +1117,18 @@ defmodule CubDB do
     {:reply, :ok, checkout_reader(ref, state)}
   end
 
-  def handle_call({:snapshot_valid?, snapshot}, _, state) do
-    %Snapshot{reader_ref: ref} = snapshot
+  def handle_call({:extend_snapshot, snapshot}, _, state) do
+    %Snapshot{reader_ref: ref, btree: btree} = snapshot
+    %Btree{store: %Store.File{file_path: file_path}} = btree
     %State{readers: readers} = state
 
-    {:reply, Map.has_key?(readers, ref), state}
+    if Map.has_key?(readers, ref) do
+      new_ref = make_ref()
+      snapshot = %Snapshot{db: self(), btree: btree, reader_ref: new_ref}
+      {:reply, {:ok, snapshot}, %State{state | readers: Map.put(readers, new_ref, file_path)}}
+    else
+      {:reply, {:error, :invalid}, state}
+    end
   end
 
   def handle_call(:dirt_factor, _, state = %State{btree: btree}) do
