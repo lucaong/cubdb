@@ -6,6 +6,20 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
+## next
+
+  - [breaking] Remove the `:timeout` option on `select/2`. This is part of a
+    refactoring and improvement that moves read operations from an
+    internally spawned Task to the client process. This makes the `:timeout`
+    option unnecessary, because the user now has complete control: by stopping
+    the process calling `CubDB`, any running read operation by that process is
+    stopped.
+  - Add the possibility to get zero-cost snapshots of the database, and perform
+    reads on them to ensure consistency of dependent reads. This is done via the
+    functions `snapshot/2`, `with_snapshot/1` and `release_snapshot/1`
+  - Add `halt_compaction/1` to stop any running compaction operation
+  - Add `compacting?/1` to check if a compaction is currently running
+
 ## v1.1.0 (2021-10-14)
 
   - Add `clear/1` function to atomically delete all entries in the database

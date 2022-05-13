@@ -2,15 +2,8 @@ defmodule CubDB.Reader do
   @moduledoc false
 
   # The `CubDB.Reader` module performs all read operations that involve access
-  # to the store. Each read operation is ran in its own process, as a `Task`, so
-  # that read operations can run concurrently. Read operations are performed on
-  # the Btree representing a snapshot of the database at the time the read
-  # operation was invoked.
-  #
-  # The Reader processes are monitored by the main db process. That allows the
-  # main process to keep track of which files are still referenced by readers,
-  # so that clean-up of old files after a compaction can be delayed until no
-  # more `Reader` processes reference them.
+  # to the store. Read operations are performed on the Btree representing a
+  # snapshot of the database at the time the read operation was invoked.
 
   alias CubDB.Btree
 
@@ -20,12 +13,6 @@ defmodule CubDB.Reader do
           | {:fetch, CubDB.key()}
           | {:has_key?, CubDB.key()}
           | {:select, Keyword.t()}
-
-  @spec run(Btree.t(), GenServer.from(), operation) :: :ok
-
-  def run(btree, caller, operation) do
-    GenServer.reply(caller, perform(btree, operation))
-  end
 
   @spec perform(Btree.t(), operation) :: any
 

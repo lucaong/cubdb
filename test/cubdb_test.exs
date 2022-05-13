@@ -184,7 +184,7 @@ defmodule CubDBTest do
   end
 
   describe "snapshot" do
-    test "get, get_multi, fetch, has_key? work as expected", %{tmp_dir: tmp_dir} do
+    test "get, get_multi, fetch, has_key?, size work as expected", %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir)
       CubDB.put(db, :a, 1)
       CubDB.put(db, :c, 3)
@@ -204,8 +204,48 @@ defmodule CubDBTest do
       assert CubDB.has_key?(snap, :a)
       refute CubDB.has_key?(snap, :b)
 
+      assert 2 = CubDB.size(snap)
+
       assert 2 = CubDB.get(db, :a)
       assert 3 = CubDB.get(db, :b)
+      assert 3 = CubDB.size(db)
+    end
+
+    test "cannot be used after release", %{tmp_dir: tmp_dir} do
+      {:ok, db} = CubDB.start_link(tmp_dir)
+
+      snap = CubDB.snapshot(db)
+      CubDB.release_snapshot(snap)
+
+      assert_raise RuntimeError,
+                   "Attempt to use CubDB snapshot after it was released or it timed out",
+                   fn ->
+                     CubDB.get(snap, :a)
+                   end
+
+      assert_raise RuntimeError,
+                   "Attempt to use CubDB snapshot after it was released or it timed out",
+                   fn ->
+                     CubDB.get_multi(snap, [:a, :b])
+                   end
+
+      assert_raise RuntimeError,
+                   "Attempt to use CubDB snapshot after it was released or it timed out",
+                   fn ->
+                     CubDB.fetch(snap, :a)
+                   end
+
+      assert_raise RuntimeError,
+                   "Attempt to use CubDB snapshot after it was released or it timed out",
+                   fn ->
+                     CubDB.has_key?(snap, :a)
+                   end
+
+      assert_raise RuntimeError,
+                   "Attempt to use CubDB snapshot after it was released or it timed out",
+                   fn ->
+                     CubDB.size(snap)
+                   end
     end
 
     test "blocks clean up until released", %{tmp_dir: tmp_dir} do
@@ -678,11 +718,17 @@ defmodule CubDBTest do
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
     CubDB.subscribe(db)
 
+    # Get snapshot to prevent compaction to complete
+    snap = CubDB.snapshot(db, :infinity)
+
     assert :ok = CubDB.compact(db)
     assert_received :compaction_started
 
     assert {:error, :pending_compaction} = CubDB.compact(db)
     refute_received :compaction_started
+
+    # Release snapshot to allow compaction to complete
+    CubDB.release_snapshot(snap)
 
     assert_receive :compaction_completed, 200
     assert :ok = CubDB.compact(db)
@@ -732,29 +778,6 @@ defmodule CubDBTest do
     assert_receive :clean_up_started
   end
 
-  test "compact/1 cleans up if a reader timeout elapses", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir)
-    CubDB.put(db, :foo, 123)
-    CubDB.subscribe(db)
-
-    assert {:timeout, _} =
-             catch_exit(
-               CubDB.select(db,
-                 timeout: 20,
-                 reduce:
-                   {nil,
-                    fn _, _ ->
-                      Process.sleep(3000)
-                    end}
-               )
-             )
-
-    :ok = CubDB.compact(db)
-
-    assert_received :compaction_started
-    assert_receive :clean_up_started
-  end
-
   test "compact/1 does not crash if compaction task crashes", %{
     tmp_dir: tmp_dir
   } do
@@ -800,10 +823,21 @@ defmodule CubDBTest do
   } do
     {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
+    CubDB.subscribe(db)
+
+    # Get snapshot to prevent compaction to complete
+    snap = CubDB.snapshot(db, :infinity)
 
     refute CubDB.compacting?(db)
     assert :ok = CubDB.compact(db)
     assert CubDB.compacting?(db)
+
+    # Release snapshot to allow compaction to complete
+    CubDB.release_snapshot(snap)
+
+    assert_receive :compaction_completed, 200
+
+    refute CubDB.compacting?(db)
   end
 
   test "auto_file_sync is true by default", %{tmp_dir: tmp_dir} do
