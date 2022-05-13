@@ -7,11 +7,7 @@ defmodule CubDBTest do
     tmp_dir = tmp_dir |> String.trim() |> String.to_charlist()
 
     on_exit(fn ->
-      with {:ok, files} <- File.ls(tmp_dir) do
-        for file <- files, do: File.rm(Path.join(tmp_dir, file))
-      end
-
-      :ok = File.rmdir(tmp_dir)
+      File.rm_rf!(tmp_dir)
     end)
 
     {:ok, tmp_dir: tmp_dir}
@@ -343,6 +339,14 @@ defmodule CubDBTest do
       assert_receive :catch_up_completed, 1000
       assert_receive :clean_up_started, 1000
     end
+
+    test "releasing a snapshot twice does not error", %{tmp_dir: tmp_dir} do
+      {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+      snap = CubDB.snapshot(db)
+
+      assert :ok = CubDB.release_snapshot(snap)
+      assert :ok = CubDB.release_snapshot(snap)
+    end
   end
 
   test "reads are concurrent", %{tmp_dir: tmp_dir} do
@@ -534,6 +538,73 @@ defmodule CubDBTest do
     assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
     assert ^state = :sys.get_state(db)
     assert 1 = CubDB.get(db, :a)
+  end
+
+  test "writes are serialized", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    entries = [
+      [a: 1, b: 2, c: 3],
+      [d: 4, e: 5, f: 6],
+      [g: 7, h: 8, i: 9],
+      [j: 10, k: 11, l: 12],
+      [m: 13, n: 14, o: 15]
+    ]
+
+    tasks =
+      Enum.map(entries, fn xs ->
+        Task.async(fn -> CubDB.put_multi(db, xs) end)
+      end)
+
+    for task <- tasks, do: Task.await(task)
+
+    {:ok, result} = CubDB.select(db)
+
+    assert result == List.flatten(entries)
+  end
+
+  test "write access is released even if a writer raises", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    assert_raise RuntimeError, "boom!", fn ->
+      CubDB.get_and_update(db, :a, fn _ ->
+        raise "boom!"
+      end)
+    end
+
+    assert :ok = CubDB.put(db, :a, 1)
+  end
+
+  test "readers are not blocked by a writer", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put(db, :a, 0)
+
+    Task.async(fn ->
+      CubDB.get_and_update(db, :a, fn a ->
+        receive do
+          :continue -> {a, a + 1}
+        end
+      end)
+    end)
+
+    assert 0 = CubDB.get(db, :a)
+  end
+
+  test "readers are not blocked by another reader", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put(db, :a, 0)
+
+    Task.async(fn ->
+      CubDB.select(db,
+        reduce: fn _, _ ->
+          receive do
+            :continue -> nil
+          end
+        end
+      )
+    end)
+
+    assert 0 = CubDB.get(db, :a)
   end
 
   test "get_and_update_multi/4 is persisted to disk", %{tmp_dir: tmp_dir} do

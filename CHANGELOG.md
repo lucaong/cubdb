@@ -21,6 +21,7 @@ reports changes here.
     block readers or writers, and is isolated from concurrent writes.
   - Add `halt_compaction/1` to stop any running compaction operation
   - Add `compacting?/1` to check if a compaction is currently running
+  - Improve concurrency of read operations while writing
 
 ## v1.1.0 (2021-10-14)
 
