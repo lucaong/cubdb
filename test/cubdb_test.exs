@@ -186,12 +186,10 @@ defmodule CubDBTest do
   describe "snapshot" do
     test "get, get_multi, fetch, has_key?, size work as expected", %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir)
-      CubDB.put(db, :a, 1)
-      CubDB.put(db, :c, 3)
+      CubDB.put_multi(db, a: 1, c: 3)
 
       snap = CubDB.snapshot(db)
-      :ok = CubDB.put(db, :a, 2)
-      :ok = CubDB.put(db, :b, 3)
+      :ok = CubDB.put_multi(db, a: 2, b: 3)
 
       assert 1 = CubDB.get(snap, :a)
       assert 0 = CubDB.get(snap, :b, 0)
@@ -278,6 +276,26 @@ defmodule CubDBTest do
       assert_receive :compaction_started
       refute_receive :clean_up_started, timeout - 200
       assert_receive :clean_up_started, timeout
+    end
+
+    test "read operations extend the validity of the snapshot until the end of the read operation", %{tmp_dir: tmp_dir} do
+      {:ok, db} = CubDB.start_link(tmp_dir)
+      CubDB.subscribe(db)
+
+      CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
+
+      snap = CubDB.snapshot(db, 50)
+      :ok = CubDB.compact(db)
+
+      {:ok, result} = CubDB.select(snap, pipe: [
+        map: fn x ->
+          Process.sleep(20)
+          x
+        end
+      ])
+
+      assert result == [a: 1, b: 2, c: 3, d: 4, e: 5]
+      assert_receive :clean_up_started, 1000
     end
 
     test "with_snapshot/2 automatically releases the snapshot", %{tmp_dir: tmp_dir} do
