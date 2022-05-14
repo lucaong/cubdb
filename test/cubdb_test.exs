@@ -706,6 +706,25 @@ defmodule CubDBTest do
     assert :ok = CubDB.compact(db)
   end
 
+  test "catch up waits for pending writes", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+
+    entries = [a: 1, b: 2, c: 3]
+
+    for {key, value} <- entries, do: CubDB.put(db, key, value)
+
+    CubDB.subscribe(db)
+
+    {:ok, 1} = CubDB.get_and_update(db, :a, fn a ->
+      CubDB.compact(db)
+      Process.sleep(1000)
+      {a, 10}
+    end)
+
+    assert_receive :catch_up_completed, 1000
+    assert CubDB.get(db, :a) == 10
+  end
+
   test "compaction stops the old Btree upon clean-up, releasing resources", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
 
