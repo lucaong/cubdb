@@ -13,6 +13,9 @@ reports changes here.
     spawned Task to the client process. This makes the `:timeout` option
     unnecessary: by stopping the process calling `CubDB`, any running read
     operation by that process is stopped.
+  - [breaking] `get_and_update_multi/4` does not take an option argument
+    anymore, making it `get_and_update_multi/3`. The only available option used
+    to be `:timeout`, which is not supported anymore.
   - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
     cost read only snapshots of the database.
   - Add `back_up/2` to produce a database backup. The backup process does not

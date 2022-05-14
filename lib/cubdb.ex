@@ -11,7 +11,7 @@ defmodule CubDB do
 
     - Arbitrary selection of ranges of entries sorted by key with `select/2`
 
-    - Atomic transactions with `put_multi/2`, `get_and_update_multi/4`, etc.
+    - Atomic transactions with `put_multi/2`, `get_and_update_multi/3`, etc.
 
     - Concurrent read operations, that do not block nor are blocked by writes
 
@@ -733,10 +733,8 @@ defmodule CubDB do
   @spec get_and_update_multi(
           GenServer.server(),
           [key],
-          (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, [key] | nil}),
-          [opt]
+          (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, [key] | nil})
         ) :: {:ok, any} | {:error, any}
-        when opt: {:timeout, timeout}
 
   @doc """
   Gets and updates or deletes multiple entries in an atomic transaction.
@@ -753,15 +751,8 @@ defmodule CubDB do
   written to the database, and `keys_to_delete` is a list of keys to be deleted.
 
   The read and write operations are executed as an atomic transaction, so they
-  will either all succeed, or all fail. Note that `get_and_update_multi/4`
+  will either all succeed, or all fail. Note that `get_and_update_multi/3`
   blocks other write operations until it completes.
-
-  The `options` argument is an optional keyword list of options, including:
-
-     - `:timeout` - a timeout (in milliseconds or `:infinity`, defaulting to
-     `5000`) for the operation, after which the function returns `{:error,
-     :timeout}`. This is useful to avoid blocking other write operations for too
-     long.
 
   ## Example
 
@@ -793,49 +784,14 @@ defmodule CubDB do
         {joy, %{"Joy" => joy}, ["Anna"]}
       end)
   """
-  def get_and_update_multi(db, keys_to_get, fun, options \\ []) do
-    timeout = Keyword.get(options, :timeout, 5000)
+  def get_and_update_multi(db, keys_to_get, fun) do
 
     writer(db, fn btree ->
-      compute_update = fn ->
-        key_values = Reader.perform(btree, {:get_multi, keys_to_get})
+      key_values = Reader.perform(btree, {:get_multi, keys_to_get})
+      {result, entries_to_put, keys_to_delete} = fun.(key_values)
 
-        try do
-          fun.(key_values)
-        rescue
-          e -> {:exception, e, __STACKTRACE__}
-        end
-      end
-
-      case run_with_timeout(compute_update, timeout) do
-        {:ok, {result, entries_to_put, keys_to_delete}} ->
-          btree = do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete)
-          {btree, {:ok, result}}
-
-        {:error, cause} ->
-          {btree, {:error, cause}}
-      end
+      {do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete), {:ok, result}}
     end)
-  end
-
-  @spec run_with_timeout(fun, timeout) :: {:ok, any} | {:error, any}
-
-  defp run_with_timeout(fun, timeout) do
-    task = Task.async(fun)
-
-    case Task.yield(task, timeout) || Task.shutdown(task) do
-      nil ->
-        {:error, :timeout}
-
-      {:exit, reason} ->
-        {:error, reason}
-
-      {:ok, {:exception, e, stacktrace}} ->
-        reraise(e, stacktrace)
-
-      {:ok, result} ->
-        {:ok, result}
-    end
   end
 
   @spec put_and_delete_multi(GenServer.server(), %{key => value}, [key]) :: :ok

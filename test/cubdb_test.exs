@@ -365,7 +365,7 @@ defmodule CubDBTest do
     assert {:ok, [a: 1, b: 2, c: 3, d: 4]} = CubDB.select(db)
   end
 
-  test "get_and_update_multi/4, get_and_update/3 and update/3 work as expected", %{
+  test "get_and_update_multi/3, get_and_update/3 and update/3 work as expected", %{
     tmp_dir: tmp_dir
   } do
     {:ok, db} = CubDB.start_link(tmp_dir)
@@ -415,19 +415,9 @@ defmodule CubDBTest do
              end)
 
     assert CubDB.get(db, :b) == 1
-
-    assert {:error, :timeout} =
-             CubDB.get_and_update_multi(
-               db,
-               [:a, :c],
-               fn _ ->
-                 Process.sleep(80)
-               end,
-               timeout: 50
-             )
   end
 
-  test "get_and_update_multi/4 works well during a compaction", %{tmp_dir: tmp_dir} do
+  test "get_and_update_multi/3 works well during a compaction", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
 
     entries = [a: 1, b: 2, c: 3, d: 4]
@@ -607,7 +597,7 @@ defmodule CubDBTest do
     assert 0 = CubDB.get(db, :a)
   end
 
-  test "get_and_update_multi/4 is persisted to disk", %{tmp_dir: tmp_dir} do
+  test "get_and_update_multi/3 is persisted to disk", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
@@ -717,6 +707,7 @@ defmodule CubDBTest do
 
     {:ok, 1} = CubDB.get_and_update(db, :a, fn a ->
       CubDB.compact(db)
+      assert_receive :compaction_completed, 1000
       Process.sleep(1000)
       {a, 10}
     end)
