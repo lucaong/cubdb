@@ -9,18 +9,18 @@ reports changes here.
 ## v2.0.0 (unreleased)
 
   - [breaking] Remove the `:timeout` option on `select/2`. This is part of a
-    refactoring and improvement that moves read operations from an
-    internally spawned Task to the client process. This makes the `:timeout`
-    option unnecessary, because the user now has complete control: by stopping
-    the process calling `CubDB`, any running read operation by that process is
-    stopped.
-  - Add the possibility to get zero-cost snapshots of the database, and perform
-    reads on them to ensure consistency of dependent reads. This is done via the
-    functions `snapshot/2`, `with_snapshot/1` and `release_snapshot/1`
+    refactoring and improvement that moves read operations from an internally
+    spawned Task to the client process. This makes the `:timeout` option
+    unnecessary: by stopping the process calling `CubDB`, any running read
+    operation by that process is stopped.
+  - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
+    cost read only snapshots of the database.
   - Add `back_up/2` to produce a database backup. The backup process does not
     block readers or writers, and is isolated from concurrent writes.
   - Add `halt_compaction/1` to stop any running compaction operation
   - Add `compacting?/1` to check if a compaction is currently running
+  - Move read and write operations to the caller process as opposed to the
+    `CubDB` server process.
   - Improve concurrency of read operations while writing
 
 ## v1.1.0 (2021-10-14)
