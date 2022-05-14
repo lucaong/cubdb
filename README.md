@@ -27,7 +27,7 @@ section](https://hexdocs.pm/cubdb/howto.html) for more information.
 
   - Concurrent read operations, that do not block nor are blocked by writes
 
-  - Zero cost snapshots
+  - Zero cost read only snapshots
 
   - Unexpected shutdowns won't corrupt the database or break atomicity
 
