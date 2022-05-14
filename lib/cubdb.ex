@@ -207,7 +207,8 @@ defmodule CubDB do
             auto_file_sync: boolean,
             subs: list(pid),
             writer: pid | nil,
-            write_queue: :queue.queue()
+            write_queue: :queue.queue(),
+            paused_catch_up: {Btree.t(), Btree.t()} | nil
           }
 
     @enforce_keys [:btree, :data_dir, :clean_up]
@@ -225,7 +226,8 @@ defmodule CubDB do
       auto_file_sync: true,
       subs: [],
       writer: nil,
-      write_queue: :queue.new()
+      write_queue: :queue.new(),
+      paused_catch_up: nil
     ]
   end
 
@@ -1263,7 +1265,7 @@ defmodule CubDB do
     %State{btree: btree} = state
 
     ref = make_ref()
-    state = checkin_reader(ref, state)
+    state = checkin_reader(ref, btree, state)
     snapshot = %Snapshot{db: self(), btree: btree, reader_ref: ref}
 
     case ttl do
@@ -1287,7 +1289,7 @@ defmodule CubDB do
 
     if Map.has_key?(readers, ref) do
       new_ref = make_ref()
-      state = checkin_reader(new_ref, state)
+      state = checkin_reader(new_ref, btree, state)
       snapshot = %Snapshot{db: self(), btree: btree, reader_ref: new_ref}
 
       {:reply, {:ok, snapshot}, state}
@@ -1304,7 +1306,7 @@ defmodule CubDB do
     %State{btree: btree} = state
 
     ref = make_ref()
-    state = checkin_reader(ref, state)
+    state = checkin_reader(ref, btree, state)
 
     {:reply, {btree, ref}, %State{state | writer: pid}}
   end
@@ -1315,7 +1317,12 @@ defmodule CubDB do
   end
 
   def handle_call({:cancel_write, ref}, {pid, _}, state = %State{writer: pid}) do
-    {:reply, :ok, advance_write_queue(checkout_reader(ref, state))}
+    state =
+      checkout_reader(ref, state)
+      |> advance_write_queue()
+      |> resume_catch_up()
+
+    {:reply, :ok, state}
   end
 
   def handle_call({:complete_write, btree, ref}, {pid, _}, state = %State{writer: pid}) do
@@ -1325,6 +1332,7 @@ defmodule CubDB do
     state =
       checkout_reader(ref, %State{state | btree: btree})
       |> advance_write_queue()
+      |> resume_catch_up()
       |> maybe_auto_compact()
 
     {:reply, :ok, state}
@@ -1418,10 +1426,10 @@ defmodule CubDB do
     {:noreply, state}
   end
 
-  @spec checkin_reader(reference, State.t()) :: State.t()
+  @spec checkin_reader(reference, Btree.t(), State.t()) :: State.t()
 
-  def checkin_reader(ref, state) do
-    %State{btree: btree, readers: readers} = state
+  def checkin_reader(ref, btree, state) do
+    %State{readers: readers} = state
     %Btree{store: %Store.File{file_path: file_path}} = btree
 
     %State{state | readers: Map.put(readers, ref, file_path)}
@@ -1485,26 +1493,48 @@ defmodule CubDB do
 
   @spec catch_up(Btree.t(), Btree.t(), State.t()) :: State.t()
 
-  defp catch_up(compacted_btree, original_btree, state) do
-    %State{btree: latest_btree, task_supervisor: supervisor, old_btrees: old_btrees} = state
+  defp catch_up(compacted_btree, original_btree, %State{btree: latest_btree} = state)
+       when latest_btree == original_btree do
+    %State{btree: latest_btree, old_btrees: old_btrees, writer: writer} = state
 
-    if latest_btree == original_btree do
+    if writer == nil do
       compacted_btree = finalize_compaction(compacted_btree)
       state = %State{state | btree: compacted_btree, old_btrees: [latest_btree | old_btrees]}
       for pid <- state.subs, do: send(pid, :catch_up_completed)
       trigger_clean_up(state)
     else
-      {:ok, pid} =
-        Task.Supervisor.start_child(supervisor, CatchUp, :run, [
-          self(),
-          compacted_btree,
-          original_btree,
-          latest_btree
-        ])
-
-      Process.monitor(pid)
-      %State{state | catch_up: pid}
+      pause_catch_up(compacted_btree, original_btree, state)
     end
+  end
+
+  defp catch_up(compacted_btree, original_btree, state) do
+    %State{btree: latest_btree, task_supervisor: supervisor} = state
+
+    {:ok, pid} =
+      Task.Supervisor.start_child(supervisor, CatchUp, :run, [
+        self(),
+        compacted_btree,
+        original_btree,
+        latest_btree
+      ])
+
+    Process.monitor(pid)
+    %State{state | catch_up: pid}
+  end
+
+  @spec pause_catch_up(Btree.t(), Btree.t(), State.t()) :: State.t()
+
+  defp pause_catch_up(compacted_btree, original_btree, state) do
+    %State{state | paused_catch_up: {compacted_btree, original_btree}}
+  end
+
+  @spec resume_catch_up(State.t()) :: State.t()
+
+  defp resume_catch_up(%State{paused_catch_up: nil} = state), do: state
+
+  defp resume_catch_up(%State{paused_catch_up: {compacted_btree, original_btree}} = state) do
+    state = %State{state | paused_catch_up: nil}
+    catch_up(compacted_btree, original_btree, state)
   end
 
   @spec finalize_compaction(Btree.t()) :: Btree.t()
@@ -1637,7 +1667,7 @@ defmodule CubDB do
             ref = make_ref()
             GenServer.reply(next, {btree, ref})
             {pid, _} = next
-            {pid, queue, checkin_reader(ref, state)}
+            {pid, queue, checkin_reader(ref, btree, state)}
 
           {:empty, queue} ->
             {nil, queue}
