@@ -1175,14 +1175,14 @@ defmodule CubDB do
         when result: term
 
   defp writer(db, fun) do
-    btree = GenServer.call(db, :start_write, :infinity)
+    {btree, ref} = GenServer.call(db, :start_write, :infinity)
 
     returned =
       try do
         fun.(btree)
       rescue
         exception ->
-          GenServer.call(db, :cancel_write, :infinity)
+          GenServer.call(db, {:cancel_write, ref}, :infinity)
           reraise exception, __STACKTRACE__
       end
 
@@ -1195,7 +1195,7 @@ defmodule CubDB do
           {btree, result}
       end
 
-    GenServer.call(db, {:complete_write, btree}, :infinity)
+    GenServer.call(db, {:complete_write, btree, ref}, :infinity)
     result
   end
 
@@ -1232,19 +1232,19 @@ defmodule CubDB do
   end
 
   def handle_call({:snapshot, ttl}, _, state) do
-    %State{btree: btree, readers: readers} = state
-    %Btree{store: %Store.File{file_path: file_path}} = btree
+    %State{btree: btree} = state
 
     ref = make_ref()
+    state = checkin_reader(ref, state)
     snapshot = %Snapshot{db: self(), btree: btree, reader_ref: ref}
 
     case ttl do
       :infinity ->
-        {:reply, snapshot, %State{state | readers: Map.put(readers, ref, file_path)}}
+        {:reply, snapshot, state}
 
       ttl when is_integer(ttl) ->
         Process.send_after(self(), {:snapshot_timeout, ref}, ttl)
-        {:reply, snapshot, %State{state | readers: Map.put(readers, ref, file_path)}}
+        {:reply, snapshot, state}
     end
   end
 
@@ -1255,13 +1255,14 @@ defmodule CubDB do
 
   def handle_call({:extend_snapshot, snapshot}, _, state) do
     %Snapshot{reader_ref: ref, btree: btree} = snapshot
-    %Btree{store: %Store.File{file_path: file_path}} = btree
     %State{readers: readers} = state
 
     if Map.has_key?(readers, ref) do
       new_ref = make_ref()
+      state = checkin_reader(new_ref, state)
       snapshot = %Snapshot{db: self(), btree: btree, reader_ref: new_ref}
-      {:reply, {:ok, snapshot}, %State{state | readers: Map.put(readers, new_ref, file_path)}}
+
+      {:reply, {:ok, snapshot}, state}
     else
       {:reply, {:error, :invalid}, state}
     end
@@ -1271,8 +1272,13 @@ defmodule CubDB do
     {:reply, Btree.dirt_factor(btree), state}
   end
 
-  def handle_call(:start_write, {pid, _}, state = %State{writer: nil, btree: btree}) do
-    {:reply, btree, %State{state | writer: pid}}
+  def handle_call(:start_write, {pid, _}, state = %State{writer: nil}) do
+    %State{btree: btree} = state
+
+    ref = make_ref()
+    state = checkin_reader(ref, state)
+
+    {:reply, {btree, ref}, %State{state | writer: pid}}
   end
 
   def handle_call(:start_write, from, state) do
@@ -1280,16 +1286,16 @@ defmodule CubDB do
     {:noreply, %State{state | write_queue: :queue.in(from, queue)}}
   end
 
-  def handle_call(:cancel_write, {pid, _}, state = %State{writer: pid}) do
-    {:reply, :ok, advance_write_queue(state)}
+  def handle_call({:cancel_write, ref}, {pid, _}, state = %State{writer: pid}) do
+    {:reply, :ok, advance_write_queue(checkout_reader(ref, state))}
   end
 
-  def handle_call({:complete_write, btree}, {pid, _}, state = %State{writer: pid}) do
+  def handle_call({:complete_write, btree, ref}, {pid, _}, state = %State{writer: pid}) do
     %State{btree: current_btree} = state
     btree = if btree != current_btree && state.auto_file_sync, do: Btree.sync(btree), else: btree
 
     state =
-      %State{state | btree: btree}
+      checkout_reader(ref, %State{state | btree: btree})
       |> advance_write_queue()
       |> maybe_auto_compact()
 
@@ -1425,6 +1431,15 @@ defmodule CubDB do
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     {:noreply, state}
+  end
+
+  @spec checkin_reader(reference, State.t()) :: State.t()
+
+  def checkin_reader(ref, state) do
+    %State{btree: btree, readers: readers} = state
+    %Btree{store: %Store.File{file_path: file_path}} = btree
+
+    %State{state | readers: Map.put(readers, ref, file_path)}
   end
 
   @spec checkout_reader(reference, State.t()) :: State.t()
@@ -1631,12 +1646,13 @@ defmodule CubDB do
     if :queue.is_empty(queue) do
       %State{state | writer: nil}
     else
-      {writer, queue} =
+      {writer, queue, state} =
         case :queue.out(queue) do
           {{:value, next}, queue} ->
-            GenServer.reply(next, btree)
+            ref = make_ref()
+            GenServer.reply(next, {btree, ref})
             {pid, _} = next
-            {pid, queue}
+            {pid, queue, checkin_reader(ref, state)}
 
           {:empty, queue} ->
             {nil, queue}
