@@ -705,12 +705,13 @@ defmodule CubDBTest do
 
     CubDB.subscribe(db)
 
-    {:ok, 1} = CubDB.get_and_update(db, :a, fn a ->
-      CubDB.compact(db)
-      assert_receive :compaction_completed, 1000
-      Process.sleep(1000)
-      {a, 10}
-    end)
+    {:ok, 1} =
+      CubDB.get_and_update(db, :a, fn a ->
+        CubDB.compact(db)
+        assert_receive :compaction_completed, 1000
+        Process.sleep(1000)
+        {a, 10}
+      end)
 
     assert_receive :catch_up_completed, 1000
     assert CubDB.get(db, :a) == 10

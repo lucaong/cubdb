@@ -785,7 +785,6 @@ defmodule CubDB do
       end)
   """
   def get_and_update_multi(db, keys_to_get, fun) do
-
     writer(db, fn btree ->
       key_values = Reader.perform(btree, {:get_multi, keys_to_get})
       {result, entries_to_put, keys_to_delete} = fun.(key_values)
