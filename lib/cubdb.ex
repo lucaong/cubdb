@@ -205,7 +205,9 @@ defmodule CubDB do
             readers: %{required(reference) => String.t()},
             auto_compact: {pos_integer, number} | false,
             auto_file_sync: boolean,
-            subs: list(pid)
+            subs: list(pid),
+            writer: pid | nil,
+            write_queue: :queue.queue()
           }
 
     @enforce_keys [:btree, :data_dir, :clean_up]
@@ -221,7 +223,9 @@ defmodule CubDB do
       readers: %{},
       auto_compact: true,
       auto_file_sync: true,
-      subs: []
+      subs: [],
+      writer: nil,
+      write_queue: :queue.new()
     ]
   end
 
@@ -629,7 +633,9 @@ defmodule CubDB do
   If `key` was already present, it is overwritten.
   """
   def put(db, key, value) do
-    GenServer.call(db, {:put, key, value}, :infinity)
+    writer(db, fn btree ->
+      Btree.insert(btree, key, value) |> Btree.commit()
+    end)
   end
 
   @spec put_new(GenServer.server(), key, value) :: :ok | {:error, :exists}
@@ -697,17 +703,15 @@ defmodule CubDB do
   original value, no write is performed to disk.
   """
   def get_and_update(db, key, fun) do
-    with {:ok, result} <-
-           get_and_update_multi(db, [key], fn entries ->
-             value = Map.get(entries, key, nil)
+    get_and_update_multi(db, [key], fn entries ->
+      value = Map.get(entries, key, nil)
 
-             case fun.(value) do
-               {result, ^value} -> {result, [], []}
-               {result, new_value} -> {result, %{key => new_value}, []}
-               :pop -> {value, [], [key]}
-             end
-           end),
-         do: {:ok, result}
+      case fun.(value) do
+        {result, ^value} -> {result, [], []}
+        {result, new_value} -> {result, %{key => new_value}, []}
+        :pop -> {value, [], [key]}
+      end
+    end)
   end
 
   @spec get_and_update_multi(
@@ -738,10 +742,10 @@ defmodule CubDB do
 
   The `options` argument is an optional keyword list of options, including:
 
-    - `:timeout` - a timeout (in milliseconds or `:infinity`, defaulting to
-    `5000`) for the operation, after which the function returns `{:error,
-    :timeout}`. This is useful to avoid blocking other write operations for too
-    long.
+     - `:timeout` - a timeout (in milliseconds or `:infinity`, defaulting to
+     `5000`) for the operation, after which the function returns `{:error,
+     :timeout}`. This is useful to avoid blocking other write operations for too
+     long.
 
   ## Example
 
@@ -774,7 +778,48 @@ defmodule CubDB do
       end)
   """
   def get_and_update_multi(db, keys_to_get, fun, options \\ []) do
-    GenServer.call(db, {:get_and_update_multi, keys_to_get, fun, options}, :infinity)
+    timeout = Keyword.get(options, :timeout, 5000)
+
+    writer(db, fn btree ->
+      compute_update = fn ->
+        key_values = Reader.perform(btree, {:get_multi, keys_to_get})
+
+        try do
+          fun.(key_values)
+        rescue
+          e -> {:exception, e, __STACKTRACE__}
+        end
+      end
+
+      case run_with_timeout(compute_update, timeout) do
+        {:ok, {result, entries_to_put, keys_to_delete}} ->
+          btree = do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete)
+          {btree, {:ok, result}}
+
+        {:error, cause} ->
+          {btree, {:error, cause}}
+      end
+    end)
+  end
+
+  @spec run_with_timeout(fun, timeout) :: {:ok, any} | {:error, any}
+
+  defp run_with_timeout(fun, timeout) do
+    task = Task.async(fun)
+
+    case Task.yield(task, timeout) || Task.shutdown(task) do
+      nil ->
+        {:error, :timeout}
+
+      {:exit, reason} ->
+        {:error, reason}
+
+      {:ok, {:exception, e, stacktrace}} ->
+        reraise(e, stacktrace)
+
+      {:ok, result} ->
+        {:ok, result}
+    end
   end
 
   @spec put_and_delete_multi(GenServer.server(), %{key => value}, [key]) :: :ok
@@ -786,7 +831,33 @@ defmodule CubDB do
   value}`. Keys to delete are passed as a list of keys.
   """
   def put_and_delete_multi(db, entries_to_put, keys_to_delete) do
-    GenServer.call(db, {:put_and_delete_multi, entries_to_put, keys_to_delete}, :infinity)
+    writer(db, fn btree ->
+      do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete)
+    end)
+  end
+
+  @spec do_put_and_delete_multi(GenServer.server(), Btree.t(), [entry], [key]) :: Btree.t()
+
+  defp do_put_and_delete_multi(_db, btree, [], []), do: btree
+
+  defp do_put_and_delete_multi(_db, btree, entries_to_put, []) when entries_to_put == %{},
+    do: btree
+
+  defp do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete) do
+    btree =
+      Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
+        Btree.insert(btree, key, value)
+      end)
+
+    btree =
+      Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
+        case compacting?(db) do
+          false -> Btree.delete(btree, key)
+          true -> Btree.mark_deleted(btree, key)
+        end
+      end)
+
+    Btree.commit(btree)
   end
 
   @spec get_multi(GenServer.server(), [key]) :: %{key => value}
@@ -1100,6 +1171,34 @@ defmodule CubDB do
     end
   end
 
+  @spec writer(GenServer.server(), (Btree.t() -> Btree.t() | {Btree.t(), result})) :: result | :ok
+        when result: term
+
+  defp writer(db, fun) do
+    btree = GenServer.call(db, :start_write, :infinity)
+
+    returned =
+      try do
+        fun.(btree)
+      rescue
+        exception ->
+          GenServer.call(db, :cancel_write, :infinity)
+          reraise exception, __STACKTRACE__
+      end
+
+    {btree, result} =
+      case returned do
+        %Btree{} = btree ->
+          {btree, :ok}
+
+        {%Btree{} = btree, result} ->
+          {btree, result}
+      end
+
+    GenServer.call(db, {:complete_write, btree}, :infinity)
+    result
+  end
+
   # OTP callbacks
 
   @doc false
@@ -1172,11 +1271,29 @@ defmodule CubDB do
     {:reply, Btree.dirt_factor(btree), state}
   end
 
-  def handle_call({:put, key, value}, _, state) do
-    %State{btree: btree, auto_file_sync: auto_file_sync} = state
-    btree = Btree.insert(btree, key, value) |> Btree.commit()
-    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
-    {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
+  def handle_call(:start_write, {pid, _}, state = %State{writer: nil, btree: btree}) do
+    {:reply, btree, %State{state | writer: pid}}
+  end
+
+  def handle_call(:start_write, from, state) do
+    %State{write_queue: queue} = state
+    {:noreply, %State{state | write_queue: :queue.in(from, queue)}}
+  end
+
+  def handle_call(:cancel_write, {pid, _}, state = %State{writer: pid}) do
+    {:reply, :ok, advance_write_queue(state)}
+  end
+
+  def handle_call({:complete_write, btree}, {pid, _}, state = %State{writer: pid}) do
+    %State{btree: current_btree} = state
+    btree = if btree != current_btree && state.auto_file_sync, do: Btree.sync(btree), else: btree
+
+    state =
+      %State{state | btree: btree}
+      |> advance_write_queue()
+      |> maybe_auto_compact()
+
+    {:reply, :ok, state}
   end
 
   def handle_call({:put_new, key, value}, _, state) do
@@ -1205,30 +1322,6 @@ defmodule CubDB do
     btree = if auto_file_sync, do: Btree.sync(btree), else: btree
 
     {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
-  end
-
-  def handle_call({:get_and_update_multi, keys_to_get, fun, options}, _, state) do
-    %State{btree: btree} = state
-    timeout = Keyword.get(options, :timeout, 5000)
-
-    compute_update = fn ->
-      key_values = Reader.perform(btree, {:get_multi, keys_to_get})
-      fun.(key_values)
-    end
-
-    case run_with_timeout(compute_update, timeout) do
-      {:ok, {result, entries_to_put, keys_to_delete}} ->
-        state = do_put_and_delete_multi(state, entries_to_put, keys_to_delete)
-        {:reply, {:ok, result}, state}
-
-      {:error, cause} ->
-        {:reply, {:error, cause}, state}
-    end
-  end
-
-  def handle_call({:put_and_delete_multi, entries_to_put, keys_to_delete}, _, state) do
-    state = do_put_and_delete_multi(state, entries_to_put, keys_to_delete)
-    {:reply, :ok, state}
   end
 
   def handle_call(:clear, _, state) do
@@ -1318,12 +1411,6 @@ defmodule CubDB do
 
   def handle_info({:catch_up, _, _, _}, state), do: state
 
-  def handle_info({:reader_timeout, reader}, state) do
-    Process.unlink(reader)
-    Process.exit(reader, :timeout)
-    {:noreply, state}
-  end
-
   def handle_info({:snapshot_timeout, ref}, state) do
     {:noreply, checkout_reader(ref, state)}
   end
@@ -1355,51 +1442,6 @@ defmodule CubDB do
         else
           %State{state | readers: readers}
         end
-    end
-  end
-
-  @spec do_put_and_delete_multi(State.t(), [entry], [key]) :: State.t()
-
-  defp do_put_and_delete_multi(state, [], []), do: state
-  defp do_put_and_delete_multi(state, entries_to_put, []) when entries_to_put == %{}, do: state
-
-  defp do_put_and_delete_multi(state, entries_to_put, keys_to_delete) do
-    %State{btree: btree, auto_file_sync: auto_file_sync} = state
-
-    btree =
-      Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
-        Btree.insert(btree, key, value)
-      end)
-
-    btree =
-      Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
-        case compaction_running?(state) do
-          false -> Btree.delete(btree, key)
-          true -> Btree.mark_deleted(btree, key)
-        end
-      end)
-
-    btree = Btree.commit(btree)
-
-    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
-
-    maybe_auto_compact(%State{state | btree: btree})
-  end
-
-  @spec run_with_timeout(fun, timeout) :: {:ok, any} | {:error, any}
-
-  defp run_with_timeout(fun, timeout) do
-    task = Task.async(fun)
-
-    case Task.yield(task, timeout) || Task.shutdown(task) do
-      nil ->
-        {:error, :timeout}
-
-      {:exit, reason} ->
-        {:error, reason}
-
-      {:ok, result} ->
-        {:ok, result}
     end
   end
 
@@ -1579,6 +1621,29 @@ defmodule CubDB do
     %Btree{dirt: dirt} = btree
     dirt_factor = Btree.dirt_factor(btree)
     dirt >= min_writes and dirt_factor >= min_dirt_factor
+  end
+
+  @spec advance_write_queue(State.t()) :: State.t()
+
+  defp advance_write_queue(state) do
+    %State{write_queue: queue, btree: btree} = state
+
+    if :queue.is_empty(queue) do
+      %State{state | writer: nil}
+    else
+      {writer, queue} =
+        case :queue.out(queue) do
+          {{:value, next}, queue} ->
+            GenServer.reply(next, btree)
+            {pid, _} = next
+            {pid, queue}
+
+          {:empty, queue} ->
+            {nil, queue}
+        end
+
+      %State{state | writer: writer, write_queue: queue}
+    end
   end
 
   @spec parse_auto_compact(any) :: {:ok, false | {pos_integer, number}} | {:error, any}
