@@ -648,7 +648,15 @@ defmodule CubDB do
   :exists}`.
   """
   def put_new(db, key, value) do
-    GenServer.call(db, {:put_new, key, value}, :infinity)
+    writer(db, fn btree ->
+      case Btree.insert_new(btree, key, value) do
+        {:error, :exists} = reply ->
+          {btree, reply}
+
+        btree ->
+          Btree.commit(btree)
+      end
+    end)
   end
 
   @spec delete(GenServer.server(), key) :: :ok
@@ -659,7 +667,13 @@ defmodule CubDB do
   If `key` was not present in the database, nothing is done.
   """
   def delete(db, key) do
-    GenServer.call(db, {:delete, key}, :infinity)
+    writer(db, fn btree ->
+      if compacting?(db) do
+        Btree.mark_deleted(btree, key) |> Btree.commit()
+      else
+        Btree.delete(btree, key) |> Btree.commit()
+      end
+    end)
   end
 
   @spec update(GenServer.server(), key, value, (value -> value)) :: :ok
@@ -928,7 +942,21 @@ defmodule CubDB do
   """
 
   def clear(db) do
-    GenServer.call(db, :clear, :infinity)
+    should_compact =
+      writer(db, fn btree ->
+        btree = Btree.clear(btree) |> Btree.commit()
+
+        if compacting?(db) do
+          halt_compaction(db)
+          {btree, true}
+        else
+          {btree, false}
+        end
+      end)
+
+    if should_compact, do: compact(db)
+
+    :ok
   end
 
   @spec compact(GenServer.server()) :: :ok | {:error, String.t()}
@@ -1300,49 +1328,6 @@ defmodule CubDB do
       |> maybe_auto_compact()
 
     {:reply, :ok, state}
-  end
-
-  def handle_call({:put_new, key, value}, _, state) do
-    %State{btree: btree, auto_file_sync: auto_file_sync} = state
-
-    case Btree.insert_new(btree, key, value) do
-      {:error, :exists} = reply ->
-        {:reply, reply, state}
-
-      btree ->
-        btree = Btree.commit(btree)
-        btree = if auto_file_sync, do: Btree.sync(btree), else: btree
-        {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
-    end
-  end
-
-  def handle_call({:delete, key}, _, state) do
-    %State{btree: btree, auto_file_sync: auto_file_sync} = state
-
-    btree =
-      case compaction_running?(state) do
-        false -> Btree.delete(btree, key) |> Btree.commit()
-        true -> Btree.mark_deleted(btree, key) |> Btree.commit()
-      end
-
-    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
-
-    {:reply, :ok, maybe_auto_compact(%State{state | btree: btree})}
-  end
-
-  def handle_call(:clear, _, state) do
-    %State{btree: btree, auto_file_sync: auto_file_sync} = state
-    btree = Btree.clear(btree) |> Btree.commit()
-    btree = if auto_file_sync, do: Btree.sync(btree), else: btree
-    state = %State{state | btree: btree}
-
-    if compaction_running?(state) do
-      state = do_halt_compaction(state)
-      {:ok, compactor} = trigger_compaction(state)
-      {:reply, :ok, %State{state | compactor: compactor}}
-    else
-      {:reply, :ok, maybe_auto_compact(state)}
-    end
   end
 
   def handle_call(:compact, _, state) do
