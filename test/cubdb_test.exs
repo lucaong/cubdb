@@ -835,6 +835,8 @@ defmodule CubDBTest do
     CubDB.release_snapshot(snap)
 
     assert_receive :compaction_completed, 200
+    assert_receive :catch_up_completed, 200
+
     assert :ok = CubDB.compact(db)
   end
 
@@ -940,6 +942,7 @@ defmodule CubDBTest do
     CubDB.release_snapshot(snap)
 
     assert_receive :compaction_completed, 200
+    assert_receive :catch_up_completed, 200
 
     refute CubDB.compacting?(db)
   end
