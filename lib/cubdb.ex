@@ -141,10 +141,10 @@ defmodule CubDB do
   use GenServer
 
   alias CubDB.Btree
-  alias CubDB.CatchUp
   alias CubDB.CleanUp
   alias CubDB.Compactor
   alias CubDB.Reader
+  alias CubDB.Writer
   alias CubDB.Store
 
   @db_file_extension ".cub"
@@ -198,7 +198,6 @@ defmodule CubDB do
             data_dir: String.t(),
             task_supervisor: pid,
             compactor: pid | nil,
-            catch_up: pid | nil,
             clean_up: pid,
             clean_up_pending: boolean,
             old_btrees: [Btree.t()],
@@ -207,8 +206,7 @@ defmodule CubDB do
             auto_file_sync: boolean,
             subs: list(pid),
             writer: pid | nil,
-            write_queue: :queue.queue(),
-            paused_catch_up: {Btree.t(), Btree.t()} | nil
+            write_queue: :queue.queue()
           }
 
     @enforce_keys [:btree, :data_dir, :clean_up]
@@ -217,7 +215,6 @@ defmodule CubDB do
       btree: nil,
       data_dir: nil,
       compactor: nil,
-      catch_up: nil,
       clean_up: nil,
       clean_up_pending: false,
       old_btrees: [],
@@ -226,8 +223,7 @@ defmodule CubDB do
       auto_file_sync: true,
       subs: [],
       writer: nil,
-      write_queue: :queue.new(),
-      paused_catch_up: nil
+      write_queue: :queue.new()
     ]
   end
 
@@ -635,8 +631,8 @@ defmodule CubDB do
   If `key` was already present, it is overwritten.
   """
   def put(db, key, value) do
-    writer(db, fn btree ->
-      Btree.insert(btree, key, value) |> Btree.commit()
+    Writer.acquire(db, fn btree ->
+      {Btree.insert(btree, key, value) |> Btree.commit(), :ok}
     end)
   end
 
@@ -650,13 +646,13 @@ defmodule CubDB do
   :exists}`.
   """
   def put_new(db, key, value) do
-    writer(db, fn btree ->
+    Writer.acquire(db, fn btree ->
       case Btree.insert_new(btree, key, value) do
         {:error, :exists} = reply ->
           {btree, reply}
 
         btree ->
-          Btree.commit(btree)
+          {Btree.commit(btree), :ok}
       end
     end)
   end
@@ -669,11 +665,11 @@ defmodule CubDB do
   If `key` was not present in the database, nothing is done.
   """
   def delete(db, key) do
-    writer(db, fn btree ->
+    Writer.acquire(db, fn btree ->
       if compacting?(db) do
-        Btree.mark_deleted(btree, key) |> Btree.commit()
+        {Btree.mark_deleted(btree, key) |> Btree.commit(), :ok}
       else
-        Btree.delete(btree, key) |> Btree.commit()
+        {Btree.delete(btree, key) |> Btree.commit(), :ok}
       end
     end)
   end
@@ -785,11 +781,17 @@ defmodule CubDB do
       end)
   """
   def get_and_update_multi(db, keys_to_get, fun) do
-    writer(db, fn btree ->
+    Writer.acquire(db, fn btree ->
       key_values = Reader.perform(btree, {:get_multi, keys_to_get})
       {result, entries_to_put, keys_to_delete} = fun.(key_values)
 
-      {do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete), {:ok, result}}
+      case do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete) do
+        {:cancel, :ok} ->
+          {:cancel, {:ok, result}}
+
+        {btree, :ok} ->
+          {btree, {:ok, result}}
+      end
     end)
   end
 
@@ -802,17 +804,18 @@ defmodule CubDB do
   value}`. Keys to delete are passed as a list of keys.
   """
   def put_and_delete_multi(db, entries_to_put, keys_to_delete) do
-    writer(db, fn btree ->
+    Writer.acquire(db, fn btree ->
       do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete)
     end)
   end
 
-  @spec do_put_and_delete_multi(GenServer.server(), Btree.t(), [entry], [key]) :: Btree.t()
+  @spec do_put_and_delete_multi(GenServer.server(), Btree.t(), [entry], [key]) ::
+          {Btree.t(), :ok} | {:cancel, :ok}
 
-  defp do_put_and_delete_multi(_db, btree, [], []), do: btree
+  defp do_put_and_delete_multi(_db, _btree, [], []), do: {:cancel, :ok}
 
-  defp do_put_and_delete_multi(_db, btree, entries_to_put, []) when entries_to_put == %{},
-    do: btree
+  defp do_put_and_delete_multi(_db, _btree, entries_to_put, []) when entries_to_put == %{},
+    do: {:cancel, :ok}
 
   defp do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete) do
     btree =
@@ -828,7 +831,7 @@ defmodule CubDB do
         end
       end)
 
-    Btree.commit(btree)
+    {Btree.commit(btree), :ok}
   end
 
   @spec get_multi(GenServer.server(), [key]) :: %{key => value}
@@ -900,7 +903,7 @@ defmodule CubDB do
 
   def clear(db) do
     should_compact =
-      writer(db, fn btree ->
+      Writer.acquire(db, fn btree ->
         btree = Btree.clear(btree) |> Btree.commit()
 
         if compacting?(db) do
@@ -1156,34 +1159,6 @@ defmodule CubDB do
     end
   end
 
-  @spec writer(GenServer.server(), (Btree.t() -> Btree.t() | {Btree.t(), result})) :: result | :ok
-        when result: term
-
-  defp writer(db, fun) do
-    {btree, ref} = GenServer.call(db, :start_write, :infinity)
-
-    returned =
-      try do
-        fun.(btree)
-      rescue
-        exception ->
-          GenServer.call(db, {:cancel_write, ref}, :infinity)
-          reraise exception, __STACKTRACE__
-      end
-
-    {btree, result} =
-      case returned do
-        %Btree{} = btree ->
-          {btree, :ok}
-
-        {%Btree{} = btree, result} ->
-          {btree, result}
-      end
-
-    GenServer.call(db, {:complete_write, btree, ref}, :infinity)
-    result
-  end
-
   # OTP callbacks
 
   @doc false
@@ -1259,11 +1234,7 @@ defmodule CubDB do
 
   def handle_call(:start_write, {pid, _}, state = %State{writer: nil}) do
     %State{btree: btree} = state
-
-    ref = make_ref()
-    state = checkin_reader(ref, btree, state)
-
-    {:reply, {btree, ref}, %State{state | writer: pid}}
+    {:reply, btree, %State{state | writer: pid}}
   end
 
   def handle_call(:start_write, from, state) do
@@ -1271,23 +1242,32 @@ defmodule CubDB do
     {:noreply, %State{state | write_queue: :queue.in(from, queue)}}
   end
 
-  def handle_call({:cancel_write, ref}, {pid, _}, state = %State{writer: pid}) do
-    state =
-      checkout_reader(ref, state)
-      |> advance_write_queue()
-      |> resume_catch_up()
-
-    {:reply, :ok, state}
+  def handle_call(:cancel_write, {pid, _}, state = %State{writer: pid}) do
+    {:reply, :ok, advance_write_queue(state)}
   end
 
-  def handle_call({:complete_write, btree, ref}, {pid, _}, state = %State{writer: pid}) do
-    %State{btree: current_btree} = state
+  def handle_call({:complete_write, btree}, {pid, _}, state = %State{writer: pid}) do
+    %State{btree: current_btree, old_btrees: old_btrees} = state
     btree = if btree != current_btree && state.auto_file_sync, do: Btree.sync(btree), else: btree
 
+    %Btree{store: current_store} = current_btree
+    %Btree{store: new_store} = btree
+
+    # If store changed, this write is completing a compaction
     state =
-      checkout_reader(ref, %State{state | btree: btree})
+      if new_store != current_store do
+        trigger_clean_up(%State{
+          state
+          | btree: finalize_compaction(btree),
+            old_btrees: [current_btree | old_btrees]
+        })
+      else
+        %State{state | btree: btree}
+      end
+
+    state =
+      state
       |> advance_write_queue()
-      |> resume_catch_up()
       |> maybe_auto_compact()
 
     {:reply, :ok, state}
@@ -1346,24 +1326,11 @@ defmodule CubDB do
     {:reply, compaction_running?(state), state}
   end
 
-  def handle_info(
-        {:compaction_completed, pid, original_btree, compacted_btree},
-        state = %State{compactor: pid}
-      ) do
-    for pid <- state.subs, do: send(pid, :compaction_completed)
-    {:noreply, catch_up(compacted_btree, original_btree, state)}
+  def handle_info(message, state)
+      when message == :compaction_completed or message == :catch_up_completed do
+    for pid <- state.subs, do: send(pid, message)
+    {:noreply, state}
   end
-
-  def handle_info({:compaction_completed, _, _, _}, state), do: state
-
-  def handle_info(
-        {:catch_up, pid, compacted_btree, original_btree},
-        state = %State{catch_up: pid}
-      ) do
-    {:noreply, catch_up(compacted_btree, original_btree, state)}
-  end
-
-  def handle_info({:catch_up, _, _, _}, state), do: state
 
   def handle_info({:snapshot_timeout, ref}, state) do
     {:noreply, checkout_reader(ref, state)}
@@ -1371,10 +1338,6 @@ defmodule CubDB do
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state = %State{compactor: pid}) do
     {:noreply, %State{state | compactor: nil}}
-  end
-
-  def handle_info({:DOWN, _ref, :process, pid, _reason}, state = %State{catch_up: pid}) do
-    {:noreply, %State{state | catch_up: nil}}
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
@@ -1423,7 +1386,7 @@ defmodule CubDB do
 
   @spec trigger_compaction(%State{}) :: {:ok, pid} | {:error, any}
 
-  defp trigger_compaction(state = %State{btree: btree, data_dir: data_dir, clean_up: clean_up}) do
+  defp trigger_compaction(state = %State{data_dir: data_dir, clean_up: clean_up}) do
     case compaction_running?(state) do
       false ->
         for pid <- state.subs, do: send(pid, :compaction_started)
@@ -1433,7 +1396,6 @@ defmodule CubDB do
         with result <-
                Task.Supervisor.start_child(state.task_supervisor, Compactor, :run, [
                  self(),
-                 btree,
                  store
                ]),
              {:ok, pid} <- result do
@@ -1444,52 +1406,6 @@ defmodule CubDB do
       true ->
         {:error, :pending_compaction}
     end
-  end
-
-  @spec catch_up(Btree.t(), Btree.t(), State.t()) :: State.t()
-
-  defp catch_up(compacted_btree, original_btree, %State{btree: latest_btree} = state)
-       when latest_btree == original_btree do
-    %State{btree: latest_btree, old_btrees: old_btrees, writer: writer} = state
-
-    if writer == nil do
-      compacted_btree = finalize_compaction(compacted_btree)
-      state = %State{state | btree: compacted_btree, old_btrees: [latest_btree | old_btrees]}
-      for pid <- state.subs, do: send(pid, :catch_up_completed)
-      trigger_clean_up(state)
-    else
-      pause_catch_up(compacted_btree, original_btree, state)
-    end
-  end
-
-  defp catch_up(compacted_btree, original_btree, state) do
-    %State{btree: latest_btree, task_supervisor: supervisor} = state
-
-    {:ok, pid} =
-      Task.Supervisor.start_child(supervisor, CatchUp, :run, [
-        self(),
-        compacted_btree,
-        original_btree,
-        latest_btree
-      ])
-
-    Process.monitor(pid)
-    %State{state | catch_up: pid}
-  end
-
-  @spec pause_catch_up(Btree.t(), Btree.t(), State.t()) :: State.t()
-
-  defp pause_catch_up(compacted_btree, original_btree, state) do
-    %State{state | paused_catch_up: {compacted_btree, original_btree}}
-  end
-
-  @spec resume_catch_up(State.t()) :: State.t()
-
-  defp resume_catch_up(%State{paused_catch_up: nil} = state), do: state
-
-  defp resume_catch_up(%State{paused_catch_up: {compacted_btree, original_btree}} = state) do
-    state = %State{state | paused_catch_up: nil}
-    catch_up(compacted_btree, original_btree, state)
   end
 
   @spec finalize_compaction(Btree.t()) :: Btree.t()
@@ -1531,18 +1447,17 @@ defmodule CubDB do
 
   @spec compaction_running?(%State{}) :: boolean
 
-  defp compaction_running?(%State{compactor: nil, catch_up: nil}), do: false
+  defp compaction_running?(%State{compactor: nil}), do: false
 
   defp compaction_running?(_), do: true
 
   @spec do_halt_compaction(%State{}) :: %State{}
 
-  defp do_halt_compaction(state = %State{compactor: nil, catch_up: nil}), do: state
+  defp do_halt_compaction(state = %State{compactor: nil}), do: state
 
-  defp do_halt_compaction(state = %State{compactor: pid1, catch_up: pid2}) do
-    if pid1 != nil, do: Process.exit(pid1, :halt)
-    if pid2 != nil, do: Process.exit(pid2, :halt)
-    %State{state | compactor: nil, catch_up: nil}
+  defp do_halt_compaction(state = %State{compactor: pid}) do
+    if pid != nil, do: Process.exit(pid, :halt)
+    %State{state | compactor: nil}
   end
 
   @spec trigger_clean_up(%State{}) :: %State{}
@@ -1619,10 +1534,9 @@ defmodule CubDB do
       {writer, queue, state} =
         case :queue.out(queue) do
           {{:value, next}, queue} ->
-            ref = make_ref()
-            GenServer.reply(next, {btree, ref})
+            GenServer.reply(next, btree)
             {pid, _} = next
-            {pid, queue, checkin_reader(ref, btree, state)}
+            {pid, queue, state}
 
           {:empty, queue} ->
             {nil, queue}
