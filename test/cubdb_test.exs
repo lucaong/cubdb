@@ -374,32 +374,29 @@ defmodule CubDBTest do
 
     for {key, value} <- entries, do: CubDB.put(db, key, value)
 
-    assert {:ok, result} =
+    assert [2, 2] =
              CubDB.get_and_update_multi(db, [:a, :c], fn %{a: a, c: c} ->
                a = a + 1
                c = c - 1
                {[a, c], %{a: a, c: c}, [:d]}
              end)
 
-    assert result == [2, 2]
     assert CubDB.get(db, :a) == 2
     assert CubDB.get(db, :c) == 2
     assert CubDB.has_key?(db, :d) == false
 
-    assert {:ok, result} =
+    assert 2 =
              CubDB.get_and_update(db, :b, fn b ->
                {b, b + 3}
              end)
 
-    assert result == 2
     assert CubDB.get(db, :a) == 2
 
-    assert {:ok, result} =
+    assert 5 =
              CubDB.get_and_update(db, :b, fn _ ->
                :pop
              end)
 
-    assert result == 5
     assert CubDB.has_key?(db, :b) == false
 
     assert :ok =
@@ -426,14 +423,13 @@ defmodule CubDBTest do
 
     CubDB.compact(db)
 
-    assert {:ok, result} =
+    assert [2, 2] =
              CubDB.get_and_update_multi(db, [:a, :c], fn %{a: a, c: c} ->
                a = a + 1
                c = c - 1
                {[a, c], %{a: a, c: c}, [:d]}
              end)
 
-    assert result == [2, 2]
     assert CubDB.get(db, :a) == 2
     assert CubDB.get(db, :c) == 2
     assert CubDB.has_key?(db, :d) == false
@@ -506,7 +502,7 @@ defmodule CubDBTest do
 
     :ok = CubDB.put(db, :a, 1)
 
-    {:ok, 1} = CubDB.get_and_update(db, :a, fn x -> {x, x + 1} end)
+    1 = CubDB.get_and_update(db, :a, fn x -> {x, x + 1} end)
 
     GenServer.stop(db)
 
@@ -523,7 +519,7 @@ defmodule CubDBTest do
     {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
     state = :sys.get_state(db)
 
-    {:ok, 123} = CubDB.get_and_update(db, :a, fn x -> {123, x} end)
+    123 = CubDB.get_and_update(db, :a, fn x -> {123, x} end)
 
     assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
     assert ^state = :sys.get_state(db)
@@ -602,7 +598,7 @@ defmodule CubDBTest do
 
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
 
-    {:ok, %{a: 1, b: 2, c: 3}} =
+    %{a: 1, b: 2, c: 3} =
       CubDB.get_and_update_multi(db, [:a, :b, :c], fn entries ->
         entries_incremented = entries |> Enum.map(fn {k, v} -> {k, v + 1} end) |> Enum.into(%{})
         {entries, entries_incremented, []}
@@ -705,7 +701,7 @@ defmodule CubDBTest do
 
     CubDB.subscribe(db)
 
-    {:ok, 1} =
+    1 =
       CubDB.get_and_update(db, :a, fn a ->
         CubDB.compact(db)
         assert_receive :compaction_completed, 1000

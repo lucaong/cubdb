@@ -682,24 +682,20 @@ defmodule CubDB do
   If `key` is present in the database, `fun` is invoked with the corresponding
   `value`, and the result is set as the new value of `key`. If `key` is not
   found, `initial` is inserted as the value of `key`.
-
-  The return value is `:ok`, or `{:error, reason}` in case an error occurs.
   """
   def update(db, key, initial, fun) do
-    with {:ok, nil} <-
-           get_and_update_multi(db, [key], fn entries ->
-             case Map.fetch(entries, key) do
-               :error ->
-                 {nil, %{key => initial}, []}
+    get_and_update_multi(db, [key], fn entries ->
+      case Map.fetch(entries, key) do
+        :error ->
+          {:ok, %{key => initial}, []}
 
-               {:ok, value} ->
-                 {nil, %{key => fun.(value)}, []}
-             end
-           end),
-         do: :ok
+        {:ok, value} ->
+          {:ok, %{key => fun.(value)}, []}
+      end
+    end)
   end
 
-  @spec get_and_update(GenServer.server(), key, (value -> {any, value} | :pop)) :: {:ok, any}
+  @spec get_and_update(GenServer.server(), key, (value -> {any, value} | :pop)) :: any
 
   @doc """
   Gets the value corresponding to `key` and updates it, in one atomic transaction.
@@ -708,8 +704,6 @@ defmodule CubDB do
   present), and must return a two element tuple: the result value to be
   returned, and the new value to be associated to `key`. `fun` may also return
   `:pop`, in which case the current value is deleted and returned.
-
-  The return value is `{:ok, result}`, or `{:error, reason}` in case an error occurs.
 
   Note that in case the value to update returned by `fun` is the same as the
   original value, no write is performed to disk.
@@ -730,7 +724,7 @@ defmodule CubDB do
           GenServer.server(),
           [key],
           (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, [key] | nil})
-        ) :: {:ok, any} | {:error, any}
+        ) :: any
 
   @doc """
   Gets and updates or deletes multiple entries in an atomic transaction.
@@ -738,8 +732,7 @@ defmodule CubDB do
   Gets all values associated with keys in `keys_to_get`, and passes them as a
   map of `%{key => value}` entries to `fun`. If a key is not found, it won't be
   added to the map passed to `fun`. Updates the database and returns a result
-  according to the return value of `fun`. Returns {`:ok`, return_value} in case
-  of success, `{:error, reason}` otherwise.
+  according to the return value of `fun`.
 
   The function `fun` should return a tuple of three elements: `{return_value,
   entries_to_put, keys_to_delete}`, where `return_value` is an arbitrary value
@@ -756,7 +749,7 @@ defmodule CubDB do
   and we want to transfer 10 units from `"Anna"` to `"Joy"`, returning their
   updated balance:
 
-      {:ok, {anna, joy}} = CubDB.get_and_update_multi(db, ["Anna", "Joy"], fn entries ->
+      {anna, joy} = CubDB.get_and_update_multi(db, ["Anna", "Joy"], fn entries ->
         anna = Map.get(entries, "Anna", 0)
         joy = Map.get(entries, "Joy", 0)
 
@@ -771,7 +764,7 @@ defmodule CubDB do
   Or, if we want to transfer all of the balance from `"Anna"` to `"Joy"`,
   deleting `"Anna"`'s entry, and returning `"Joy"`'s resulting balance:
 
-      {:ok, joy} = CubDB.get_and_update_multi(db, ["Anna", "Joy"], fn entries ->
+      joy = CubDB.get_and_update_multi(db, ["Anna", "Joy"], fn entries ->
         anna = Map.get(entries, "Anna", 0)
         joy = Map.get(entries, "Joy", 0)
 
@@ -787,10 +780,10 @@ defmodule CubDB do
 
       case do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete) do
         {:cancel, :ok} ->
-          {:cancel, {:ok, result}}
+          {:cancel, result}
 
         {btree, :ok} ->
-          {btree, {:ok, result}}
+          {btree, result}
       end
     end)
   end
