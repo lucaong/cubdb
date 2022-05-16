@@ -669,7 +669,9 @@ defmodule CubDB do
       if compacting?(db) do
         {Btree.mark_deleted(btree, key) |> Btree.commit(), :ok}
       else
-        {Btree.delete(btree, key) |> Btree.commit(), :ok}
+        new_btree = Btree.delete(btree, key)
+        new_btree = if new_btree != btree, do: Btree.commit(new_btree), else: new_btree
+        {new_btree, :ok}
       end
     end)
   end
@@ -810,9 +812,9 @@ defmodule CubDB do
   defp do_put_and_delete_multi(_db, _btree, entries_to_put, []) when entries_to_put == %{},
     do: {:cancel, :ok}
 
-  defp do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete) do
+  defp do_put_and_delete_multi(db, original_btree, entries_to_put, keys_to_delete) do
     btree =
-      Enum.reduce(entries_to_put || [], btree, fn {key, value}, btree ->
+      Enum.reduce(entries_to_put || [], original_btree, fn {key, value}, btree ->
         Btree.insert(btree, key, value)
       end)
 
@@ -824,7 +826,10 @@ defmodule CubDB do
         end
       end)
 
-    {Btree.commit(btree), :ok}
+    btree =
+      if original_btree != btree, do: Btree.commit(btree), else: btree
+
+    {btree, :ok}
   end
 
   @spec get_multi(GenServer.server(), [key]) :: %{key => value}

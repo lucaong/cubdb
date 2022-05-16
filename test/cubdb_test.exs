@@ -112,7 +112,7 @@ defmodule CubDBTest do
     assert Process.alive?(pid)
   end
 
-  test "put/3, get/3, fetch/2, delete/3, has_key?/2, and put_new/3 work as expected", %{
+  test "put/3, get/3, fetch/2, delete/2, has_key?/2, and put_new/3 work as expected", %{
     tmp_dir: tmp_dir
   } do
     {:ok, db} = CubDB.start_link(tmp_dir)
@@ -141,6 +141,24 @@ defmodule CubDBTest do
     CubDB.stop(db)
     {:ok, db} = CubDB.start_link(tmp_dir)
     assert {:ok, [{^key, 123}]} = CubDB.select(db)
+  end
+
+  test "delete/2 does not error and does not write to disk when deleting an entry that was not present", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
+
+    assert :ok = CubDB.delete(db, :x)
+
+    assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
+  end
+
+  test "delete_multi/2 does not error and does not write to disk when deleting an entry that was not present", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
+
+    assert :ok = CubDB.delete_multi(db, [:x, :y])
+
+    assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
   end
 
   test "select/2 works as expected", %{tmp_dir: tmp_dir} do
