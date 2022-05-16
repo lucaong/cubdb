@@ -516,37 +516,46 @@ defmodule CubDBTest do
 
     :ok = CubDB.put(db, :a, 1)
 
-    {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
     state = :sys.get_state(db)
 
-    123 = CubDB.get_and_update(db, :a, fn x -> {123, x} end)
+    file_stat = CubDB.get_and_update(db, :a, fn x ->
+      # Obtain file stat after the get part of get_and_update,
+      # otherwise the atime will change
+      {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
+      {file_stat, x}
+    end)
 
     assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
     assert ^state = :sys.get_state(db)
     assert 1 = CubDB.get(db, :a)
   end
 
-  test "writes are serialized", %{tmp_dir: tmp_dir} do
+  test "concurrent writes are serialized", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
 
-    entries = [
-      [a: 1, b: 2, c: 3],
-      [d: 4, e: 5, f: 6],
-      [g: 7, h: 8, i: 9],
-      [j: 10, k: 11, l: 12],
-      [m: 13, n: 14, o: 15]
-    ]
+    :ok = CubDB.put_multi(db, a: 0, h: 0, v: 0, w: 0, x: 0, y: 0, z: 0)
 
-    tasks =
-      Enum.map(entries, fn xs ->
-        Task.async(fn -> CubDB.put_multi(db, xs) end)
-      end)
+    tasks = CubDB.get_and_update(db, :a, fn _ ->
+      task1 = Task.async(fn -> CubDB.put(db, :b, 2) end)
+      task2 = Task.async(fn -> CubDB.put_new(db, :c, 3) end)
+      task3 = Task.async(fn -> CubDB.delete(db, :v) end)
+      task4 = Task.async(fn -> CubDB.put_multi(db, d: 4, e: 5) end)
+      task5 = Task.async(fn -> CubDB.delete_multi(db, [:w, :x]) end)
+      task6 = Task.async(fn -> CubDB.put_and_delete_multi(db, [f: 6, g: 7], [:y]) end)
+      task7 = Task.async(fn -> CubDB.get_and_update_multi(db, [:h, :i], fn _ ->
+        {:ok, %{h: 8, i: 9}, [:z]}
+      end) end)
 
-    for task <- tasks, do: Task.await(task)
+      {[task1, task2, task3, task4, task5, task6, task7], 1}
+    end)
+
+    results = for task <- tasks, do: Task.await(task)
+
+    assert [:ok, :ok, :ok, :ok, :ok, :ok, :ok] = results
 
     {:ok, result} = CubDB.select(db)
 
-    assert result == List.flatten(entries)
+    assert result == [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9]
   end
 
   test "write access is released even if a writer raises", %{tmp_dir: tmp_dir} do

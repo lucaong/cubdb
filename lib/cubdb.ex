@@ -1521,22 +1521,18 @@ defmodule CubDB do
   defp advance_write_queue(state) do
     %State{write_queue: queue, btree: btree} = state
 
-    if :queue.is_empty(queue) do
-      %State{state | writer: nil}
-    else
-      {writer, queue, state} =
-        case :queue.out(queue) do
-          {{:value, next}, queue} ->
-            GenServer.reply(next, btree)
-            {pid, _} = next
-            {pid, queue, state}
+    {writer, queue} =
+      case :queue.out(queue) do
+        {{:value, next}, queue} ->
+          GenServer.reply(next, btree)
+          {pid, _} = next
+          {pid, queue}
 
-          {:empty, queue} ->
-            {nil, queue}
-        end
+        {:empty, queue} ->
+          {nil, queue}
+      end
 
-      %State{state | writer: writer, write_queue: queue}
-    end
+    %State{state | writer: writer, write_queue: queue}
   end
 
   @spec parse_auto_compact(any) :: {:ok, false | {pos_integer, number}} | {:error, any}
