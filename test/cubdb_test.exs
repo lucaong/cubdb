@@ -143,7 +143,8 @@ defmodule CubDBTest do
     assert {:ok, [{^key, 123}]} = CubDB.select(db)
   end
 
-  test "delete/2 does not error and does not write to disk when deleting an entry that was not present", %{tmp_dir: tmp_dir} do
+  test "delete/2 does not error and does not write to disk when deleting an entry that was not present",
+       %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
 
@@ -152,7 +153,8 @@ defmodule CubDBTest do
     assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
   end
 
-  test "delete_multi/2 does not error and does not write to disk when deleting an entry that was not present", %{tmp_dir: tmp_dir} do
+  test "delete_multi/2 does not error and does not write to disk when deleting an entry that was not present",
+       %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
 
@@ -536,12 +538,13 @@ defmodule CubDBTest do
 
     state = :sys.get_state(db)
 
-    file_stat = CubDB.get_and_update(db, :a, fn x ->
-      # Obtain file stat after the get part of get_and_update,
-      # otherwise the atime will change
-      {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
-      {file_stat, x}
-    end)
+    file_stat =
+      CubDB.get_and_update(db, :a, fn x ->
+        # Obtain file stat after the get part of get_and_update,
+        # otherwise the atime will change
+        {:ok, file_stat} = CubDB.current_db_file(db) |> File.stat()
+        {file_stat, x}
+      end)
 
     assert {:ok, ^file_stat} = CubDB.current_db_file(db) |> File.stat()
     assert ^state = :sys.get_state(db)
@@ -553,19 +556,24 @@ defmodule CubDBTest do
 
     :ok = CubDB.put_multi(db, a: 0, h: 0, v: 0, w: 0, x: 0, y: 0, z: 0)
 
-    tasks = CubDB.get_and_update(db, :a, fn _ ->
-      task1 = Task.async(fn -> CubDB.put(db, :b, 2) end)
-      task2 = Task.async(fn -> CubDB.put_new(db, :c, 3) end)
-      task3 = Task.async(fn -> CubDB.delete(db, :v) end)
-      task4 = Task.async(fn -> CubDB.put_multi(db, d: 4, e: 5) end)
-      task5 = Task.async(fn -> CubDB.delete_multi(db, [:w, :x]) end)
-      task6 = Task.async(fn -> CubDB.put_and_delete_multi(db, [f: 6, g: 7], [:y]) end)
-      task7 = Task.async(fn -> CubDB.get_and_update_multi(db, [:h, :i], fn _ ->
-        {:ok, %{h: 8, i: 9}, [:z]}
-      end) end)
+    tasks =
+      CubDB.get_and_update(db, :a, fn _ ->
+        task1 = Task.async(fn -> CubDB.put(db, :b, 2) end)
+        task2 = Task.async(fn -> CubDB.put_new(db, :c, 3) end)
+        task3 = Task.async(fn -> CubDB.delete(db, :v) end)
+        task4 = Task.async(fn -> CubDB.put_multi(db, d: 4, e: 5) end)
+        task5 = Task.async(fn -> CubDB.delete_multi(db, [:w, :x]) end)
+        task6 = Task.async(fn -> CubDB.put_and_delete_multi(db, [f: 6, g: 7], [:y]) end)
 
-      {[task1, task2, task3, task4, task5, task6, task7], 1}
-    end)
+        task7 =
+          Task.async(fn ->
+            CubDB.get_and_update_multi(db, [:h, :i], fn _ ->
+              {:ok, %{h: 8, i: 9}, [:z]}
+            end)
+          end)
+
+        {[task1, task2, task3, task4, task5, task6, task7], 1}
+      end)
 
     results = for task <- tasks, do: Task.await(task)
 

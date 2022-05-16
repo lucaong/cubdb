@@ -826,8 +826,7 @@ defmodule CubDB do
         end
       end)
 
-    btree =
-      if original_btree != btree, do: Btree.commit(btree), else: btree
+    btree = if original_btree != btree, do: Btree.commit(btree), else: btree
 
     {btree, :ok}
   end
