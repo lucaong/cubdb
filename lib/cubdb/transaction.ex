@@ -1,6 +1,7 @@
 defmodule CubDB.Tx do
   alias CubDB.Btree
   alias CubDB.Reader
+  alias CubDB.Snapshot
   alias CubDB.Tx
 
   @enforce_keys [:btree, :compacting, :owner]
@@ -74,6 +75,77 @@ defmodule CubDB.Tx do
   """
   def select(%Tx{btree: btree}, options \\ []) when is_list(options) do
     Reader.select(btree, options)
+  end
+
+  @spec refetch(Tx.t(), CubDB.key(), Snapshot.t()) :: :unchanged | {:ok, CubDB.value()} | :error
+
+  @doc """
+  If `key` was not written since the point in time represented by `snapshot`,
+  returns `:unchanged`. Otherwise, behaves like `fetch/2`.
+
+  Checking if the key was written is done without fetching the whole entry, but
+  instead only checking index pages. This makes `refetch/3` useful as a
+  performance optimization in cases when one needs to verify if an entry changed
+  with respect to a snapshot: using `refetch/3` can save some disk access if
+  `CubDB` is able to determine that the key was not written since the snapshot.
+
+  ## Example
+
+  The function `refetch/3` can be useful when implementing optimistic
+  concurrency control. Suppose, for example, that computing the updated value of
+  some entry is a slow operation. In order to avoid holding a transaction open
+  for too long, one could compute the update outside of the transaction, and
+  then check if the value on which the update was computed is still the same: if
+  so, commit the update, otherwise perform the computation again. This kind of
+  optimistic concurrency control can use `refetch/3` to avoid reading the value
+  from disk when nothing has changed:
+
+      def update_optimistically(db, key) do
+        outcome = CubDB.with_snapshot(db, fn snap ->
+          value = CubDB.Snapshot.get(snap, key)
+
+          # Perform the slow calculation outside of the transaction
+          new_value = some_slow_calculation(value)
+
+          CubDB.transaction(db, fn tx ->
+            # Check if the value changed in the meanwhile
+            case CubDB.Tx.refetch(tx, key, snap) do
+              :unchanged ->
+                # The entry was not written since we last read it, commit the
+                # new value
+                {:commit, CubDB.Tx.put(tx, key, new_value), :ok}
+
+              {:ok, ^value} ->
+                # The entry was written, but its value did not change
+                {:commit, CubDB.Tx.put(tx, key, new_value), :ok}
+
+              _ ->
+                # The entry changed since we last read it, cancel the
+                # transaction and re-compute the update
+                {:cancel, :recompute}
+            end
+          end)
+        end)
+
+        case outcome do
+          :recompute ->
+            update_optimistically(db, key)
+
+          :ok ->
+            :ok
+        end
+      end
+  """
+  def refetch(tx, key, snapshot)
+
+  def refetch(%Tx{btree: btree}, key, %Snapshot{btree: reference_btree}) do
+    case Btree.written_since?(btree, key, reference_btree) do
+      false ->
+        :unchanged
+
+      _ ->
+        Reader.fetch(btree, key)
+    end
   end
 
   @spec size(Tx.t()) :: non_neg_integer
