@@ -199,33 +199,8 @@ defmodule CubDBTest do
     assert result == 6
   end
 
-  describe "snapshot" do
-    test "get, get_multi, fetch, has_key?, size work as expected", %{tmp_dir: tmp_dir} do
-      {:ok, db} = CubDB.start_link(tmp_dir)
-      CubDB.put_multi(db, a: 1, c: 3)
-
-      snap = CubDB.snapshot(db)
-      :ok = CubDB.put_multi(db, a: 2, b: 3)
-
-      assert 1 = CubDB.get(snap, :a)
-      assert 0 = CubDB.get(snap, :b, 0)
-
-      assert %{:a => 1, :c => 3} = CubDB.get_multi(snap, [:a, :b, :c])
-
-      assert {:ok, 1} = CubDB.fetch(snap, :a)
-      assert :error = CubDB.fetch(snap, :b)
-
-      assert CubDB.has_key?(snap, :a)
-      refute CubDB.has_key?(snap, :b)
-
-      assert 2 = CubDB.size(snap)
-
-      assert 2 = CubDB.get(db, :a)
-      assert 3 = CubDB.get(db, :b)
-      assert 3 = CubDB.size(db)
-    end
-
-    test "cannot be used after release", %{tmp_dir: tmp_dir} do
+  describe "snapshot/2" do
+    test "returns a snapshot that cannot be used after release", %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir)
 
       snap = CubDB.snapshot(db)
@@ -234,35 +209,35 @@ defmodule CubDBTest do
       assert_raise RuntimeError,
                    "Attempt to use CubDB snapshot after it was released or it timed out",
                    fn ->
-                     CubDB.get(snap, :a)
+                     CubDB.Snapshot.get(snap, :a)
                    end
 
       assert_raise RuntimeError,
                    "Attempt to use CubDB snapshot after it was released or it timed out",
                    fn ->
-                     CubDB.get_multi(snap, [:a, :b])
+                     CubDB.Snapshot.get_multi(snap, [:a, :b])
                    end
 
       assert_raise RuntimeError,
                    "Attempt to use CubDB snapshot after it was released or it timed out",
                    fn ->
-                     CubDB.fetch(snap, :a)
+                     CubDB.Snapshot.fetch(snap, :a)
                    end
 
       assert_raise RuntimeError,
                    "Attempt to use CubDB snapshot after it was released or it timed out",
                    fn ->
-                     CubDB.has_key?(snap, :a)
+                     CubDB.Snapshot.has_key?(snap, :a)
                    end
 
       assert_raise RuntimeError,
                    "Attempt to use CubDB snapshot after it was released or it timed out",
                    fn ->
-                     CubDB.size(snap)
+                     CubDB.Snapshot.size(snap)
                    end
     end
 
-    test "blocks clean up until released", %{tmp_dir: tmp_dir} do
+    test "blocks clean up until the snapshot released", %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
       snap = CubDB.snapshot(db, :infinity)
 
@@ -280,7 +255,7 @@ defmodule CubDBTest do
       assert_receive :clean_up_started, 1000
     end
 
-    test "blocks clean up until timeout", %{tmp_dir: tmp_dir} do
+    test "blocks clean up until the snapshot times out", %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
 
       CubDB.subscribe(db)
@@ -294,72 +269,6 @@ defmodule CubDBTest do
       assert_receive :clean_up_started, timeout
     end
 
-    test "read operations extend the validity of the snapshot until the end of the read operation",
-         %{tmp_dir: tmp_dir} do
-      {:ok, db} = CubDB.start_link(tmp_dir)
-      CubDB.subscribe(db)
-
-      CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4, e: 5)
-
-      snap = CubDB.snapshot(db, 50)
-      :ok = CubDB.compact(db)
-
-      {:ok, result} =
-        CubDB.select(snap,
-          pipe: [
-            map: fn x ->
-              Process.sleep(20)
-              x
-            end
-          ]
-        )
-
-      assert result == [a: 1, b: 2, c: 3, d: 4, e: 5]
-      assert_receive :clean_up_started, 1000
-    end
-
-    test "with_snapshot/2 automatically releases the snapshot", %{tmp_dir: tmp_dir} do
-      {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
-
-      CubDB.put(db, :a, 123)
-
-      CubDB.subscribe(db)
-
-      assert 123 =
-               CubDB.with_snapshot(db, fn snap ->
-                 CubDB.put(db, :a, 0)
-                 CubDB.get(snap, :a)
-               end)
-
-      :ok = CubDB.compact(db)
-
-      assert_receive :compaction_started
-      assert_receive :compaction_completed, 1000
-      assert_receive :catch_up_completed, 1000
-      assert_receive :clean_up_started, 1000
-    end
-
-    test "with_snapshot/2 automatically releases the snapshot even in case of an exception", %{
-      tmp_dir: tmp_dir
-    } do
-      {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
-
-      CubDB.subscribe(db)
-
-      assert_raise RuntimeError, "boom!", fn ->
-        CubDB.with_snapshot(db, fn _ ->
-          raise "boom!"
-        end)
-      end
-
-      :ok = CubDB.compact(db)
-
-      assert_receive :compaction_started
-      assert_receive :compaction_completed, 1000
-      assert_receive :catch_up_completed, 1000
-      assert_receive :clean_up_started, 1000
-    end
-
     test "releasing a snapshot twice does not error", %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
       snap = CubDB.snapshot(db)
@@ -367,6 +276,48 @@ defmodule CubDBTest do
       assert :ok = CubDB.release_snapshot(snap)
       assert :ok = CubDB.release_snapshot(snap)
     end
+  end
+
+  test "with_snapshot/2 automatically releases the snapshot", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+
+    CubDB.put(db, :a, 123)
+
+    CubDB.subscribe(db)
+
+    assert 123 =
+             CubDB.with_snapshot(db, fn snap ->
+               CubDB.put(db, :a, 0)
+               CubDB.Snapshot.get(snap, :a)
+             end)
+
+    :ok = CubDB.compact(db)
+
+    assert_receive :compaction_started
+    assert_receive :compaction_completed, 1000
+    assert_receive :catch_up_completed, 1000
+    assert_receive :clean_up_started, 1000
+  end
+
+  test "with_snapshot/2 automatically releases the snapshot even in case of an exception", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: false)
+
+    CubDB.subscribe(db)
+
+    assert_raise RuntimeError, "boom!", fn ->
+      CubDB.with_snapshot(db, fn _ ->
+        raise "boom!"
+      end)
+    end
+
+    :ok = CubDB.compact(db)
+
+    assert_receive :compaction_started
+    assert_receive :compaction_completed, 1000
+    assert_receive :catch_up_completed, 1000
+    assert_receive :clean_up_started, 1000
   end
 
   test "reads are concurrent", %{tmp_dir: tmp_dir} do
@@ -1036,24 +987,6 @@ defmodule CubDBTest do
       {:ok, copy} = CubDB.start_link(data_dir: backup_dir)
 
       assert CubDB.select(db) == CubDB.select(copy)
-    end
-
-    test "creates a backup of the given snapshot", %{tmp_dir: tmp_dir, backup_dir: backup_dir} do
-      File.rm_rf!(backup_dir)
-      {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
-
-      :ok = CubDB.put_multi(db, foo: 1, bar: 2, baz: 3)
-
-      snap = CubDB.snapshot(db, :infinity)
-      :ok = CubDB.put_multi(db, foo: 0, qux: 4)
-
-      assert :ok = CubDB.back_up(snap, backup_dir)
-
-      {:ok, copy} = CubDB.start_link(data_dir: backup_dir)
-
-      assert CubDB.select(snap) == CubDB.select(copy)
-
-      CubDB.release_snapshot(snap)
     end
   end
 

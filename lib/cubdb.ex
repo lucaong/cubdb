@@ -118,8 +118,8 @@ defmodule CubDB do
       # the key of y depends on the value of x, so we ensure consistency by getting
       # them from the same snapshot, isolating from the effects of concurrent writes
       {x, y} = CubDB.with_snapshot(db, fn snap ->
-        x = CubDB.get(snap, :x)
-        y = CubDB.get(snap, x)
+        x = CubDB.Snapshot.get(snap, :x)
+        y = CubDB.Snapshot.get(snap, x)
 
         {x, y}
       end)
@@ -146,6 +146,7 @@ defmodule CubDB do
   alias CubDB.Reader
   alias CubDB.Writer
   alias CubDB.Store
+  alias CubDB.Snapshot
 
   @db_file_extension ".cub"
   @compaction_file_extension ".compact"
@@ -170,25 +171,6 @@ defmodule CubDB do
           | {:pipe, [pipe_operation]}
           | {:reverse, boolean}
           | {:reduce, fun | {any, fun}}
-
-  defmodule Snapshot do
-    @moduledoc false
-
-    @type t :: %CubDB.Snapshot{
-            db: GenServer.server(),
-            btree: Btree.t(),
-            reader_ref: reference
-          }
-
-    @enforce_keys [:db, :btree, :reader_ref]
-    defstruct [
-      :db,
-      :btree,
-      :reader_ref
-    ]
-  end
-
-  @opaque snapshot :: %Snapshot{}
 
   defmodule State do
     @moduledoc false
@@ -312,75 +294,52 @@ defmodule CubDB do
     GenServer.stop(db, reason, timeout)
   end
 
-  @spec get(GenServer.server() | snapshot, key, value) :: value
+  @spec get(GenServer.server(), key, value) :: value
 
   @doc """
-  Gets the value associated to `key` from the database or snapshot.
+  Gets the value associated to `key` from the database.
 
   If no value is associated with `key`, `default` is returned (which is `nil`,
   unless specified otherwise).
   """
-  def get(db_or_snapshot, key) do
-    get(db_or_snapshot, key, nil)
-  end
-
-  def get(%Snapshot{} = snapshot, key, default) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:get, key, default})
-    end)
-  end
-
-  def get(db, key, default) do
+  def get(db, key, default \\ nil) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
       Reader.perform(btree, {:get, key, default})
     end)
   end
 
-  @spec fetch(GenServer.server() | snapshot, key) :: {:ok, value} | :error
+  @spec fetch(GenServer.server(), key) :: {:ok, value} | :error
 
   @doc """
-  Fetches the value for the given `key` in the database or snapshot, or returns
-  `:error` if `key` is not present.
+  Fetches the value for the given `key` in the database, or returns `:error` if
+  `key` is not present.
 
   If the database contains an entry with the given `key` and value `value`, it
   returns `{:ok, value}`. If `key` is not found, it returns `:error`.
   """
-  def fetch(%Snapshot{} = snapshot, key) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:fetch, key})
-    end)
-  end
-
   def fetch(db, key) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
       Reader.perform(btree, {:fetch, key})
     end)
   end
 
-  @spec has_key?(GenServer.server() | snapshot, key) :: boolean
+  @spec has_key?(GenServer.server(), key) :: boolean
 
   @doc """
-  Returns whether an entry with the given `key` exists in the database or
-  snapshot.
+  Returns whether an entry with the given `key` exists in the database.
   """
-  def has_key?(%Snapshot{} = snapshot, key) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:has_key?, key})
-    end)
-  end
-
   def has_key?(db, key) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
       Reader.perform(btree, {:has_key?, key})
     end)
   end
 
-  @spec select(GenServer.server() | snapshot, [select_option]) ::
+  @spec select(GenServer.server(), [select_option]) ::
           {:ok, any} | {:error, Exception.t()}
 
   @doc """
-  Selects a range of entries from the database or snapshot, and optionally
-  performs a pipeline of operations on them.
+  Selects a range of entries from the database, and optionally performs a
+  pipeline of operations on them.
 
   It returns `{:ok, result}` if successful, or `{:error, exception}` if an
   exception is raised.
@@ -473,38 +432,24 @@ defmodule CubDB do
         reduce: fn n, sum -> sum + n end # reduce to the sum of selected values
       )
   """
-  def select(db_or_snapshot), do: select(db_or_snapshot, [])
-
-  def select(%Snapshot{} = snapshot, options) when is_list(options) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:select, options})
-    end)
-  end
-
-  def select(db, options) when is_list(options) do
+  def select(db, options \\ []) when is_list(options) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
       Reader.perform(btree, {:select, options})
     end)
   end
 
-  @spec size(GenServer.server() | snapshot) :: pos_integer
+  @spec size(GenServer.server()) :: non_neg_integer
 
   @doc """
-  Returns the number of entries present in the database or snapshot.
+  Returns the number of entries present in the database.
   """
-  def size(%Snapshot{} = snapshot) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Enum.count(btree)
-    end)
-  end
-
   def size(db) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
       Enum.count(btree)
     end)
   end
 
-  @spec snapshot(GenServer.server(), timeout) :: snapshot
+  @spec snapshot(GenServer.server(), timeout) :: Snapshot.t()
 
   @doc """
   Returns a snapshot of the database in its current state.
@@ -527,9 +472,11 @@ defmodule CubDB do
   does not require to choose an arbitrary timeout, and also automatically
   releases the snapshot after use.
 
-  After obtaining a snapshot, it is possible to read from it using the same
-  functions used to read from the live database, such as `get/3`, get_multi/2`,
-  `fetch/2`, `has_key?/2`.
+  After obtaining a snapshot, it is possible to read from it using the functions
+  in `CubDB.Snapshot`, which work the same way as the functions in `CubDB` with
+  the same name, such as `CubDB.Snapshot.get/3`, `CubDB.Snapshot.get_multi/2`,
+  `CubDB.Snapshot.fetch/2`, `CubDB.Snapshot.has_key?/2`,
+  `CubDB.Snapshot.select/2`.
 
   It is *not* possible to perform write operations on a snapshot.
 
@@ -543,7 +490,7 @@ defmodule CubDB do
       # Getting a value from the snapshot returns the value of the entry at the
       # time the snapshot was obtained, even if the entry has changed in the
       # meanwhile
-      CubDB.get(snap, :a)
+      CubDB.Snapshot.get(snap, :a)
       # => 123
 
       # Getting the same value from the database returns the latest value
@@ -554,7 +501,7 @@ defmodule CubDB do
     GenServer.call(db, {:snapshot, timeout}, :infinity)
   end
 
-  @spec release_snapshot(snapshot) :: :ok
+  @spec release_snapshot(Snapshot.t()) :: :ok
 
   @doc """
   Releases a snapshot when it is not needed anymore, releasing related resources
@@ -566,11 +513,12 @@ defmodule CubDB do
   `:infinity` though, one has to manually call `release_snapshot/1` once the
   snapshot is not needed anymore.
   """
-  def release_snapshot(snapshot = %Snapshot{db: db}) do
+  def release_snapshot(snapshot) do
+    %Snapshot{db: db} = snapshot
     GenServer.call(db, {:release_snapshot, snapshot}, :infinity)
   end
 
-  @spec with_snapshot(GenServer.server(), (snapshot -> any)) :: any
+  @spec with_snapshot(GenServer.server(), (Snapshot.t() -> result)) :: result when result: any
 
   @doc """
   Calls `fun` passing a snapshot, and automatically releases the snapshot when
@@ -847,12 +795,6 @@ defmodule CubDB do
       CubDB.get_multi(db, [:a, :b, :c, :x])
       # => %{a: 1, b: 2, c: nil}
   """
-  def get_multi(%Snapshot{} = snapshot, keys) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:get_multi, keys})
-    end)
-  end
-
   def get_multi(db, keys) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
       Reader.perform(btree, {:get_multi, keys})
@@ -1074,10 +1016,10 @@ defmodule CubDB do
     GenServer.call(db, :current_db_file, :infinity)
   end
 
-  @spec back_up(GenServer.server() | snapshot, Path.t()) :: :ok | {:error, term}
+  @spec back_up(GenServer.server(), Path.t()) :: :ok | {:error, term}
 
   @doc """
-  Creates a backup of the database or snapshot into the target directory path
+  Creates a backup of the database into the target directory path
 
   The directory is created upon calling `back_up/2`, and an error tuple is
   returned if it already exists.
@@ -1089,26 +1031,10 @@ defmodule CubDB do
   After the backup completes successfully, it is possible to open it by starting
   a `CubDB` process using the target path as its data directory.
   """
-  def back_up(%Snapshot{} = snapshot, target_path) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      perform_back_up(btree, target_path)
-    end)
-  end
-
   def back_up(db, target_path) do
-    with_snapshot(db, fn %Snapshot{btree: btree} ->
-      perform_back_up(btree, target_path)
+    with_snapshot(db, fn snapshot ->
+      Snapshot.back_up(snapshot, target_path)
     end)
-  end
-
-  @spec perform_back_up(Btree.t(), Path.t()) :: :ok | {:error, term}
-
-  defp perform_back_up(btree, target_path) do
-    with :ok <- File.mkdir(target_path),
-         {:ok, store} <- Store.File.create(Path.join(target_path, "0#{@db_file_extension}")) do
-      Btree.load(btree, store) |> Btree.sync()
-      Store.close(store)
-    end
   end
 
   @spec cubdb_file?(String.t()) :: boolean
@@ -1138,22 +1064,6 @@ defmodule CubDB do
   def file_name_to_n(file_name) do
     base_name = Path.basename(file_name, Path.extname(file_name))
     String.to_integer(base_name, 16)
-  end
-
-  @spec extend_snapshot(snapshot, (snapshot -> result)) :: result when result: term
-
-  defp extend_snapshot(snapshot = %Snapshot{db: db}, fun) do
-    case GenServer.call(db, {:extend_snapshot, snapshot}, :infinity) do
-      {:ok, snap} ->
-        try do
-          fun.(snap)
-        after
-          CubDB.release_snapshot(snap)
-        end
-
-      _ ->
-        raise "Attempt to use CubDB snapshot after it was released or it timed out"
-    end
   end
 
   # OTP callbacks
@@ -1343,7 +1253,7 @@ defmodule CubDB do
 
   @spec checkin_reader(reference, Btree.t(), State.t()) :: State.t()
 
-  def checkin_reader(ref, btree, state) do
+  defp checkin_reader(ref, btree, state) do
     %State{readers: readers} = state
     %Btree{store: %Store.File{file_path: file_path}} = btree
 

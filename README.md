@@ -122,8 +122,8 @@ disk or in memory, apart from some small bookkeeping:
 # the key of y depends on the value of x, so we ensure consistency by getting
 # them from the same snapshot, isolating from the effects of concurrent writes
 {x, y} = CubDB.with_snapshot(db, fn snap ->
-  x = CubDB.get(snap, :x)
-  y = CubDB.get(snap, x)
+  x = CubDB.Snapshot.get(snap, :x)
+  y = CubDB.Snapshot.get(snap, x)
 
   {x, y}
 end)
