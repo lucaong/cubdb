@@ -19,7 +19,8 @@ reports changes here.
     unnecessary: by stopping the process calling `CubDB`, any running read
     operation by that process is stopped.
   - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
-    cost read only snapshots of the database.
+    cost read-only snapshots of the database. The functions in `CubDB.Snapshot`
+    allow to read from a snapshot.
   - Add `back_up/2` to produce a database backup. The backup process does not
     block readers or writers, and is isolated from concurrent writes.
   - Add `halt_compaction/1` to stop any running compaction operation

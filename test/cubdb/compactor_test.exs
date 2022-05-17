@@ -1,4 +1,4 @@
-defmodule CubDB.Store.CompactorTest do
+defmodule CubDB.CompactorTest do
   use ExUnit.Case
 
   alias CubDB.Btree
