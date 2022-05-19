@@ -12,7 +12,7 @@ defmodule CubDB.SnapshotTest do
     {:ok, tmp_dir: tmp_dir}
   end
 
-  test "get, get_multi, fetch, has_key?, size work as expected", %{tmp_dir: tmp_dir} do
+  test "get, get_multi, fetch, has_key?, size, and select work as expected", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     CubDB.put_multi(db, a: 1, c: 3)
 
@@ -29,6 +29,8 @@ defmodule CubDB.SnapshotTest do
 
     assert CubDB.Snapshot.has_key?(snap, :a)
     refute CubDB.Snapshot.has_key?(snap, :b)
+
+    assert {:ok, [a: 1, c: 3]} = CubDB.Snapshot.select(snap)
 
     assert 2 = CubDB.Snapshot.size(snap)
 

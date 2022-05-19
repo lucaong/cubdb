@@ -320,6 +320,148 @@ defmodule CubDBTest do
     assert_receive :clean_up_started, 1000
   end
 
+  test "transaction/2 when fun returns {:commit, :tx, result} commits the transaction and returns the result",
+       %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put_multi(db, a: 0, b: 0, x: 0)
+
+    assert 123 =
+             CubDB.transaction(db, fn tx ->
+               tx = CubDB.Tx.put(tx, :a, 1)
+               tx = CubDB.Tx.put(tx, :b, 2)
+               tx = CubDB.Tx.delete(tx, :x)
+               {:commit, tx, 123}
+             end)
+
+    assert 1 = CubDB.get(db, :a)
+    assert 2 = CubDB.get(db, :b)
+    assert :error = CubDB.fetch(db, :x)
+
+    :ok = CubDB.stop(db)
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    assert 1 = CubDB.get(db, :a)
+    assert 2 = CubDB.get(db, :b)
+    assert :error = CubDB.fetch(db, :x)
+  end
+
+  test "transaction/2 when fun returns {:cancel, result} cancels the transaction and returns the result",
+       %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put_multi(db, a: 0, x: 0)
+
+    assert 123 =
+             CubDB.transaction(db, fn tx ->
+               tx = CubDB.Tx.put(tx, :a, 1)
+               CubDB.Tx.delete(tx, :x)
+               {:cancel, 123}
+             end)
+
+    assert 0 = CubDB.get(db, :a)
+    assert 0 = CubDB.get(db, :x)
+
+    :ok = CubDB.stop(db)
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    assert 0 = CubDB.get(db, :a)
+    assert 0 = CubDB.get(db, :x)
+  end
+
+  test "transaction/2 when fun raises an exception cancels the transaction and re-raises the exception",
+       %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put_multi(db, a: 0, x: 0)
+
+    assert_raise RuntimeError, "boom!", fn ->
+      CubDB.transaction(db, fn tx ->
+        tx = CubDB.Tx.put(tx, :a, 1)
+        CubDB.Tx.delete(tx, :x)
+        raise "boom!"
+      end)
+    end
+
+    :ok = CubDB.stop(db)
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    assert 0 = CubDB.get(db, :a)
+    assert 0 = CubDB.get(db, :x)
+  end
+
+  test "transaction/2 when fun throws a value cancels the transaction and re-throws the value", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put_multi(db, a: 0, x: 0)
+
+    assert :hello =
+             catch_throw(
+               CubDB.transaction(db, fn tx ->
+                 tx = CubDB.Tx.put(tx, :a, 1)
+                 CubDB.Tx.delete(tx, :x)
+                 throw(:hello)
+               end)
+             )
+
+    :ok = CubDB.stop(db)
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    assert 0 = CubDB.get(db, :a)
+    assert 0 = CubDB.get(db, :x)
+  end
+
+  test "transaction/2 when fun exits cancels the transaction and exits again with the same value",
+       %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put_multi(db, a: 0, x: 0)
+
+    assert "hello" =
+             catch_exit(
+               CubDB.transaction(db, fn tx ->
+                 tx = CubDB.Tx.put(tx, :a, 1)
+                 CubDB.Tx.delete(tx, :x)
+                 exit("hello")
+               end)
+             )
+
+    :ok = CubDB.stop(db)
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    assert 0 = CubDB.get(db, :a)
+    assert 0 = CubDB.get(db, :x)
+  end
+
+  test "transaction/2 raises when used inside another transaction", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    assert_raise RuntimeError,
+                 "Cannot start nested write transaction. You might be using CubDB instead of CubDB.Tx to perform writes inside of a transaction",
+                 fn ->
+                   CubDB.transaction(db, fn _tx ->
+                     CubDB.transaction(db, fn _tx -> nil end)
+                   end)
+                 end
+  end
+
+  test "transaction/2 raises when trying to commit another transaction", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+
+    tx =
+      CubDB.transaction(db, fn tx ->
+        tx = CubDB.Tx.put(tx, :a, 1)
+        {:cancel, tx}
+      end)
+
+    assert_raise RuntimeError,
+                 "Attempt to commit a transaction started by a different owner",
+                 fn ->
+                   CubDB.transaction(db, fn _ ->
+                     {:commit, tx, nil}
+                   end)
+                 end
+
+    assert CubDB.has_key?(db, :a) == false
+  end
+
   test "reads are concurrent", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     entries = [a: 1, b: 2, c: 3, d: 4]

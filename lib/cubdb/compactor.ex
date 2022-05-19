@@ -20,7 +20,7 @@ defmodule CubDB.Compactor do
   alias CubDB.Btree
   alias CubDB.Store
   alias CubDB.Snapshot
-  alias CubDB.Writer
+  alias CubDB.Tx
 
   @value Btree.__value__()
   @deleted Btree.__deleted__()
@@ -50,11 +50,11 @@ defmodule CubDB.Compactor do
 
   def catch_up(db, compacted_btree, original_btree) do
     result =
-      Writer.acquire(db, fn
-        ^original_btree ->
-          {compacted_btree, :done}
+      CubDB.transaction(db, fn
+        %Tx{btree: ^original_btree} = tx ->
+          {:commit, %Tx{tx | btree: compacted_btree}, :done}
 
-        latest_btree ->
+        %Tx{btree: latest_btree} ->
           {:cancel, latest_btree}
       end)
 
