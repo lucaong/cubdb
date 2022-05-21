@@ -8,6 +8,10 @@ reports changes here.
 
 ## v2.0.0 (unreleased)
 
+Version `2.0.0` brings better concurrency, atomic transactions with arbitrary
+operations, zero cost read-only snapshots, database backup, and more, all with a
+simpler and more scalable internal architecture.
+
   - [breaking] The functions `get_and_update/3` and `get_and_update_multi/3` now
     return directly `result`, instead of a `{:ok, result}` tuple.
   - [breaking] `get_and_update_multi/4` does not take an option argument
