@@ -21,6 +21,9 @@ reports changes here.
   - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
     cost read-only snapshots of the database. The functions in `CubDB.Snapshot`
     allow to read from a snapshot.
+  - Add `transaction/2` to perform multiple write (and read) operations in a
+    single atomic transaction. The functions in `CubDB.Tx` allow to read and
+    write on a transaction.
   - Add `back_up/2` to produce a database backup. The backup process does not
     block readers or writers, and is isolated from concurrent writes.
   - Add `halt_compaction/1` to stop any running compaction operation

@@ -144,9 +144,9 @@ defmodule CubDB do
   alias CubDB.CleanUp
   alias CubDB.Compactor
   alias CubDB.Reader
-  alias CubDB.Writer
   alias CubDB.Store
   alias CubDB.Snapshot
+  alias CubDB.Tx
 
   @db_file_extension ".cub"
   @compaction_file_extension ".compact"
@@ -187,7 +187,7 @@ defmodule CubDB do
             auto_compact: {pos_integer, number} | false,
             auto_file_sync: boolean,
             subs: list(pid),
-            writer: pid | nil,
+            writer: GenServer.from() | nil,
             write_queue: :queue.queue()
           }
 
@@ -556,6 +556,138 @@ defmodule CubDB do
     end
   end
 
+  @spec transaction(GenServer.server(), (Tx.t() -> {:commit, Tx.t(), result} | {:cancel, result})) ::
+          result
+        when result: any
+
+  @doc """
+  Starts a write transaction, passes it to the given function, and commits or
+  cancels it depending on the return value.
+
+  The transaction blocks other writers until the function returns, but does not
+  block concurrent readers.
+
+  The module `CubDB.Tx` contains functions to perform read and write operations
+  on the transaction. The function `fun` is called with the transaction as
+  argument, and should return `{:commit, tx, results}` to commit the transaction
+  `tx` and return `result`, or `{:cancel, result}` to cancel the transaction and
+  return `result`.
+
+  Only use `CubDB.Tx` functions to write when inside a transaction (like
+  `CubDB.Tx.put` or `CubDB.Tx.delete`). Using functions in the `CubDB` module to
+  perform a write when inside a transaction (like `CubDB.put` or `CubDB.delete`)
+  raises an exception. Note that functions in `CubDB.Tx` writing to the
+  transaction have a functional API, so they return a modified transaction
+  rather than mutating it in place.
+
+  The transaction value passed to `fun` should not be used outside of the
+  function.
+
+  ## Example:
+
+  Suppose the keys `:a` and `:b` map to balances, and we want to transfer 5 from
+  `:a` to `:b`, if `:a` has enough balance:
+
+      CubDB.transaction(db, fn tx ->
+        a = CubDB.Tx.get(tx, :a)
+        b = CubDB.Tx.get(tx, :b)
+
+        if a >= 5 do
+          tx = CubDB.Tx.put(tx, :a, a - 5)
+          tx = CubDB.Tx.put(tx, :b, b + 5)
+          {:commit, tx, :ok}
+        else
+          {:cancel, :not_enough_balance}
+        end
+      end)
+
+  The read functions in `CubDB.Tx` read the in-transaction state, as opposed to
+  the live database state, so they see writes performed inside the transaction
+  even before they are committed:
+
+      # Assuming we start from an empty database
+      CubDB.transaction(db, fn tx ->
+        tx = CubDB.Tx.put(tx, :a, 123)
+
+        # CubDB.Tx.get sees the in-transaction value
+        CubDB.Tx.get(tx, :a)
+        # => 123
+
+        # CubDB.get instead does not see the uncommitted write
+        CubDB.get(db, :a)
+        # => nil
+
+        {:commit, tx, nil}
+      end)
+
+      # After the transaction is committed, CubDB.get sees the write
+      CubDB.get(db, :a)
+      # => 123
+  """
+  def transaction(db, fun) do
+    tx = start_transaction(db)
+
+    returned =
+      try do
+        fun.(tx)
+      rescue
+        exception ->
+          cancel_transaction(db)
+          reraise(exception, __STACKTRACE__)
+      catch
+        :throw, value ->
+          cancel_transaction(db)
+          throw(value)
+
+        :exit, value ->
+          cancel_transaction(db)
+          exit(value)
+      end
+
+    case returned do
+      {:commit, %Tx{} = tx, result} ->
+        commit_transaction(db, tx)
+        result
+
+      {:cancel, result} ->
+        cancel_transaction(db)
+        result
+
+      _ ->
+        raise "Wrong return value from CubDB.transaction/2 function, only {:commit, transaction, result} or {:cancel, result} are allowed"
+    end
+  end
+
+  @spec start_transaction(GenServer.server()) :: Tx.t()
+
+  defp start_transaction(db) do
+    case GenServer.call(db, :start_transaction, :infinity) do
+      {:error, :already_in_transaction} ->
+        raise "Cannot start nested write transaction. You might be using CubDB instead of CubDB.Tx to perform writes inside of a transaction"
+
+      %Tx{} = tx ->
+        tx
+    end
+  end
+
+  @spec cancel_transaction(GenServer.server()) :: :ok
+
+  defp cancel_transaction(db) do
+    GenServer.call(db, :cancel_transaction, :infinity)
+  end
+
+  @spec commit_transaction(GenServer.server(), Tx.t()) :: :ok
+
+  defp commit_transaction(db, tx) do
+    case GenServer.call(db, {:commit_transaction, tx}, :infinity) do
+      {:error, :invalid_owner} ->
+        raise "Attempt to commit a transaction started by a different owner"
+
+      :ok ->
+        :ok
+    end
+  end
+
   @spec dirt_factor(GenServer.server()) :: float
 
   @doc """
@@ -579,8 +711,8 @@ defmodule CubDB do
   If `key` was already present, it is overwritten.
   """
   def put(db, key, value) do
-    Writer.acquire(db, fn btree ->
-      {Btree.insert(btree, key, value) |> Btree.commit(), :ok}
+    transaction(db, fn tx ->
+      {:commit, Tx.put(tx, key, value), :ok}
     end)
   end
 
@@ -594,13 +726,13 @@ defmodule CubDB do
   :exists}`.
   """
   def put_new(db, key, value) do
-    Writer.acquire(db, fn btree ->
-      case Btree.insert_new(btree, key, value) do
+    transaction(db, fn tx ->
+      case Tx.put_new(tx, key, value) do
         {:error, :exists} = reply ->
-          {btree, reply}
+          {:cancel, reply}
 
-        btree ->
-          {Btree.commit(btree), :ok}
+        tx ->
+          {:commit, tx, :ok}
       end
     end)
   end
@@ -613,14 +745,8 @@ defmodule CubDB do
   If `key` was not present in the database, nothing is done.
   """
   def delete(db, key) do
-    Writer.acquire(db, fn btree ->
-      if compacting?(db) do
-        {Btree.mark_deleted(btree, key) |> Btree.commit(), :ok}
-      else
-        new_btree = Btree.delete(btree, key)
-        new_btree = if new_btree != btree, do: Btree.commit(new_btree), else: new_btree
-        {new_btree, :ok}
-      end
+    transaction(db, fn tx ->
+      {:commit, Tx.delete(tx, key), :ok}
     end)
   end
 
@@ -724,16 +850,16 @@ defmodule CubDB do
       end)
   """
   def get_and_update_multi(db, keys_to_get, fun) do
-    Writer.acquire(db, fn btree ->
+    transaction(db, fn %Tx{btree: btree} = tx ->
       key_values = Reader.perform(btree, {:get_multi, keys_to_get})
       {result, entries_to_put, keys_to_delete} = fun.(key_values)
 
-      case do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete) do
+      case do_put_and_delete_multi(tx, entries_to_put, keys_to_delete) do
         {:cancel, :ok} ->
           {:cancel, result}
 
-        {btree, :ok} ->
-          {btree, result}
+        {:commit, tx, :ok} ->
+          {:commit, tx, result}
       end
     end)
   end
@@ -747,36 +873,31 @@ defmodule CubDB do
   value}`. Keys to delete are passed as a list of keys.
   """
   def put_and_delete_multi(db, entries_to_put, keys_to_delete) do
-    Writer.acquire(db, fn btree ->
-      do_put_and_delete_multi(db, btree, entries_to_put, keys_to_delete)
+    transaction(db, fn tx ->
+      do_put_and_delete_multi(tx, entries_to_put, keys_to_delete)
     end)
   end
 
-  @spec do_put_and_delete_multi(GenServer.server(), Btree.t(), [entry], [key]) ::
-          {Btree.t(), :ok} | {:cancel, :ok}
+  @spec do_put_and_delete_multi(Tx.t(), [entry], [key]) ::
+          {:commit, Tx.t(), :ok} | {:cancel, :ok}
 
-  defp do_put_and_delete_multi(_db, _btree, [], []), do: {:cancel, :ok}
+  defp do_put_and_delete_multi(_tx, [], []), do: {:cancel, :ok}
 
-  defp do_put_and_delete_multi(_db, _btree, entries_to_put, []) when entries_to_put == %{},
+  defp do_put_and_delete_multi(_tx, entries_to_put, []) when entries_to_put == %{},
     do: {:cancel, :ok}
 
-  defp do_put_and_delete_multi(db, original_btree, entries_to_put, keys_to_delete) do
-    btree =
-      Enum.reduce(entries_to_put || [], original_btree, fn {key, value}, btree ->
-        Btree.insert(btree, key, value)
+  defp do_put_and_delete_multi(tx, entries_to_put, keys_to_delete) do
+    tx =
+      Enum.reduce(entries_to_put || [], tx, fn {key, value}, tx ->
+        Tx.put(tx, key, value)
       end)
 
-    btree =
-      Enum.reduce(keys_to_delete || [], btree, fn key, btree ->
-        case compacting?(db) do
-          false -> Btree.delete(btree, key)
-          true -> Btree.mark_deleted(btree, key)
-        end
+    tx =
+      Enum.reduce(keys_to_delete || [], tx, fn key, tx ->
+        Tx.delete(tx, key)
       end)
 
-    btree = if original_btree != btree, do: Btree.commit(btree), else: btree
-
-    {btree, :ok}
+    {:commit, tx, :ok}
   end
 
   @spec get_multi(GenServer.server(), [key]) :: %{key => value}
@@ -839,23 +960,10 @@ defmodule CubDB do
   halted, and a new one started immediately after. The new compaction should be
   very fast, as the database is empty as a result of the `clear/1` call.
   """
-
   def clear(db) do
-    should_compact =
-      Writer.acquire(db, fn btree ->
-        btree = Btree.clear(btree) |> Btree.commit()
-
-        if compacting?(db) do
-          halt_compaction(db)
-          {btree, true}
-        else
-          {btree, false}
-        end
-      end)
-
-    if should_compact, do: compact(db)
-
-    :ok
+    transaction(db, fn tx ->
+      {:commit, Tx.clear(tx), :ok}
+    end)
   end
 
   @spec compact(GenServer.server()) :: :ok | {:error, String.t()}
@@ -1139,23 +1247,36 @@ defmodule CubDB do
     {:reply, Btree.dirt_factor(btree), state}
   end
 
-  def handle_call(:start_write, {pid, _}, state = %State{writer: nil}) do
+  def handle_call(:start_transaction, from, state = %State{writer: nil}) do
     %State{btree: btree} = state
-    {:reply, btree, %State{state | writer: pid}}
+
+    {:reply, %Tx{btree: btree, compacting: compaction_running?(state), owner: from},
+     %State{state | writer: from}}
   end
 
-  def handle_call(:start_write, from, state) do
+  def handle_call(:start_transaction, {pid, _}, state = %State{writer: {pid, _}}) do
+    {:reply, {:error, :already_in_transaction}, state}
+  end
+
+  def handle_call(:start_transaction, from, state) do
     %State{write_queue: queue} = state
     {:noreply, %State{state | write_queue: :queue.in(from, queue)}}
   end
 
-  def handle_call(:cancel_write, {pid, _}, state = %State{writer: pid}) do
+  def handle_call(:cancel_transaction, {pid, _}, state = %State{writer: {pid, _}}) do
     {:reply, :ok, advance_write_queue(state)}
   end
 
-  def handle_call({:complete_write, btree}, {pid, _}, state = %State{writer: pid}) do
+  def handle_call({:commit_transaction, %Tx{owner: owner}}, _, state = %State{writer: writer})
+      when owner != writer do
+    {:reply, {:error, :invalid_owner}, state}
+  end
+
+  def handle_call({:commit_transaction, tx}, {pid, _}, state = %State{writer: {pid, _}}) do
+    %Tx{btree: btree, recompact: recompact} = tx
     %State{btree: current_btree, old_btrees: old_btrees} = state
-    btree = if btree != current_btree && state.auto_file_sync, do: Btree.sync(btree), else: btree
+
+    btree = if btree != current_btree, do: maybe_sync(Btree.commit(btree), state), else: btree
 
     %Btree{store: current_store} = current_btree
     %Btree{store: new_store} = btree
@@ -1172,10 +1293,16 @@ defmodule CubDB do
         %State{state | btree: btree}
       end
 
+    state = advance_write_queue(state)
+
     state =
-      state
-      |> advance_write_queue()
-      |> maybe_auto_compact()
+      if recompact do
+        state = do_halt_compaction(state)
+        trigger_compaction(state)
+        state
+      else
+        maybe_auto_compact(state)
+      end
 
     {:reply, :ok, state}
   end
@@ -1250,6 +1377,11 @@ defmodule CubDB do
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     {:noreply, state}
   end
+
+  @spec maybe_sync(Btree.t(), State.t()) :: Btree.t()
+
+  defp maybe_sync(btree, %State{auto_file_sync: false}), do: btree
+  defp maybe_sync(btree, %State{auto_file_sync: true}), do: Btree.sync(btree)
 
   @spec checkin_reader(reference, Btree.t(), State.t()) :: State.t()
 
@@ -1438,9 +1570,13 @@ defmodule CubDB do
     {writer, queue} =
       case :queue.out(queue) do
         {{:value, next}, queue} ->
-          GenServer.reply(next, btree)
-          {pid, _} = next
-          {pid, queue}
+          GenServer.reply(next, %Tx{
+            btree: btree,
+            compacting: compaction_running?(state),
+            owner: next
+          })
+
+          {next, queue}
 
         {:empty, queue} ->
           {nil, queue}
