@@ -38,7 +38,7 @@ section](https://hexdocs.pm/cubdb/howto.html) for more information.
 
 To ensure consistency, performance, and robustness to data corruption, `CubDB`
 database file uses an append-only, immutable B-tree data structure. Entries are
-never changed in-place, and read operations are performed on immutable
+never changed in-place, and read operations are performed on zero cost immutable
 snapshots.
 
 

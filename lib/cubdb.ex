@@ -24,8 +24,8 @@ defmodule CubDB do
 
   To ensure consistency, performance, and robustness to data corruption, `CubDB`
   database file uses an append-only, immutable B-tree data structure. Entries
-  are never changed in-place, and read operations are performed on immutable
-  snapshots.
+  are never changed in-place, and read operations are performed on zero cost
+  immutable snapshots.
 
   More information can be found in the following sections:
 
@@ -480,23 +480,27 @@ defmodule CubDB do
   @doc """
   Returns a snapshot of the database in its current state.
 
-  A snapshot is an immutable representation of the state of the database at a
-  specific time.
+  _Note: it is usually better to use `with_snapshot/2` instead of `snapshot/2`,
+  as the former automatically manages the snapshot life cycle, even in case of
+  crashes._
 
-  Getting a snapshot is basically zero-cost: nothing needs to be copied or
-  written, apart from some small in-memory bookkeeping. The only cost of a
-  snapshot is that it delays cleanup of old files after compaction for as long
-  as it is in use. For this reason, a snapshot has a timeout, configurable as
-  the optional second argument of `snapshot/2` (defaulting to 5000, or 5
-  seconds, if not specified). After such timeout elapses, the snapshot cannot be
-  used anymore, and any pending cleanup is performed.
+  A snapshot is an immutable, read-only representation of the database at a
+  specific point in time. Getting a snapshot is basically zero-cost: nothing
+  needs to be copied or written, apart from some small in-memory bookkeeping.
+
+  The only cost of a snapshot is that it delays cleanup of old files after
+  compaction for as long as it is in use. For this reason, a snapshot has a
+  timeout, configurable as the optional second argument of `snapshot/2`
+  (defaulting to 5000, or 5 seconds, if not specified). After such timeout
+  elapses, the snapshot cannot be used anymore, and any pending cleanup is
+  performed.
 
   It is possible to pass `:infinity` as the timeout, but then one must manually
   call `release_snapshot/1` to release the snapshot after use.
 
-  Alternatively, using `with_snapshot/1` is often a better alternative, as it
-  does not require to choose an arbitrary timeout, and also automatically
-  releases the snapshot after use.
+  Using `with_snapshot/1` is often a better alternative to `snapshot/2`, as it
+  does not require to choose an arbitrary timeout, and automatically ensures
+  that the the snapshot is released after use, even in case of a crash.
 
   After obtaining a snapshot, it is possible to read from it using the functions
   in `CubDB.Snapshot`, which work the same way as the functions in `CubDB` with
@@ -504,7 +508,7 @@ defmodule CubDB do
   `CubDB.Snapshot.fetch/2`, `CubDB.Snapshot.has_key?/2`,
   `CubDB.Snapshot.select/2`.
 
-  It is *not* possible to perform write operations on a snapshot.
+  It is *not* possible to write on a snapshot.
 
   ## Example
 
@@ -538,6 +542,9 @@ defmodule CubDB do
   released after the timeout elapses. When getting a snapshot with a timeout of
   `:infinity` though, one has to manually call `release_snapshot/1` once the
   snapshot is not needed anymore.
+
+  In most cases, using `with_snapshot/2` is a better alternative to manually
+  calling `snapshot/2` and `release_snapshot/1`
   """
   def release_snapshot(snapshot) do
     %Snapshot{db: db} = snapshot
@@ -550,25 +557,40 @@ defmodule CubDB do
   Calls `fun` passing a snapshot, and automatically releases the snapshot when
   the function returns
 
-  It returns the value returned by calling the function `fun`.
+  It returns the value returned by the function `fun`.
 
-  This is equivalent to obtaining a snapshot with `snapshot/2` and a timeout of
-  `:infinity`, performing the operations in the body of the function, then
-  manually releasing the snapshot with `release_snapshot/1`, but by using
-  `with_snapshot/2` one does not have to choose an arbitrary timeout value, or
-  remember to release the snapshot.
+  A snapshot is an immutable, read-only representation of the database at a
+  specific point in time, isolated from writes. It is basically zero-cost:
+  nothing needs to be copied or written, apart from some small in-memory
+  bookkeeping.
+
+  Calling `with_snapshot/2` is equivalent to obtaining a snapshot with
+  `snapshot/2` and a timeout of `:infinity`, performing the operations in the
+  body of the function, then manually releasing the snapshot with
+  `release_snapshot/1`, but `with_snapshot/2` automatically manages the snapshot
+  life cycle, also in case of an exception is raise, a value is thrown, or the
+  process exists. This makes `with_snapshot/2` usually a better choice than
+  `snapshot/2`.
+
+  After obtaining a snapshot, it is possible to read from it using the functions
+  in `CubDB.Snapshot`, which work the same way as the functions in `CubDB` with
+  the same name, such as `CubDB.Snapshot.get/3`, `CubDB.Snapshot.get_multi/2`,
+  `CubDB.Snapshot.fetch/2`, `CubDB.Snapshot.has_key?/2`,
+  `CubDB.Snapshot.select/2`.
+
+  It is *not* possible to write on a snapshot.
 
   ## Example
 
   Assume that we have two entries in the database, and the key of the second
   entry depends on the value of the first (so the value of the first entry
-  "points" to the other entry). In this case, we might want to get both entries
-  from the same snapshot, to avoid inconsistencies. Here's how that can be done
-  with `with_snapshot/2`:
+  "points" to the other entry). In this case, we want to get both entries from
+  the same snapshot, to avoid inconsistencies due to concurrent writes. Here's
+  how that can be done with `with_snapshot/2`:
 
       {x, y} = CubDB.with_snapshot(db, fn snap ->
-        x = CubDB.get(snap, :x)
-        y = CubDB.get(snap, x)
+        x = CubDB.Snapshot.get(snap, :x)
+        y = CubDB.Snapshot.get(snap, x)
         {x, y}
       end)
   """
@@ -591,20 +613,24 @@ defmodule CubDB do
   cancels it depending on the return value.
 
   The transaction blocks other writers until the function returns, but does not
-  block concurrent readers.
+  block concurrent readers. When the need is to only read inside a transaction,
+  and not perform any write, using a snapshot is a better choice, as it does not
+  block writers (see `with_snapshot/2`).
 
   The module `CubDB.Tx` contains functions to perform read and write operations
-  on the transaction. The function `fun` is called with the transaction as
+  whithin the transaction. The function `fun` is called with the transaction as
   argument, and should return `{:commit, tx, results}` to commit the transaction
   `tx` and return `result`, or `{:cancel, result}` to cancel the transaction and
   return `result`.
 
+  If an exception is raised, or a value thrown, or the process exits while
+  inside of a transaction, the transaction is cancelled.
+
   Only use `CubDB.Tx` functions to write when inside a transaction (like
   `CubDB.Tx.put` or `CubDB.Tx.delete`). Using functions in the `CubDB` module to
   perform a write when inside a transaction (like `CubDB.put` or `CubDB.delete`)
-  raises an exception. Note that functions in `CubDB.Tx` writing to the
-  transaction have a functional API, so they return a modified transaction
-  rather than mutating it in place.
+  raises an exception. Note that write functions in `CubDB.Tx` have a functional
+  API: they return a modified transaction rather than mutating it in place.
 
   The transaction value passed to `fun` should not be used outside of the
   function.
