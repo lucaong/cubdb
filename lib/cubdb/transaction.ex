@@ -32,7 +32,7 @@ defmodule CubDB.Tx do
   the live database.
   """
   def get(%Tx{btree: btree}, key, default \\ nil) do
-    Reader.perform(btree, {:get, key, default})
+    Reader.get(btree, key, default)
   end
 
   @spec fetch(Tx.t(), CubDB.key()) :: {:ok, CubDB.value()} | :error
@@ -48,7 +48,7 @@ defmodule CubDB.Tx do
   the live database.
   """
   def fetch(%Tx{btree: btree}, key) do
-    Reader.perform(btree, {:fetch, key})
+    Reader.fetch(btree, key)
   end
 
   @spec has_key?(Tx.t(), CubDB.key()) :: boolean
@@ -60,11 +60,10 @@ defmodule CubDB.Tx do
   of the live database.
   """
   def has_key?(%Tx{btree: btree}, key) do
-    Reader.perform(btree, {:has_key?, key})
+    Reader.has_key?(btree, key)
   end
 
-  @spec select(Tx.t(), [CubDB.select_option()]) ::
-          {:ok, any} | {:error, Exception.t()}
+  @spec select(Tx.t(), [CubDB.select_option()]) :: any
 
   @doc """
   Selects a range of entries from the transaction, and optionally performs a
@@ -74,7 +73,7 @@ defmodule CubDB.Tx do
   from a transaction instead of the live database.
   """
   def select(%Tx{btree: btree}, options \\ []) when is_list(options) do
-    Reader.perform(btree, {:select, options})
+    Reader.select(btree, options)
   end
 
   @spec size(Tx.t()) :: non_neg_integer
@@ -86,7 +85,7 @@ defmodule CubDB.Tx do
   live database.
   """
   def size(%Tx{btree: btree}) do
-    Enum.count(btree)
+    Reader.size(btree)
   end
 
   @spec put(Tx.t(), CubDB.key(), CubDB.value()) :: Tx.t()

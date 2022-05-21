@@ -34,12 +34,12 @@ defmodule CubDB.TransactionTest do
 
       assert 2 = CubDB.Tx.size(tx)
 
-      assert {:ok, [a: 1, b: 2]} = CubDB.Tx.select(tx)
+      assert [a: 1, b: 2] = CubDB.Tx.select(tx)
 
       {:cancel, nil}
     end)
 
-    assert {:ok, [a: 1, c: 3]} = CubDB.select(db)
+    assert [a: 1, c: 3] = CubDB.select(db)
   end
 
   test "put/3 inserts an entry if committed", %{tmp_dir: tmp_dir} do

@@ -14,16 +14,18 @@ defmodule CubDB.Reader do
           | {:has_key?, CubDB.key()}
           | {:select, Keyword.t()}
 
-  @spec perform(Btree.t(), operation) :: any
+  @spec get(Btree.t(), CubDB.key(), any) :: any
 
-  def perform(btree, {:get, key, default}) do
+  def get(btree, key, default) do
     case Btree.fetch(btree, key) do
       {:ok, value} -> value
       :error -> default
     end
   end
 
-  def perform(btree, {:get_multi, keys}) do
+  @spec get_multi(Btree.t(), [CubDB.key()]) :: %{CubDB.key() => CubDB.value()}
+
+  def get_multi(btree, keys) do
     Enum.reduce(keys, %{}, fn key, map ->
       case Btree.fetch(btree, key) do
         {:ok, value} -> Map.put(map, key, value)
@@ -32,26 +34,28 @@ defmodule CubDB.Reader do
     end)
   end
 
-  def perform(btree, {:fetch, key}) do
+  @spec fetch(Btree.t(), CubDB.key()) :: {:ok, CubDB.value()} | :error
+
+  def fetch(btree, key) do
     Btree.fetch(btree, key)
   end
 
-  def perform(btree, {:has_key?, key}) do
+  @spec has_key?(Btree.t(), CubDB.key()) :: boolean
+
+  def has_key?(btree, key) do
     case Btree.fetch(btree, key) do
       {:ok, _} -> true
       :error -> false
     end
   end
 
-  def perform(btree, {:select, options}) do
-    {:ok, select(btree, options)}
-  rescue
-    error -> {:error, error}
-  end
+  @spec size(Btree.t()) :: non_neg_integer
 
-  @spec select(Btree.t(), Keyword.t()) :: any
+  def size(btree), do: Enum.count(btree)
 
-  defp select(btree, options) when is_list(options) do
+  @spec select(Btree.t(), [CubDB.select_option()]) :: any
+
+  def select(btree, options) when is_list(options) do
     min_key =
       case Keyword.fetch(options, :min_key) do
         {:ok, key} ->

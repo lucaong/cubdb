@@ -34,7 +34,7 @@ defmodule CubDB.Snapshot do
   """
   def get(%Snapshot{} = snapshot, key, default \\ nil) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:get, key, default})
+      Reader.get(btree, key, default)
     end)
   end
 
@@ -49,7 +49,7 @@ defmodule CubDB.Snapshot do
   """
   def get_multi(%Snapshot{} = snapshot, keys) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:get_multi, keys})
+      Reader.get_multi(btree, keys)
     end)
   end
 
@@ -67,7 +67,7 @@ defmodule CubDB.Snapshot do
   """
   def fetch(%Snapshot{} = snapshot, key) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:fetch, key})
+      Reader.fetch(btree, key)
     end)
   end
 
@@ -81,26 +81,22 @@ defmodule CubDB.Snapshot do
   """
   def has_key?(%Snapshot{} = snapshot, key) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:has_key?, key})
+      Reader.has_key?(btree, key)
     end)
   end
 
-  @spec select(Snapshot.t(), [CubDB.select_option()]) ::
-          {:ok, any} | {:error, Exception.t()}
+  @spec select(Snapshot.t(), [CubDB.select_option()]) :: any
 
   @doc """
   Selects a range of entries from the snapshot, and optionally performs a
   pipeline of operations on them.
-
-  It returns `{:ok, result}` if successful, or `{:error, exception}` if an
-  exception is raised.
 
   It works the same and accepts the same options as `CubDB.select/2`, but reads
   from a snapshot instead of the live database.
   """
   def select(%Snapshot{} = snapshot, options \\ []) when is_list(options) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:select, options})
+      Reader.select(btree, options)
     end)
   end
 
@@ -114,7 +110,7 @@ defmodule CubDB.Snapshot do
   """
   def size(%Snapshot{} = snapshot) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Enum.count(btree)
+      Reader.size(btree)
     end)
   end
 

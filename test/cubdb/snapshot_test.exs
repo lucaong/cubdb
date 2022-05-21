@@ -30,7 +30,7 @@ defmodule CubDB.SnapshotTest do
     assert CubDB.Snapshot.has_key?(snap, :a)
     refute CubDB.Snapshot.has_key?(snap, :b)
 
-    assert {:ok, [a: 1, c: 3]} = CubDB.Snapshot.select(snap)
+    assert [a: 1, c: 3] = CubDB.Snapshot.select(snap)
 
     assert 2 = CubDB.Snapshot.size(snap)
 
@@ -49,7 +49,7 @@ defmodule CubDB.SnapshotTest do
     snap = CubDB.snapshot(db, 50)
     :ok = CubDB.compact(db)
 
-    {:ok, result} =
+    result =
       CubDB.Snapshot.select(snap,
         pipe: [
           map: fn x ->

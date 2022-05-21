@@ -330,7 +330,7 @@ defmodule CubDB do
   """
   def get(db, key, default \\ nil) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:get, key, default})
+      Reader.get(btree, key, default)
     end)
   end
 
@@ -345,7 +345,7 @@ defmodule CubDB do
   """
   def fetch(db, key) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:fetch, key})
+      Reader.fetch(btree, key)
     end)
   end
 
@@ -356,19 +356,15 @@ defmodule CubDB do
   """
   def has_key?(db, key) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:has_key?, key})
+      Reader.has_key?(btree, key)
     end)
   end
 
-  @spec select(GenServer.server(), [select_option]) ::
-          {:ok, any} | {:error, Exception.t()}
+  @spec select(GenServer.server(), [select_option]) :: any
 
   @doc """
   Selects a range of entries from the database, and optionally performs a
   pipeline of operations on them.
-
-  It returns `{:ok, result}` if successful, or `{:error, exception}` if an
-  exception is raised.
 
   ## Options
 
@@ -432,22 +428,22 @@ defmodule CubDB do
   To select all entries with keys between `:a` and `:c` as a list of `{key,
   value}` entries we can do:
 
-      {:ok, entries} = CubDB.select(db, min_key: :a, max_key: :c)
+      entries = CubDB.select(db, min_key: :a, max_key: :c)
 
   If we want to get all entries with keys between `:a` and `:c`, with `:c`
   excluded, we can do:
 
-      {:ok, entries} = CubDB.select(db,
+      entries = CubDB.select(db,
         min_key: :a, max_key: :c, max_key_inclusive: false)
 
   To select the last 3 entries, we can do:
 
-      {:ok, entries} = CubDB.select(db, reverse: true, pipe: [take: 3])
+      entries = CubDB.select(db, reverse: true, pipe: [take: 3])
 
   If we want to obtain the sum of the first 10 positive numeric values
   associated to keys from `:a` to `:f`, we can do:
 
-      {:ok, sum} = CubDB.select(db,
+      sum = CubDB.select(db,
         min_key: :a,
         max_key: :f,
         pipe: [
@@ -460,7 +456,7 @@ defmodule CubDB do
   """
   def select(db, options \\ []) when is_list(options) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:select, options})
+      Reader.select(btree, options)
     end)
   end
 
@@ -471,7 +467,7 @@ defmodule CubDB do
   """
   def size(db) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
-      Enum.count(btree)
+      Reader.size(btree)
     end)
   end
 
@@ -903,7 +899,7 @@ defmodule CubDB do
   """
   def get_and_update_multi(db, keys_to_get, fun) do
     transaction(db, fn %Tx{btree: btree} = tx ->
-      key_values = Reader.perform(btree, {:get_multi, keys_to_get})
+      key_values = Reader.get_multi(btree, keys_to_get)
       {result, entries_to_put, keys_to_delete} = fun.(key_values)
 
       case do_put_and_delete_multi(tx, entries_to_put, keys_to_delete) do
@@ -970,7 +966,7 @@ defmodule CubDB do
   """
   def get_multi(db, keys) do
     with_snapshot(db, fn %Snapshot{btree: btree} ->
-      Reader.perform(btree, {:get_multi, keys})
+      Reader.get_multi(btree, keys)
     end)
   end
 

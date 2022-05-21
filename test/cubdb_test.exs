@@ -140,7 +140,7 @@ defmodule CubDBTest do
 
     CubDB.stop(db)
     {:ok, db} = CubDB.start_link(tmp_dir)
-    assert {:ok, [{^key, 123}]} = CubDB.select(db)
+    assert [{^key, 123}] = CubDB.select(db)
   end
 
   test "delete/2 does not error and does not write to disk when deleting an entry that was not present",
@@ -177,24 +177,24 @@ defmodule CubDBTest do
 
     for {key, value} <- entries, do: CubDB.put(db, key, value)
 
-    assert {:ok, result} =
-             CubDB.select(db,
-               min_key: {:names, 0},
-               max_key: {:names, 2},
-               max_key_inclusive: false
-             )
+    result =
+      CubDB.select(db,
+        min_key: {:names, 0},
+        max_key: {:names, 2},
+        max_key_inclusive: false
+      )
 
     assert result == [{{:names, 0}, "Ada"}, {{:names, 1}, "Jay"}]
 
-    assert {:ok, result} =
-             CubDB.select(db,
-               min_key: :a,
-               max_key: :c,
-               pipe: [
-                 map: fn {_, value} -> value end
-               ],
-               reduce: fn n, sum -> sum + n end
-             )
+    result =
+      CubDB.select(db,
+        min_key: :a,
+        max_key: :c,
+        pipe: [
+          map: fn {_, value} -> value end
+        ],
+        reduce: fn n, sum -> sum + n end
+      )
 
     assert result == 6
   end
@@ -475,7 +475,7 @@ defmodule CubDBTest do
       |> Enum.to_list()
 
     assert [ok: 1, ok: 2, ok: 3] = reads
-    assert {:ok, [a: 1, b: 2, c: 3, d: 4]} = CubDB.select(db)
+    assert [a: 1, b: 2, c: 3, d: 4] = CubDB.select(db)
   end
 
   test "get_and_update_multi/3, get_and_update/3 and update/3 work as expected", %{
@@ -569,7 +569,7 @@ defmodule CubDBTest do
     :ok = CubDB.put_multi(db, %{a: 1, b: 2, c: 3})
     assert :ok = CubDB.put_and_delete_multi(db, %{d: 4, e: 5}, [:a, :c])
 
-    assert {:ok, [b: 2, d: 4, e: 5]} = CubDB.select(db)
+    assert [b: 2, d: 4, e: 5] = CubDB.select(db)
   end
 
   test "put/3 is persisted to disk", %{tmp_dir: tmp_dir} do
@@ -593,7 +593,7 @@ defmodule CubDBTest do
 
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    assert {:ok, [a: 1, b: 2, c: 3]} = CubDB.select(db)
+    assert [a: 1, b: 2, c: 3] = CubDB.select(db)
   end
 
   test "update/4 is persisted to disk", %{tmp_dir: tmp_dir} do
@@ -672,7 +672,7 @@ defmodule CubDBTest do
 
     assert [:ok, :ok, :ok, :ok, :ok, :ok, :ok] = results
 
-    {:ok, result} = CubDB.select(db)
+    result = CubDB.select(db)
 
     assert result == [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9]
   end
@@ -736,7 +736,7 @@ defmodule CubDBTest do
 
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    assert {:ok, [a: 2, b: 3, c: 4]} = CubDB.select(db)
+    assert [a: 2, b: 3, c: 4] = CubDB.select(db)
   end
 
   test "delete/2 is persisted to disk", %{tmp_dir: tmp_dir} do
@@ -763,7 +763,7 @@ defmodule CubDBTest do
     GenServer.stop(db)
 
     {:ok, db} = CubDB.start_link(tmp_dir)
-    assert {:ok, [b: 2]} = CubDB.select(db)
+    assert [b: 2] = CubDB.select(db)
   end
 
   test "start_link/1 uses the last filename (in base 16)", %{tmp_dir: tmp_dir} do
@@ -935,7 +935,7 @@ defmodule CubDBTest do
     assert_receive :compaction_completed, 100
     assert_receive :catch_up_completed, 100
 
-    assert CubDB.select(db) == {:ok, [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6]}
+    assert CubDB.select(db) == [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6]
     refute CubDB.current_db_file(db) == original_file
   end
 

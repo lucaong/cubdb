@@ -18,6 +18,8 @@ reports changes here.
     spawned Task to the client process. This makes the `:timeout` option
     unnecessary: by stopping the process calling `CubDB`, any running read
     operation by that process is stopped.
+  - [breaking] The function `select/2` now returns directly `result` instead of
+    a `{:ok, result}` tuple.
   - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
     cost read-only snapshots of the database. The functions in `CubDB.Snapshot`
     allow to read from a snapshot.
@@ -36,8 +38,8 @@ reports changes here.
 
 Upgrading from `v1` to `v2` requires a few simple code changes:
 
-  1. When calling `get_and_update` or `get_and_update_multi`, the return value
-     is not a `{:ok, result}` tuple anymore, but just `result`.
+  1. When calling `get_and_update`, `get_and_update_multi`, and `select` the
+     return value is not a `{:ok, result}` tuple anymore, but just `result`.
   2. `get_and_update_multi` does not take a fourth option argument anymore. The
      only available option was `:timeout`, which was now removed. In case you
      want to enforce a timeout for the update function, you can use a `Task` and
