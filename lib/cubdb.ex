@@ -98,7 +98,7 @@ defmodule CubDB do
   Range of entries sorted by key are retrieved using `select/2`:
 
       CubDB.select(db, min_key: :b, max_key: :e)
-      #=> {:ok, [b: 2, c: 3, d: 4, e: 5]}
+      #=> [b: 2, c: 3, d: 4, e: 5]
 
   But `select/2` can do much more than that. It can apply a pipeline of operations
   (`map`, `filter`, `take`, `drop` and more) to the selected entries, it can
@@ -125,7 +125,7 @@ defmodule CubDB do
         # reduce the result to a sum
         reduce: fn n, sum -> sum + n end
       )
-      #=> {:ok, 18}
+      #=> 18
 
 
   Zero cost snapshotting is a useful feature when one needs to perform several
