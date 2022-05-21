@@ -547,12 +547,12 @@ defmodule CubDB do
       end)
   """
   def with_snapshot(db, fun) do
-    snap = CubDB.snapshot(db, :infinity)
+    snap = snapshot(db, :infinity)
 
     try do
       fun.(snap)
     after
-      CubDB.release_snapshot(snap)
+      release_snapshot(snap)
     end
   end
 
