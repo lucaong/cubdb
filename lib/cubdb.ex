@@ -623,10 +623,11 @@ defmodule CubDB do
   inside of a transaction, the transaction is cancelled.
 
   Only use `CubDB.Tx` functions to write when inside a transaction (like
-  `CubDB.Tx.put` or `CubDB.Tx.delete`). Using functions in the `CubDB` module to
-  perform a write when inside a transaction (like `CubDB.put` or `CubDB.delete`)
-  raises an exception. Note that write functions in `CubDB.Tx` have a functional
-  API: they return a modified transaction rather than mutating it in place.
+  `CubDB.Tx.put/3` or `CubDB.Tx.delete/2`). Using functions in the `CubDB`
+  module to perform a write when inside a transaction (like `CubDB.put/3` or
+  `CubDB.delete/2`) raises an exception. Note that write functions in `CubDB.Tx`
+  have a functional API: they return a modified transaction rather than mutating
+  it in place.
 
   The transaction value passed to `fun` should not be used outside of the
   function.
