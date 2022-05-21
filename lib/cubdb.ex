@@ -5,17 +5,20 @@ defmodule CubDB do
 
   ## Features
 
-    - Both keys and values can be any arbitrary Elixir (or Erlang) term.
+    - Simple `get/3`, `put/3`, and `delete/2` operations, plus more specialized
+      functions
 
-    - Simple `get/3`, `put/3`, and `delete/2` operations
+    - Fast selection of ranges of entries sorted by key with `select/2`
 
-    - Arbitrary selection of ranges of entries sorted by key with `select/2`
-
-    - Atomic transactions with `put_multi/2`, `get_and_update_multi/3`, etc.
+    - Atomic transactions
 
     - Concurrent read operations, that do not block nor are blocked by writes
 
-    - Unexpected shutdowns won't corrupt the database or break atomicity
+    - Zero cost read-only snapshots to ensure consistency when reading multiple
+      entries
+
+    - Unexpected shutdowns or crashes won't corrupt the database or break
+      atomicity
 
     - Manual or automatic compaction to optimize space usage
 
@@ -70,8 +73,24 @@ defmodule CubDB do
       CubDB.get(db, {"some", 'tuple', :key})
       #=> %{foo: "a map value"}
 
+
   Multiple operations can be performed as an atomic transaction with
-  `put_multi/2`, `delete_multi/2`, and the other `[...]_multi` functions:
+  `transaction/2` and the `CubDB.Tx` module:
+
+      # Swapping `:a` and `:b` atomically:
+      CubDB.transaction(db, fn tx ->
+        a = CubDB.Tx.get(tx, :a)
+        b = CubDB.Tx.get(tx, :b)
+
+        tx = CubDB.Tx.put(tx, :a, b)
+        tx = CubDB.Tx.put(tx, :b, a)
+
+        {:commit, tx, :ok}
+      end)
+      #=> :ok
+
+  Alternatively, it is possible to use `put_multi/2`, `delete_multi/2`, and the
+  other `[...]_multi` functions, which also guarantee atomicity:
 
       CubDB.put_multi(db, [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8])
       #=> :ok
@@ -109,20 +128,27 @@ defmodule CubDB do
       #=> {:ok, 18}
 
 
-  Zero cost snapshots are a useful feature when one needs to perform several reads
-  or selects, ensuring isolation from concurrent writes, but without blocking
-  writers. This is useful, for example, when reading imultiple keys depending on
-  each other. Snapshots come at no cost: nothing is actually copied or written on
-  disk or in memory, apart from some small bookkeeping:
+  Zero cost snapshotting is a useful feature when one needs to perform several
+  reads or selects, ensuring isolation from concurrent writes, but without
+  blocking writers. This is useful, for example, when reading multiple keys that
+  depend on each other. Snapshots come at no cost: nothing is actually copied or
+  written on disk or in memory, apart from some small internal bookkeeping. After
+  obtaining a snapshot with `with_snapshot`, one can read from it using the
+  functions in the `CubDB.Snapshot` module:
 
       # the key of y depends on the value of x, so we ensure consistency by getting
-      # them from the same snapshot, isolating from the effects of concurrent writes
+      # both entries from the same snapshot, isolating from the effects of concurrent
+      # writes
       {x, y} = CubDB.with_snapshot(db, fn snap ->
         x = CubDB.Snapshot.get(snap, :x)
         y = CubDB.Snapshot.get(snap, x)
 
         {x, y}
       end)
+
+  The functions that read multiple entries like `get_multi/2`, `select/2`, etc.
+  are internally using a snapshot, so they always ensure consistency of reads
+  and isolation from concurrent writes.
 
   Because `CubDB` uses an immutable data structure, write operations cause the
   data file to grow. When necessary, `CubDB` runs a compaction operation to

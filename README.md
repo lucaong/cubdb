@@ -152,9 +152,9 @@ functions in the `CubDB.Snapshot` module:
 end)
 ```
 
-The functions that read multiple entries like `get_multi`,
-`get_and_update_multi`, `select`, etc. are internally using a snapshot, so they
-always ensure consistency of reads and isolation from concurrent writes.
+The functions that read multiple entries like `get_multi`, `select`, etc. are
+internally using a snapshot, so they always ensure consistency of reads and
+isolation from concurrent writes.
 
 For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.html).
 
