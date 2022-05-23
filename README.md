@@ -132,13 +132,14 @@ CubDB.select(db,
 #=> 18
 ```
 
-Zero cost snapshotting is a useful feature when one needs to perform several
-reads or selects, ensuring isolation from concurrent writes, but without
-blocking writers. This is useful, for example, when reading multiple keys that
-depend on each other. Snapshots come at no cost: nothing is actually copied or
-written on disk or in memory, apart from some small internal bookkeeping. After
-obtaining a snapshot with `with_snapshot`, one can read from it using the
-functions in the `CubDB.Snapshot` module:
+Snapshots are useful when one needs to perform several reads or selects,
+ensuring isolation from concurrent writes, but without blocking writers. This is
+useful, for example, when reading multiple keys that depend on each other.
+
+Snapshots come at no cost: nothing is actually copied or written on disk or in
+memory, apart from some small internal bookkeeping. After obtaining a snapshot
+with `with_snapshot`, one can read from it using the functions in the
+`CubDB.Snapshot` module:
 
 ```elixir
 # the key of y depends on the value of x, so we ensure consistency by getting
@@ -153,8 +154,8 @@ end)
 ```
 
 The functions that read multiple entries like `get_multi`, `select`, etc. are
-internally using a snapshot, so they always ensure consistency of reads and
-isolation from concurrent writes.
+internally using a snapshot, so they always ensure consistency and isolation
+from concurrent writes.
 
 For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.html).
 

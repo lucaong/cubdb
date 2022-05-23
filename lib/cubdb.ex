@@ -128,13 +128,14 @@ defmodule CubDB do
       #=> 18
 
 
-  Zero cost snapshotting is a useful feature when one needs to perform several
-  reads or selects, ensuring isolation from concurrent writes, but without
-  blocking writers. This is useful, for example, when reading multiple keys that
-  depend on each other. Snapshots come at no cost: nothing is actually copied or
-  written on disk or in memory, apart from some small internal bookkeeping. After
-  obtaining a snapshot with `with_snapshot`, one can read from it using the
-  functions in the `CubDB.Snapshot` module:
+  Snapshots are useful when one needs to perform several reads or selects,
+  ensuring isolation from concurrent writes, but without blocking writers. This
+  is useful, for example, when reading multiple keys that depend on each other.
+
+  Snapshots come at no cost: nothing is actually copied or written on disk or in
+  memory, apart from some small internal bookkeeping. After obtaining a snapshot
+  with `with_snapshot`, one can read from it using the functions in the
+  `CubDB.Snapshot` module:
 
       # the key of y depends on the value of x, so we ensure consistency by getting
       # both entries from the same snapshot, isolating from the effects of concurrent
@@ -147,8 +148,8 @@ defmodule CubDB do
       end)
 
   The functions that read multiple entries like `get_multi/2`, `select/2`, etc.
-  are internally using a snapshot, so they always ensure consistency of reads
-  and isolation from concurrent writes.
+  are internally using a snapshot, so they always ensure consistency and
+  isolation from concurrent writes.
 
   Because `CubDB` uses an immutable, append-only data structure, write
   operations cause the data file to grow. When necessary, `CubDB` runs a
