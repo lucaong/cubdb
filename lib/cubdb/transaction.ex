@@ -89,6 +89,13 @@ defmodule CubDB.Tx do
   with respect to a snapshot: using `refetch/3` can save some disk access if
   `CubDB` is able to determine that the key was not written since the snapshot.
 
+  In some situations, such as when the entry is not present in the database, or
+  when a compaction completed after `snapshot`, the function cannot determine if
+  the entry was written or not since `snapshot`, and therefore fetches it. In
+  other words, `refetch/3` is a performance optimization to save some disk reads
+  when possible, but it might fetch an entry even if it technically did not
+  change.
+
   ## Example
 
   The function `refetch/3` can be useful when implementing optimistic
