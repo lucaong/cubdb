@@ -134,7 +134,7 @@ defmodule CubDB do
 
   Snapshots come at no cost: nothing is actually copied or written on disk or in
   memory, apart from some small internal bookkeeping. After obtaining a snapshot
-  with `with_snapshot`, one can read from it using the functions in the
+  with `with_snapshot/2`, one can read from it using the functions in the
   `CubDB.Snapshot` module:
 
       # the key of y depends on the value of x, so we ensure consistency by getting
