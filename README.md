@@ -19,10 +19,10 @@ section](https://hexdocs.pm/cubdb/howto.html) for more information.
 
   - Both keys and values can be any arbitrary Elixir (or Erlang) term.
 
-  - Simple `get`, `put`, and `delete` operations, plus more specialized
+  - Basic `get`, `put`, and `delete` operations, plus more specialized
     functions
 
-  - Fast selection of ranges of entries sorted by key with `select`
+  - Performant selection of ranges of entries sorted by key with `select`
 
   - Atomic transactions
 
@@ -34,7 +34,7 @@ section](https://hexdocs.pm/cubdb/howto.html) for more information.
   - Unexpected shutdowns or crashes won't corrupt the database or break
     atomicity
 
-  - Manual or automatic compaction to optimize space usage
+  - Manual or automatic compaction to reclaim disk space
 
 To ensure consistency, performance, and robustness to data corruption, `CubDB`
 database file uses an append-only, immutable B-tree data structure. Entries are

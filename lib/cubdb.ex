@@ -5,10 +5,10 @@ defmodule CubDB do
 
   ## Features
 
-    - Simple `get/3`, `put/3`, and `delete/2` operations, plus more specialized
+    - Basic `get/3`, `put/3`, and `delete/2` operations, plus more specialized
       functions
 
-    - Fast selection of ranges of entries sorted by key with `select/2`
+    - Performant selection of ranges of entries sorted by key with `select/2`
 
     - Atomic transactions
 
@@ -20,7 +20,7 @@ defmodule CubDB do
     - Unexpected shutdowns or crashes won't corrupt the database or break
       atomicity
 
-    - Manual or automatic compaction to optimize space usage
+    - Manual or automatic compaction to reclaim disk space
 
   To ensure consistency, performance, and robustness to data corruption, `CubDB`
   database file uses an append-only, immutable B-tree data structure. Entries
@@ -150,13 +150,13 @@ defmodule CubDB do
   are internally using a snapshot, so they always ensure consistency of reads
   and isolation from concurrent writes.
 
-  Because `CubDB` uses an immutable data structure, write operations cause the
-  data file to grow. When necessary, `CubDB` runs a compaction operation to
-  optimize the file size and reclaim disk space. Compaction runs in the
-  background, without blocking other operations. By default, `CubDB` runs
-  compaction automatically when necessary (see documentation of
-  `set_auto_compact/2` for details). Alternatively, it can be started manually
-  by calling `compact/1`.
+  Because `CubDB` uses an immutable, append-only data structure, write
+  operations cause the data file to grow. When necessary, `CubDB` runs a
+  compaction operation to optimize the file size and reclaim disk space.
+  Compaction runs in the background, without blocking other operations. By
+  default, `CubDB` runs compaction automatically when necessary (see
+  documentation of `set_auto_compact/2` for details). Alternatively, it can be
+  started manually by calling `compact/1`.
   """
 
   @doc """

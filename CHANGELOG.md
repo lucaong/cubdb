@@ -12,18 +12,16 @@ Version `2.0.0` brings better concurrency, atomic transactions with arbitrary
 operations, zero cost read-only snapshots, database backup, and more, all with a
 simpler and more scalable internal architecture.
 
-  - [breaking] The functions `get_and_update/3` and `get_and_update_multi/3` now
-    return directly `result`, instead of a `{:ok, result}` tuple.
+  - [breaking] The functions `get_and_update/3`, `get_and_update_multi/3`, and
+    `select/2` now return directly `result`, instead of a `{:ok, result}` tuple.
   - [breaking] `get_and_update_multi/4` does not take an option argument
     anymore, making it `get_and_update_multi/3`. The only available option used
     to be `:timeout`, which is not supported anymore.
   - [breaking] Remove the `:timeout` option on `select/2`. This is part of a
     refactoring and improvement that moves read operations from an internally
-    spawned Task to the client process. This makes the `:timeout` option
+    spawned `Task` to the client process. This makes the `:timeout` option
     unnecessary: by stopping the process calling `CubDB`, any running read
     operation by that process is stopped.
-  - [breaking] The function `select/2` now returns directly `result` instead of
-    a `{:ok, result}` tuple.
   - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
     cost read-only snapshots of the database. The functions in `CubDB.Snapshot`
     allow to read from a snapshot.
