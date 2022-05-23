@@ -561,12 +561,11 @@ defmodule CubDB do
   bookkeeping.
 
   Calling `with_snapshot/2` is equivalent to obtaining a snapshot with
-  `snapshot/2` and a timeout of `:infinity`, performing the operations in the
-  body of the function, then manually releasing the snapshot with
-  `release_snapshot/1`, but `with_snapshot/2` automatically manages the snapshot
-  life cycle, also in case of an exception is raise, a value is thrown, or the
-  process exists. This makes `with_snapshot/2` usually a better choice than
-  `snapshot/2`.
+  `snapshot/2` using a timeout of `:infinity`, calling `fun`, then manually
+  releasing the snapshot with `release_snapshot/1`, but `with_snapshot/2`
+  automatically manages the snapshot life cycle, also in case an exception is
+  raised, a value is thrown, or the process exists. This makes `with_snapshot/2`
+  usually a better choice than `snapshot/2`.
 
   After obtaining a snapshot, it is possible to read from it using the functions
   in `CubDB.Snapshot`, which work the same way as the functions in `CubDB` with
