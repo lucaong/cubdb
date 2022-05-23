@@ -102,31 +102,16 @@ defmodule CubDB.Tx do
 
       def update_optimistically(db, key) do
         outcome = CubDB.with_snapshot(db, fn snap ->
-          value = CubDB.Snapshot.get(snap, key)
+          {:ok, value} = CubDB.Snapshot.fetch(snap, key)
 
           # Perform the slow calculation outside of the transaction
           new_value = some_slow_calculation(value)
 
-          CubDB.transaction(db, fn tx ->
-            # Check if the value changed in the meanwhile
-            case CubDB.Tx.refetch(tx, key, snap) do
-              :unchanged ->
-                # The entry was not written since we last read it, commit the
-                # new value
-                {:commit, CubDB.Tx.put(tx, key, new_value), :ok}
-
-              {:ok, ^value} ->
-                # The entry was written, but its value did not change
-                {:commit, CubDB.Tx.put(tx, key, new_value), :ok}
-
-              _ ->
-                # The entry changed since we last read it, cancel the
-                # transaction and re-compute the update
-                {:cancel, :recompute}
-            end
-          end)
+          # In a transaction, check if the value changed, and update it if not
+          write_if_unchanged(db, key, value, snap)
         end)
 
+        # Depending on the outcome, return or recompute
         case outcome do
           :recompute ->
             update_optimistically(db, key)
@@ -134,6 +119,28 @@ defmodule CubDB.Tx do
           :ok ->
             :ok
         end
+      end
+
+      defp write_if_unchanged(db, key, value, snap) do
+        CubDB.transaction(db, fn tx ->
+          # Check if the value changed in the meanwhile
+          case CubDB.Tx.refetch(tx, key, snap) do
+            :unchanged ->
+              # The entry was not written since we last read it. Commit the
+              # new value and return :ok
+              {:commit, CubDB.Tx.put(tx, key, new_value), :ok}
+
+            {:ok, ^value} ->
+              # The entry was written, but its value did not change. Commit the
+              # new value and return :ok
+              {:commit, CubDB.Tx.put(tx, key, new_value), :ok}
+
+            _ ->
+              # The entry changed since we last read it, cancel the
+              # transaction and return :recompute
+              {:cancel, :recompute}
+          end
+        end)
       end
   """
   def refetch(tx, key, snapshot)
