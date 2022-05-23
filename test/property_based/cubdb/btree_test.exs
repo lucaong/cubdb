@@ -11,6 +11,7 @@ defmodule PropertyBased.BtreeTest do
             cap: int(min: 2, max: 32),
             tuples:
               list(
+                min: 1,
                 max: 200,
                 of:
                   tuple(
@@ -40,10 +41,13 @@ defmodule PropertyBased.BtreeTest do
 
       tree =
         Enum.reduce(operations, tree, fn {operation, {key, value}}, tree ->
+          previous_tree = tree
+
           case operation do
             :insert ->
               tree = Btree.insert(tree, key, value)
               assert {:ok, ^value} = Btree.fetch(tree, key)
+              assert Btree.written_since?(tree, key, previous_tree) == true
               tree
 
             :insert_new ->
@@ -51,12 +55,14 @@ defmodule PropertyBased.BtreeTest do
                 {:ok, existing_val} ->
                   assert {:error, :exists} = Btree.insert_new(tree, key, value)
                   assert {:ok, ^existing_val} = Btree.fetch(tree, key)
+                  assert Btree.written_since?(tree, key, previous_tree) == false
                   tree
 
                 :error ->
                   tree = Btree.insert_new(tree, key, value)
                   assert tree != {:error, :exists}
                   assert {:ok, ^value} = Btree.fetch(tree, key)
+                  assert Btree.written_since?(tree, key, previous_tree) == true
                   tree
               end
 
@@ -66,8 +72,15 @@ defmodule PropertyBased.BtreeTest do
               tree
 
             :mark_deleted ->
+              changed =
+                case Btree.fetch(tree, key) do
+                  {:ok, _} -> true
+                  :error -> false
+                end
+
               tree = Btree.mark_deleted(tree, key)
               assert :error = Btree.fetch(tree, key)
+              assert Btree.written_since?(tree, key, previous_tree) == changed
               tree
 
             :clear ->

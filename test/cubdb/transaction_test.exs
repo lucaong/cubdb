@@ -42,6 +42,28 @@ defmodule CubDB.TransactionTest do
     assert [a: 1, c: 3] = CubDB.select(db)
   end
 
+  test "refetch/3 returns :unchanged if the entry was not written, otherwise fetches it", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4)
+
+    CubDB.with_snapshot(db, fn snap ->
+      :ok = CubDB.put_multi(db, b: 0, c: 3)
+      :ok = CubDB.delete(db, :d)
+
+      CubDB.transaction(db, fn tx ->
+        assert :unchanged = CubDB.Tx.refetch(tx, :a, snap)
+        assert {:ok, 0} = CubDB.Tx.refetch(tx, :b, snap)
+        assert {:ok, 3} = CubDB.Tx.refetch(tx, :c, snap)
+        assert :error = CubDB.Tx.refetch(tx, :d, snap)
+        assert :error = CubDB.Tx.refetch(tx, :e, snap)
+
+        {:cancel, nil}
+      end)
+    end)
+  end
+
   test "put/3 inserts an entry if committed", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     CubDB.put(db, :a, 0)

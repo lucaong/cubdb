@@ -202,6 +202,66 @@ defmodule CubDB.BtreeTest do
     assert :error == Btree.fetch(big_tree, :non_existing)
   end
 
+  test "written_since?/2 checks if the entry with the given key was written since a reference btree" do
+    tiny_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
+    different_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
+
+    assert Btree.written_since?(tiny_tree, :foo, tiny_tree) == false
+
+    # Key not found, but the btree did not change
+    assert Btree.written_since?(tiny_tree, :bax, tiny_tree) == false
+
+    modified_tiny_tree = Btree.insert(tiny_tree, :foo, 3)
+    assert Btree.written_since?(modified_tiny_tree, :foo, tiny_tree) == true
+    assert Btree.written_since?(modified_tiny_tree, :bar, tiny_tree) == false
+
+    # Key not found, the node where it could belong changed
+    assert {:maybe, :not_found} = Btree.written_since?(modified_tiny_tree, :bax, tiny_tree)
+
+    assert {:maybe, :different_store} =
+             Btree.written_since?(modified_tiny_tree, :foo, different_tree)
+
+    big_tree =
+      compose_btree({
+        @branch,
+        [
+          bar: {
+            @branch,
+            [
+              bar: {@leaf, [bar: 2, baz: 3]},
+              foo: {@leaf, [foo: 1, quuux: 8]}
+            ]
+          },
+          quux: {
+            @branch,
+            [
+              quux: {@leaf, [quux: 5, qux: 4]},
+              xxx: {@leaf, [xxx: 6, yyy: 7]}
+            ]
+          }
+        ]
+      })
+
+    assert Btree.written_since?(big_tree, :foo, big_tree) == false
+
+    # Key not found, but btree did not change
+    assert Btree.written_since?(big_tree, :not_existing, big_tree) == false
+
+    modified_big_tree = Btree.insert(big_tree, :foo, 3)
+    assert Btree.written_since?(modified_big_tree, :foo, big_tree) == true
+    assert Btree.written_since?(modified_big_tree, :quux, big_tree) == false
+    assert Btree.written_since?(modified_big_tree, :bar, big_tree) == false
+
+    # Key not found but node where it would belong did not change
+    assert Btree.written_since?(modified_big_tree, :bax, big_tree) == false
+
+    # Key not found, but leaf where it would belong changed
+    assert {:maybe, :not_found} = Btree.written_since?(modified_big_tree, :fox, big_tree)
+
+    assert {:maybe, :different_store} =
+             Btree.written_since?(modified_big_tree, :foo, different_tree)
+  end
+
   test "delete/2 removes a key/value" do
     tiny_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
     btree = Btree.delete(tiny_tree, :foo) |> Btree.commit()

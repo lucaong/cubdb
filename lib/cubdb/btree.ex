@@ -117,6 +117,35 @@ defmodule CubDB.Btree do
     end
   end
 
+  @spec written_since?(Btree.t(), key, Btree.t()) ::
+          boolean | {:maybe, :not_found} | {:maybe, :different_store}
+
+  # `written_since?/3` returns `true` if the entry with the given key was
+  # written in the btree since the reference btree (which should be an older
+  # version of the same btree), or `false` if it was not written.
+  #
+  # There are two cases when the function cannot determine for sure if the key
+  # was written: if the btree changed but the key is not present, in which case
+  # it returns `{:maybe, :not_found}`, or if the store of the two btrees is
+  # different, in which case it returns `{:maybe, :different_store}`.
+  def written_since?(%Btree{store: store}, _key, %Btree{store: reference_store})
+      when reference_store != store,
+      do: {:maybe, :different_store}
+
+  def written_since?(%Btree{root_loc: loc}, _key, %Btree{root_loc: loc}), do: false
+
+  def written_since?(%Btree{root: root, store: store}, key, reference_btree) do
+    %Btree{root_loc: reference_loc} = reference_btree
+
+    case key_past_location?(root, store, key, reference_loc) do
+      :not_found ->
+        {:maybe, :not_found}
+
+      boolean_value ->
+        boolean_value
+    end
+  end
+
   @spec insert(Btree.t(), key, val) :: Btree.t()
 
   # `insert/3` writes an entry in the Btree, updating the previous one with the
@@ -373,6 +402,35 @@ defmodule CubDB.Btree do
 
   defp lookup_leaf(leaf = {@leaf, _}, _, _, path) do
     {leaf, path}
+  end
+
+  @spec key_past_location?(internal_node, Store.t(), key, location) :: boolean | :not_found
+
+  defp key_past_location?({@branch, children}, store, key, target_loc) do
+    loc =
+      Enum.reduce_while(children, nil, fn
+        {_, loc}, nil ->
+          {:cont, loc}
+
+        {k, loc}, acc ->
+          if k <= key, do: {:cont, loc}, else: {:halt, acc}
+      end)
+
+    if loc > target_loc do
+      key_past_location?(Store.get_node(store, loc), store, key, target_loc)
+    else
+      false
+    end
+  end
+
+  defp key_past_location?({@leaf, children}, _store, key, target_loc) do
+    case Enum.find(children, &match?({^key, _}, &1)) do
+      nil ->
+        :not_found
+
+      {_, loc} ->
+        loc > target_loc
+    end
   end
 
   @spec build_up(Store.t(), internal_node, [{key, val}], [key], [internal_node], capacity) ::
