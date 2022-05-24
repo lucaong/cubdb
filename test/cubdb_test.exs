@@ -199,6 +199,88 @@ defmodule CubDBTest do
     assert result == 6
   end
 
+  test "select_stream/2 works as expected", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    entries = [
+      {{:names, 0}, "Ada"},
+      {{:names, 2}, "Zoe"},
+      {{:names, 1}, "Jay"},
+      {:b, 2},
+      {:a, 1},
+      {:c, 3}
+    ]
+
+    :ok = CubDB.put_multi(db, entries)
+
+    result =
+      CubDB.select_stream(db,
+        min_key: {:names, 0},
+        max_key: {:names, 2},
+        max_key_inclusive: false
+      )
+      |> Enum.into([])
+
+    assert [{{:names, 0}, "Ada"}, {{:names, 1}, "Jay"}] = result
+
+    result =
+      CubDB.select_stream(db,
+        min_key: :a,
+        max_key: :c,
+        reverse: true
+      )
+      |> Enum.into([])
+
+    assert [c: 3, b: 2, a: 1] = result
+  end
+
+  test "select_stream/2 releases the snapshot after consuming the stream", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
+
+    CubDB.subscribe(db)
+
+    CubDB.select_stream(db)
+    |> Stream.map(fn
+      {:a, 1} ->
+        :ok = CubDB.compact(db)
+
+      {:b, 2} ->
+        assert_receive :compaction_started, 1000
+        refute_receive :clean_up_started, 1000
+
+      _ ->
+        nil
+    end)
+    |> Stream.run()
+
+    assert_receive :clean_up_started, 1000
+  end
+
+  test "select_stream/2 releases the snapshot in case of a crash", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
+    :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4)
+
+    CubDB.subscribe(db)
+
+    stream =
+      CubDB.select_stream(db)
+      |> Stream.map(fn
+        {:a, 1} ->
+          :ok = CubDB.compact(db)
+
+        {:b, 2} ->
+          assert_receive :compaction_started, 1000
+
+        {:c, 3} ->
+          raise "boom!"
+      end)
+
+    assert_raise RuntimeError, "boom!", fn -> Stream.run(stream) end
+
+    assert_receive :clean_up_started, 1000
+  end
+
   describe "snapshot/2" do
     test "returns a snapshot that cannot be used after release", %{tmp_dir: tmp_dir} do
       {:ok, db} = CubDB.start_link(tmp_dir)

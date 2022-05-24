@@ -461,6 +461,108 @@ defmodule CubDB do
     end)
   end
 
+  @spec select_stream(GenServer.server(), [select_option]) :: Enumerable.t()
+
+  @doc """
+  Selects a range of entries from the database, returning a lazy stream.
+
+  It works similarly to `select/2`, but returns a lazy stream that can be used
+  with functions in the `Enum` and `Stream` modules. The actual database read is
+  performed only when the stream is consumed.
+
+  ## Options
+
+  The `min_key` and `max_key` specify the range of entries that are selected. By
+  default, the range is inclusive, so all entries that have a key greater or
+  equal than `min_key` and less or equal then `max_key` are selected:
+
+      # Select all entries where "a" <= key <= "d"
+      CubDB.select(db, min_key: "b", max_key: "d")
+
+  The range boundaries can be excluded by setting `min_key_inclusive` or
+  `max_key_inclusive` to `false`:
+
+      # Select all entries where "a" <= key < "d"
+      CubDB.select(db, min_key: "b", max_key: "d", max_key_inclusive: false)
+
+  Any of `:min_key` and `:max_key` can be omitted, to leave the range
+  open-ended.
+
+      # Select entries where key <= "a"
+      CubDB.select(db, max_key: "a")
+
+  As `nil` is a valid key, setting `min_key` or `max_key` to `nil` does NOT
+  leave the range open ended:
+
+      # Select entries where nil <= key <= "a"
+      CubDB.select(db, min_key: nil, max_key: "a")
+
+  The `reverse` option, when set to true, causes the entries to be selected and
+  traversed in reverse order.
+
+  Note that, when selecting a key range, specifying `min_key` and/or `max_key`
+  is more performant than using functions in `Enum` or `Stream` to filter out
+  entries out of range, because `min_key` and `max_key` avoid loading
+  unnecessary entries from disk entirely.
+
+  ## Examples
+
+  To select all entries with keys between `:a` and `:c` as a list of `{key,
+  value}` entries we can do:
+
+      entries = CubDB.select(db, min_key: :a, max_key: :c) |> Enum.into([])
+
+  If we want to get all entries with keys between `:a` and `:c`, with `:c`
+  excluded, we can do:
+
+      entries =
+        CubDB.select_stream(db,
+          min_key: :a,
+          max_key: :c,
+          max_key_inclusive: false
+        )
+        |> Enum.into([])
+
+  To select the last 3 entries, we can do:
+
+      entries = CubDB.select(db, reverse: true) |> Enum.take(3)
+
+  If we want to obtain the sum of the first 10 positive numeric values
+  associated to keys from `:a` to `:f`, we can do:
+
+      sum =
+        CubDB.select_stream(db,
+          min_key: :a,
+          max_key: :f
+        )
+        |> Stream.map(fn {_key, value} -> value end) # map values
+        |> Stream.filter(fn n -> is_number(n) and n > 0 end) # only positive numbers
+        |> Stream.take(10) # take only the first 10 entries in the range
+        |> Enum.sum() # sum the selected values
+  """
+  def select_stream(db, options \\ []) when is_list(options) do
+    Stream.resource(
+      fn ->
+        snap = CubDB.snapshot(db, :infinity)
+        %Snapshot{btree: btree} = snap
+        stream = Reader.select_stream(btree, options)
+        step = fn val, _acc -> {:suspend, val} end
+        next = &Enumerable.reduce(stream, &1, step)
+        {snap, next}
+      end,
+      fn {snap, next} ->
+        case next.({:cont, nil}) do
+          {:done, _} ->
+            {:halt, {snap, nil}}
+
+          {:suspended, value, next} ->
+            {[value], {snap, next}}
+        end
+      end,
+      fn {snap, _} -> CubDB.release_snapshot(snap) end
+    )
+  end
+
   @spec size(GenServer.server()) :: non_neg_integer
 
   @doc """
@@ -1299,8 +1401,14 @@ defmodule CubDB do
   def handle_call(:start_transaction, from, state = %State{writer: nil}) do
     %State{btree: btree} = state
 
-    {:reply, %Tx{btree: btree, compacting: compaction_running?(state), owner: from},
-     %State{state | writer: from}}
+    tx = %Tx{
+      btree: btree,
+      compacting: compaction_running?(state),
+      owner: from,
+      db: self()
+    }
+
+    {:reply, tx, %State{state | writer: from}}
   end
 
   def handle_call(:start_transaction, {pid, _}, state = %State{writer: {pid, _}}) do
@@ -1354,6 +1462,14 @@ defmodule CubDB do
       end
 
     {:reply, :ok, state}
+  end
+
+  def handle_call({:validate_transaction, %Tx{owner: owner}}, _, state = %State{writer: owner}) do
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:validate_transaction, _}, _, state) do
+    {:reply, :error, state}
   end
 
   def handle_call(:compact, _, state) do
@@ -1622,7 +1738,8 @@ defmodule CubDB do
           GenServer.reply(next, %Tx{
             btree: btree,
             compacting: compaction_running?(state),
-            owner: next
+            owner: next,
+            db: self()
           })
 
           {next, queue}
