@@ -140,7 +140,7 @@ defmodule CubDBTest do
 
     CubDB.stop(db)
     {:ok, db} = CubDB.start_link(tmp_dir)
-    assert [{^key, 123}] = CubDB.select(db)
+    assert [{^key, 123}] = CubDB.select(db) |> Enum.to_list()
   end
 
   test "delete/2 does not error and does not write to disk when deleting an entry that was not present",
@@ -170,42 +170,6 @@ defmodule CubDBTest do
       {{:names, 0}, "Ada"},
       {{:names, 2}, "Zoe"},
       {{:names, 1}, "Jay"},
-      {:a, 1},
-      {:b, 2},
-      {:c, 3}
-    ]
-
-    for {key, value} <- entries, do: CubDB.put(db, key, value)
-
-    result =
-      CubDB.select(db,
-        min_key: {:names, 0},
-        max_key: {:names, 2},
-        max_key_inclusive: false
-      )
-
-    assert result == [{{:names, 0}, "Ada"}, {{:names, 1}, "Jay"}]
-
-    result =
-      CubDB.select(db,
-        min_key: :a,
-        max_key: :c,
-        pipe: [
-          map: fn {_, value} -> value end
-        ],
-        reduce: fn n, sum -> sum + n end
-      )
-
-    assert result == 6
-  end
-
-  test "select_stream/2 works as expected", %{tmp_dir: tmp_dir} do
-    {:ok, db} = CubDB.start_link(tmp_dir)
-
-    entries = [
-      {{:names, 0}, "Ada"},
-      {{:names, 2}, "Zoe"},
-      {{:names, 1}, "Jay"},
       {:b, 2},
       {:a, 1},
       {:c, 3}
@@ -214,7 +178,7 @@ defmodule CubDBTest do
     :ok = CubDB.put_multi(db, entries)
 
     result =
-      CubDB.select_stream(db,
+      CubDB.select(db,
         min_key: {:names, 0},
         max_key: {:names, 2},
         max_key_inclusive: false
@@ -224,7 +188,7 @@ defmodule CubDBTest do
     assert [{{:names, 0}, "Ada"}, {{:names, 1}, "Jay"}] = result
 
     result =
-      CubDB.select_stream(db,
+      CubDB.select(db,
         min_key: :a,
         max_key: :c,
         reverse: true
@@ -234,13 +198,13 @@ defmodule CubDBTest do
     assert [c: 3, b: 2, a: 1] = result
   end
 
-  test "select_stream/2 releases the snapshot after consuming the stream", %{tmp_dir: tmp_dir} do
+  test "select/2 releases the snapshot after consuming the stream", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3)
 
     CubDB.subscribe(db)
 
-    CubDB.select_stream(db)
+    CubDB.select(db)
     |> Stream.map(fn
       {:a, 1} ->
         :ok = CubDB.compact(db)
@@ -257,14 +221,14 @@ defmodule CubDBTest do
     assert_receive :clean_up_started, 1000
   end
 
-  test "select_stream/2 releases the snapshot in case of a crash", %{tmp_dir: tmp_dir} do
+  test "select/2 releases the snapshot in case of a crash", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
     :ok = CubDB.put_multi(db, a: 1, b: 2, c: 3, d: 4)
 
     CubDB.subscribe(db)
 
     stream =
-      CubDB.select_stream(db)
+      CubDB.select(db)
       |> Stream.map(fn
         {:a, 1} ->
           :ok = CubDB.compact(db)
@@ -557,7 +521,7 @@ defmodule CubDBTest do
       |> Enum.to_list()
 
     assert [ok: 1, ok: 2, ok: 3] = reads
-    assert [a: 1, b: 2, c: 3, d: 4] = CubDB.select(db)
+    assert [a: 1, b: 2, c: 3, d: 4] = CubDB.select(db) |> Enum.to_list()
   end
 
   test "get_and_update_multi/3, get_and_update/3 and update/3 work as expected", %{
@@ -651,7 +615,7 @@ defmodule CubDBTest do
     :ok = CubDB.put_multi(db, %{a: 1, b: 2, c: 3})
     assert :ok = CubDB.put_and_delete_multi(db, %{d: 4, e: 5}, [:a, :c])
 
-    assert [b: 2, d: 4, e: 5] = CubDB.select(db)
+    assert [b: 2, d: 4, e: 5] = CubDB.select(db) |> Enum.to_list()
   end
 
   test "put/3 is persisted to disk", %{tmp_dir: tmp_dir} do
@@ -675,7 +639,7 @@ defmodule CubDBTest do
 
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    assert [a: 1, b: 2, c: 3] = CubDB.select(db)
+    assert [a: 1, b: 2, c: 3] = CubDB.select(db) |> Enum.to_list()
   end
 
   test "update/4 is persisted to disk", %{tmp_dir: tmp_dir} do
@@ -754,7 +718,7 @@ defmodule CubDBTest do
 
     assert [:ok, :ok, :ok, :ok, :ok, :ok, :ok] = results
 
-    result = CubDB.select(db)
+    result = CubDB.select(db) |> Enum.to_list()
 
     assert result == [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9]
   end
@@ -798,6 +762,7 @@ defmodule CubDBTest do
           end
         end
       )
+      |> Enum.to_list()
     end)
 
     assert 0 = CubDB.get(db, :a)
@@ -818,7 +783,7 @@ defmodule CubDBTest do
 
     {:ok, db} = CubDB.start_link(tmp_dir)
 
-    assert [a: 2, b: 3, c: 4] = CubDB.select(db)
+    assert [a: 2, b: 3, c: 4] = CubDB.select(db) |> Enum.to_list()
   end
 
   test "delete/2 is persisted to disk", %{tmp_dir: tmp_dir} do
@@ -845,7 +810,7 @@ defmodule CubDBTest do
     GenServer.stop(db)
 
     {:ok, db} = CubDB.start_link(tmp_dir)
-    assert [b: 2] = CubDB.select(db)
+    assert [b: 2] = CubDB.select(db) |> Enum.to_list()
   end
 
   test "start_link/1 uses the last filename (in base 16)", %{tmp_dir: tmp_dir} do
@@ -1017,7 +982,7 @@ defmodule CubDBTest do
     assert_receive :compaction_completed, 100
     assert_receive :catch_up_completed, 100
 
-    assert CubDB.select(db) == [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6]
+    assert CubDB.select(db) |> Enum.to_list() == [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6]
     refute CubDB.current_db_file(db) == original_file
   end
 
@@ -1056,22 +1021,18 @@ defmodule CubDBTest do
 
     # This blocks the reader until we send a :resume message
     Task.start_link(fn ->
-      CubDB.select(db,
-        timeout: :infinity,
-        reduce:
-          {0,
-           fn _, a ->
-             if a == 0 do
-               send(caller, {:stopping, self()})
+      CubDB.select(db)
+      |> Enum.reduce(0, fn _, a ->
+        if a == 0 do
+          send(caller, {:stopping, self()})
 
-               receive do
-                 :resume -> nil
-               end
-             end
+          receive do
+            :resume -> nil
+          end
+        end
 
-             a + 1
-           end}
-      )
+        a + 1
+      end)
     end)
 
     reader =
@@ -1210,7 +1171,7 @@ defmodule CubDBTest do
 
       {:ok, copy} = CubDB.start_link(data_dir: backup_dir)
 
-      assert CubDB.select(db) == CubDB.select(copy)
+      assert CubDB.select(db) |> Enum.to_list() == CubDB.select(copy) |> Enum.to_list()
     end
   end
 

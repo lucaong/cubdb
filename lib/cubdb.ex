@@ -97,36 +97,21 @@ defmodule CubDB do
 
   Range of entries sorted by key are retrieved using `select/2`:
 
-      CubDB.select(db, min_key: :b, max_key: :e)
+      CubDB.select(db, min_key: :b, max_key: :e) |> Enum.to_list()
       #=> [b: 2, c: 3, d: 4, e: 5]
 
-  But `select/2` can do much more than that. It can apply a pipeline of operations
-  (`map`, `filter`, `take`, `drop` and more) to the selected entries, it can
-  select the entries in normal or reverse order, and it can `reduce` the result
-  using an arbitrary function:
+  The `select/2` function can select entries in normal or reverse order, and returns
+  a lazy stream, so one can use functions in the `Stream` and `Enum` modules to
+  map, filter, and transform the result, only fetching from the database the
+  relevant entries:
 
       # Take the sum of the last 3 even values:
-      CubDB.select(db,
-        # select entries in reverse order
-        reverse: true,
-
-        # apply a pipeline of operations to the entries
-        pipe: [
-          # map each entry discarding the key and keeping only the value
-          map: fn {_key, value} -> value end,
-
-          # filter only even integers
-          filter: fn value -> is_integer(value) && Integer.is_even(value) end,
-
-          # take the first 3 values
-          take: 3
-        ],
-
-        # reduce the result to a sum
-        reduce: fn n, sum -> sum + n end
-      )
+      CubDB.select(db, reverse: true) # select entries in reverse order
+      |> Stream.map(fn {_key, value} -> value end) # map each entry discarding the key and keeping only the value
+      |> Stream.filter(fn value -> is_integer(value) && Integer.is_even(value) end) # filter only even integers
+      |> Stream.take(3) # take the first 3 values
+      |> Enum.sum() # sum the values
       #=> 18
-
 
   Snapshots are useful when one needs to perform several reads or selects,
   ensuring isolation from concurrent writes, but without blocking writers. This
@@ -183,21 +168,12 @@ defmodule CubDB do
   @type value :: any
   @type entry :: {key, value}
   @type option :: {:auto_compact, {pos_integer, number} | boolean} | {:auto_file_sync, boolean}
-  @type pipe_operation ::
-          {:map, fun}
-          | {:filter, fun}
-          | {:take, non_neg_integer}
-          | {:drop, non_neg_integer}
-          | {:take_while, fun}
-          | {:drop_while, fun}
   @type select_option ::
           {:min_key, any}
           | {:max_key, any}
           | {:min_key_inclusive, boolean}
           | {:max_key_inclusive, boolean}
-          | {:pipe, [pipe_operation]}
           | {:reverse, boolean}
-          | {:reduce, fun | {any, fun}}
 
   defmodule State do
     @moduledoc false
@@ -361,114 +337,14 @@ defmodule CubDB do
     end)
   end
 
-  @spec select(GenServer.server(), [select_option]) :: any
-
-  @doc """
-  Selects a range of entries from the database, and optionally performs a
-  pipeline of operations on them.
-
-  ## Options
-
-  The `min_key` and `max_key` specify the range of entries that are selected. By
-  default, the range is inclusive, so all entries that have a key greater or
-  equal than `min_key` and less or equal then `max_key` are selected:
-
-      # Select all entries where "a" <= key <= "d"
-      CubDB.select(db, min_key: "b", max_key: "d")
-
-  The range boundaries can be excluded by setting `min_key_inclusive` or
-  `max_key_inclusive` to `false`:
-
-      # Select all entries where "a" <= key < "d"
-      CubDB.select(db, min_key: "b", max_key: "d", max_key_inclusive: false)
-
-  Any of `:min_key` and `:max_key` can be omitted, to leave the range
-  open-ended.
-
-      # Select entries where key <= "a"
-      CubDB.select(db, max_key: "a")
-
-  As `nil` is a valid key, setting `min_key` or `max_key` to `nil` does NOT
-  leave the range open ended:
-
-      # Select entries where nil <= key <= "a"
-      CubDB.select(db, min_key: nil, max_key: "a")
-
-  The `reverse` option, when set to true, causes the entries to be selected and
-  traversed in reverse order.
-
-  The `pipe` option specifies an optional list of operations performed
-  sequentially on the selected entries. The given order of operations is
-  respected. The available operations, specified as tuples, are:
-
-    - `{:filter, fun}` filters entries for which `fun` returns a truthy value
-
-    - `{:map, fun}` maps each entry to the value returned by the function `fun`
-
-    - `{:take, n}` takes the first `n` entries
-
-    - `{:drop, n}` skips the first `n` entries
-
-    - `{:take_while, fun}` takes entries while `fun` returns a truthy value
-
-    - `{:drop_while, fun}` skips entries while `fun` returns a truthy value
-
-  Note that, when selecting a key range, specifying `min_key` and/or `max_key`
-  is more performant than using `{:filter, fun}` or `{:take_while | :drop_while,
-  fun}`, because `min_key` and `max_key` avoid loading unnecessary entries from
-  disk entirely.
-
-  The `reduce` option specifies how the selected entries are aggregated. If
-  `reduce` is omitted, the entries are returned as a list. If `reduce` is a
-  function, it is used to reduce the collection of entries. If `reduce` is a
-  tuple, the first element is the starting value of the reduction, and the
-  second is the reducing function.
-
-  ## Examples
-
-  To select all entries with keys between `:a` and `:c` as a list of `{key,
-  value}` entries we can do:
-
-      entries = CubDB.select(db, min_key: :a, max_key: :c)
-
-  If we want to get all entries with keys between `:a` and `:c`, with `:c`
-  excluded, we can do:
-
-      entries = CubDB.select(db,
-        min_key: :a, max_key: :c, max_key_inclusive: false)
-
-  To select the last 3 entries, we can do:
-
-      entries = CubDB.select(db, reverse: true, pipe: [take: 3])
-
-  If we want to obtain the sum of the first 10 positive numeric values
-  associated to keys from `:a` to `:f`, we can do:
-
-      sum = CubDB.select(db,
-        min_key: :a,
-        max_key: :f,
-        pipe: [
-          map: fn {_key, value} -> value end, # map values
-          filter: fn n -> is_number(n) and n > 0 end # only positive numbers
-          take: 10, # take only the first 10 entries in the range
-        ],
-        reduce: fn n, sum -> sum + n end # reduce to the sum of selected values
-      )
-  """
-  def select(db, options \\ []) when is_list(options) do
-    with_snapshot(db, fn %Snapshot{btree: btree} ->
-      Reader.select(btree, options)
-    end)
-  end
-
-  @spec select_stream(GenServer.server(), [select_option]) :: Enumerable.t()
+  @spec select(GenServer.server(), [select_option]) :: Enumerable.t()
 
   @doc """
   Selects a range of entries from the database, returning a lazy stream.
 
-  It works similarly to `select/2`, but returns a lazy stream that can be used
-  with functions in the `Enum` and `Stream` modules. The actual database read is
-  performed only when the stream is consumed.
+  The returned lazy stream can be used with functions in the `Enum` and `Stream`
+  modules. The actual database read is performed only when the stream is
+  consumed.
 
   ## Options
 
@@ -510,7 +386,7 @@ defmodule CubDB do
   To select all entries with keys between `:a` and `:c` as a list of `{key,
   value}` entries we can do:
 
-      entries = CubDB.select(db, min_key: :a, max_key: :c) |> Enum.into([])
+      entries = CubDB.select(db, min_key: :a, max_key: :c) |> Enum.to_list()
 
   If we want to get all entries with keys between `:a` and `:c`, with `:c`
   excluded, we can do:
@@ -521,7 +397,7 @@ defmodule CubDB do
           max_key: :c,
           max_key_inclusive: false
         )
-        |> Enum.into([])
+        |> Enum.to_list()
 
   To select the last 3 entries, we can do:
 
@@ -540,12 +416,12 @@ defmodule CubDB do
         |> Stream.take(10) # take only the first 10 entries in the range
         |> Enum.sum() # sum the selected values
   """
-  def select_stream(db, options \\ []) when is_list(options) do
+  def select(db, options \\ []) when is_list(options) do
     Stream.resource(
       fn ->
         snap = CubDB.snapshot(db, :infinity)
         %Snapshot{btree: btree} = snap
-        stream = Reader.select_stream(btree, options)
+        stream = Reader.select(btree, options)
         step = fn val, _acc -> {:suspend, val} end
         next = &Enumerable.reduce(stream, &1, step)
         {snap, next}

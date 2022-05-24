@@ -46,60 +46,16 @@ defmodule CubDB.Store.ReaderTest do
   end
 
   test "select/2 selects all entries", %{btree: btree, entries: entries} do
-    assert ^entries = Reader.select(btree, [])
+    assert ^entries = Reader.select(btree, []) |> Enum.to_list()
   end
 
   test "select/2 with :min_key and :max_key selects a range of entries", %{btree: btree} do
-    assert [b: 2, c: 3, d: 4] = Reader.select(btree, min_key: :b, max_key: :d)
-  end
-
-  test "select/2 with :filter and :map selects a range of entries and applies the pipe", %{
-    btree: btree
-  } do
-    assert [2, 4, 6] =
-             Reader.select(
-               btree,
-               pipe: [
-                 filter: fn {_, value} -> rem(value, 2) == 0 end,
-                 map: fn {_, value} -> value end
-               ]
-             )
-  end
-
-  test "select/2 with :reduce applies the reduction", %{btree: btree} do
-    assert 28 =
-             Reader.select(
-               btree,
-               pipe: [map: fn {_, value} -> value end],
-               reduce: fn value, sum -> sum + value end
-             )
-
-    assert 28 =
-             Reader.select(
-               btree,
-               reduce: {0, fn {_, value}, sum -> sum + value end}
-             )
+    assert [b: 2, c: 3, d: 4] = Reader.select(btree, min_key: :b, max_key: :d) |> Enum.to_list()
   end
 
   test "select/2 with :reverse selects in inverse order", %{btree: btree, entries: entries} do
     reverse_entries = Enum.reverse(entries)
 
-    assert ^reverse_entries = Reader.select(btree, reverse: true)
-  end
-
-  test "select/2 with :take and :drop takes and drops entries", %{btree: btree} do
-    assert [c: 3, d: 4] = Reader.select(btree, pipe: [take: 4, drop: 2])
-  end
-
-  test "select/2 with :take_while and :drop_while", %{btree: btree} do
-    assert [c: 3, d: 4] =
-             Reader.select(
-               btree,
-               pipe: [take_while: fn {_, v} -> v < 5 end, drop_while: fn {_, v} -> v < 3 end]
-             )
-  end
-
-  test "perform/2 performs :select with invalid :pipe", %{btree: btree} do
-    assert_raise ArgumentError, fn -> Reader.select(btree, pipe: [xxx: 123]) end
+    assert ^reverse_entries = Reader.select(btree, reverse: true) |> Enum.to_list()
   end
 end

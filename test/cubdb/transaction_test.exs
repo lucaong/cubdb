@@ -12,7 +12,7 @@ defmodule CubDB.TransactionTest do
     {:ok, tmp_dir: tmp_dir}
   end
 
-  test "get, get_multi, fetch, has_key?, size, select, and select_stream work as expected", %{
+  test "get, get_multi, fetch, has_key?, size, select work as expected", %{
     tmp_dir: tmp_dir
   } do
     {:ok, db} = CubDB.start_link(tmp_dir)
@@ -36,14 +36,12 @@ defmodule CubDB.TransactionTest do
 
       assert 2 = CubDB.Tx.size(tx)
 
-      assert [a: 1, b: 2] = CubDB.Tx.select(tx)
-
-      assert [a: 1, b: 2] = CubDB.Tx.select_stream(tx) |> Enum.into([])
+      assert [a: 1, b: 2] = CubDB.Tx.select(tx) |> Enum.into([])
 
       {:cancel, nil}
     end)
 
-    assert [a: 1, c: 3] = CubDB.select(db)
+    assert [a: 1, c: 3] = CubDB.select(db) |> Enum.into([])
   end
 
   test "refetch/3 returns :unchanged if the entry was not written, otherwise fetches it", %{
@@ -191,13 +189,7 @@ defmodule CubDB.TransactionTest do
     assert_raise RuntimeError,
                  "Invalid transaction, likely because it was used outside of its scope",
                  fn ->
-                   CubDB.Tx.select(tx)
-                 end
-
-    assert_raise RuntimeError,
-                 "Invalid transaction, likely because it was used outside of its scope",
-                 fn ->
-                   CubDB.Tx.select_stream(tx) |> Enum.into([])
+                   CubDB.Tx.select(tx) |> Enum.into([])
                  end
 
     assert_raise RuntimeError,

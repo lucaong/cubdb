@@ -77,21 +77,7 @@ defmodule CubDB.Tx do
     Reader.has_key?(btree, key)
   end
 
-  @spec select(Tx.t(), [CubDB.select_option()]) :: any
-
-  @doc """
-  Selects a range of entries from the transaction, and optionally performs a
-  pipeline of operations on them.
-
-  It works the same and accepts the same options as `CubDB.select/2`, but reads
-  from a transaction instead of the live database.
-  """
-  def select(%Tx{btree: btree} = tx, options \\ []) when is_list(options) do
-    validate_transaction!(tx)
-    Reader.select(btree, options)
-  end
-
-  @spec select_stream(Tx.t(), [CubDB.select_option()]) :: Enumerable.t()
+  @spec select(Tx.t(), [CubDB.select_option()]) :: Enumerable.t()
 
   @doc """
   Selects a range of entries from the transaction, returning a lazy stream.
@@ -99,14 +85,14 @@ defmodule CubDB.Tx do
   The lazy stream can only be consumed within the transaction scope, or a
   `RuntimeError` will be raised.
 
-  It works the same and accepts the same options as `CubDB.select_stream/2`, but
-  reads from a transaction instead of the live database.
+  It works the same and accepts the same options as `CubDB.select/2`, but reads
+  from a transaction instead of the live database.
   """
-  def select_stream(%Tx{btree: btree, db: db} = tx, options \\ []) when is_list(options) do
+  def select(%Tx{btree: btree} = tx, options \\ []) when is_list(options) do
     Stream.resource(
       fn ->
         validate_transaction!(tx)
-        stream = Reader.select_stream(btree, options)
+        stream = Reader.select(btree, options)
         step = fn val, _acc -> {:suspend, val} end
         &Enumerable.reduce(stream, &1, step)
       end,

@@ -99,36 +99,22 @@ CubDB.put_multi(db, [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8])
 Range of entries sorted by key are retrieved using `select`:
 
 ```elixir
-CubDB.select(db, min_key: :b, max_key: :e)
+CubDB.select(db, min_key: :b, max_key: :e) |> Enum.to_list()
 #=> [b: 2, c: 3, d: 4, e: 5]
 ```
 
-But `select` can do much more than that. It can apply a pipeline of operations
-(`map`, `filter`, `take`, `drop` and more) to the selected entries, it can
-select the entries in normal or reverse order, and it can `reduce` the result
-using an arbitrary function:
+The `select` function can select entries in normal or reverse order, and returns
+a lazy stream, so one can use functions in the `Stream` and `Enum` modules to
+map, filter, and transform the result, only fetching from the database the
+relevant entries:
 
 ```elixir
 # Take the sum of the last 3 even values:
-CubDB.select(db,
-  # select entries in reverse order
-  reverse: true,
-
-  # apply a pipeline of operations to the entries
-  pipe: [
-    # map each entry discarding the key and keeping only the value
-    map: fn {_key, value} -> value end,
-
-    # filter only even integers
-    filter: fn value -> is_integer(value) && Integer.is_even(value) end,
-
-    # take the first 3 values
-    take: 3
-  ],
-
-  # reduce the result to a sum
-  reduce: fn n, sum -> sum + n end
-)
+CubDB.select(db, reverse: true) # select entries in reverse order
+|> Stream.map(fn {_key, value} -> value end) # map each entry discarding the key and keeping only the value
+|> Stream.filter(fn value -> is_integer(value) && Integer.is_even(value) end) # filter only even integers
+|> Stream.take(3) # take the first 3 values
+|> Enum.sum() # sum the values
 #=> 18
 ```
 

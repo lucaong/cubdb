@@ -93,22 +93,7 @@ defmodule CubDB.Snapshot do
     end)
   end
 
-  @spec select(Snapshot.t(), [CubDB.select_option()]) :: any
-
-  @doc """
-  Selects a range of entries from the snapshot, and optionally performs a
-  pipeline of operations on them.
-
-  It works the same and accepts the same options as `CubDB.select/2`, but reads
-  from a snapshot instead of the live database.
-  """
-  def select(%Snapshot{} = snapshot, options \\ []) when is_list(options) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.select(btree, options)
-    end)
-  end
-
-  @spec select_stream(GenServer.server(), [CubDB.select_option()]) :: Enumerable.t()
+  @spec select(GenServer.server(), [CubDB.select_option()]) :: Enumerable.t()
 
   @doc """
   Selects a range of entries from the snapshot, returning a lazy stream.
@@ -116,15 +101,15 @@ defmodule CubDB.Snapshot do
   The lazy stream can only be consumed while the snapshot is still valid, or a
   `RuntimeError` will be raised.
 
-  It works the same and accepts the same options as `CubDB.select_stream/2`, but
-  reads from a snapshot instead of the live database.
+  It works the same and accepts the same options as `CubDB.select/2`, but reads
+  from a snapshot instead of the live database.
   """
-  def select_stream(snap, options \\ []) when is_list(options) do
+  def select(snap, options \\ []) when is_list(options) do
     Stream.resource(
       fn ->
         snap = extend_snapshot(snap)
         %Snapshot{btree: btree} = snap
-        stream = Reader.select_stream(btree, options)
+        stream = Reader.select(btree, options)
         step = fn val, _acc -> {:suspend, val} end
         next = &Enumerable.reduce(stream, &1, step)
         {snap, next}

@@ -39,7 +39,7 @@ defmodule CubDB.CompactorTest do
 
       all_entries = Enum.concat(entries, more_entries) |> Enum.sort()
 
-      assert ^all_entries = CubDB.select(db)
+      assert ^all_entries = CubDB.select(db) |> Enum.to_list()
       assert CubDB.current_db_file(db) == Path.join(tmp_dir, "1.cub")
       refute Store.open?(store)
     end
