@@ -196,6 +196,18 @@ defmodule CubDBTest do
       |> Enum.into([])
 
     assert [c: 3, b: 2, a: 1] = result
+
+    result =
+      CubDB.select(db,
+        min_key: :a,
+        max_key: :c,
+        reverse: true
+      )
+      |> Stream.map(fn {_key, value} -> value end)
+      |> Stream.take(2)
+      |> Enum.sum()
+
+    assert 5 = result
   end
 
   test "select/2 releases the snapshot after consuming the stream", %{tmp_dir: tmp_dir} do
@@ -243,6 +255,22 @@ defmodule CubDBTest do
     assert_raise RuntimeError, "boom!", fn -> Stream.run(stream) end
 
     assert_receive :clean_up_started, 1000
+  end
+
+  test "select/2 raises if the legacy options :pipe or :reduce are passed", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert_raise RuntimeError,
+                 "select/2 does not have a :reduce option anymore. Use Enum.reduce on the returned lazy stream instead.",
+                 fn ->
+                   CubDB.select(db, reduce: fn a, b -> a + b end) |> Enum.to_list()
+                 end
+
+    assert_raise RuntimeError,
+                 "select/2 does not have a :pipe option anymore. Pipe the returned lazy stream into functions in Stream or Enum instead.",
+                 fn ->
+                   CubDB.select(db, pipe: [map: fn {_, v} -> v end]) |> Enum.to_list()
+                 end
   end
 
   describe "snapshot/2" do

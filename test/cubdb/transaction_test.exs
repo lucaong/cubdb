@@ -66,6 +66,24 @@ defmodule CubDB.TransactionTest do
     end)
   end
 
+  test "refetch/2 raises an exception if called with a snapshot from another process", %{
+    tmp_dir: tmp_dir
+  } do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
+    snap = CubDB.snapshot(db, :infinity)
+    CubDB.stop(db)
+
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
+
+    assert_raise RuntimeError, "Invalid snapshot from another CubDB process", fn ->
+      CubDB.transaction(db, fn tx ->
+        CubDB.Tx.refetch(tx, :a, snap)
+
+        {:cancel, nil}
+      end)
+    end
+  end
+
   test "put/3 inserts an entry if committed", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     CubDB.put(db, :a, 0)
