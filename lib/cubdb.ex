@@ -1,26 +1,24 @@
 defmodule CubDB do
   @moduledoc """
-  `CubDB` is an embedded key-value database written in the Elixir language. It
-  runs locally, it is schema-less, and backed by a single file.
+  `CubDB` is an embedded key-value database for the Elixir language. It is
+  designed for robustness, and for minimal need of resources.
 
   ## Features
 
-    - Basic `get/3`, `put/3`, and `delete/2` operations, plus more specialized
-      functions
+    - Both keys and values can be any Elixir (or Erlang) term.
 
-    - Performant selection of ranges of entries sorted by key with `select/2`
+    - Basic `get`, `put`, and `delete` operations, selection of ranges of
+    entries sorted by key with `select`.
 
-    - Atomic transactions
+    - Atomic, Consistent, Isolated, Durable (ACID) transactions.
 
-    - Concurrent read operations, that do not block nor are blocked by writes
-
-    - Zero cost read-only snapshots to ensure consistency when reading multiple
-      entries
+    - Multi version concurrency control (MVCC) allowing concurrent read
+    operations, that do not block nor are blocked by writes.
 
     - Unexpected shutdowns or crashes won't corrupt the database or break
-      atomicity
+    atomicity of transactions.
 
-    - Manual or automatic compaction to reclaim disk space
+    - Manual or automatic compaction to reclaim disk space.
 
   To ensure consistency, performance, and robustness to data corruption, `CubDB`
   database file uses an append-only, immutable B-tree data structure. Entries
