@@ -390,7 +390,7 @@ defmodule CubDB do
   excluded, we can do:
 
       entries =
-        CubDB.select_stream(db,
+        CubDB.select(db,
           min_key: :a,
           max_key: :c,
           max_key_inclusive: false
@@ -405,7 +405,7 @@ defmodule CubDB do
   associated to keys from `:a` to `:f`, we can do:
 
       sum =
-        CubDB.select_stream(db,
+        CubDB.select(db,
           min_key: :a,
           max_key: :f
         )
