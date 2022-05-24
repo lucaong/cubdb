@@ -12,7 +12,9 @@ defmodule CubDB.SnapshotTest do
     {:ok, tmp_dir: tmp_dir}
   end
 
-  test "get, get_multi, fetch, has_key?, size, and select work as expected", %{tmp_dir: tmp_dir} do
+  test "get, get_multi, fetch, has_key?, size, select work as expected", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, db} = CubDB.start_link(tmp_dir)
     CubDB.put_multi(db, a: 1, c: 3)
 
@@ -30,7 +32,7 @@ defmodule CubDB.SnapshotTest do
     assert CubDB.Snapshot.has_key?(snap, :a)
     refute CubDB.Snapshot.has_key?(snap, :b)
 
-    assert [a: 1, c: 3] = CubDB.Snapshot.select(snap)
+    assert [a: 1, c: 3] = CubDB.Snapshot.select(snap) |> Enum.into([])
 
     assert 2 = CubDB.Snapshot.size(snap)
 
@@ -50,17 +52,32 @@ defmodule CubDB.SnapshotTest do
     :ok = CubDB.compact(db)
 
     result =
-      CubDB.Snapshot.select(snap,
-        pipe: [
-          map: fn x ->
-            Process.sleep(20)
-            x
-          end
-        ]
-      )
+      CubDB.Snapshot.select(snap)
+      |> Stream.map(fn x ->
+        Process.sleep(20)
+        x
+      end)
+      |> Enum.into([])
 
     assert result == [a: 1, b: 2, c: 3, d: 4, e: 5]
     assert_receive :clean_up_started, 1000
+  end
+
+  test "select/2 raises if the stream is consumed when the snapshot is not valid anymore",
+       %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    CubDB.put(db, :a, 1)
+
+    stream =
+      CubDB.with_snapshot(db, fn snap ->
+        CubDB.Snapshot.select(snap)
+      end)
+
+    assert_raise RuntimeError,
+                 "Attempt to use CubDB snapshot after it was released or it timed out",
+                 fn ->
+                   Stream.run(stream)
+                 end
   end
 
   describe "back_up/2" do
@@ -97,7 +114,8 @@ defmodule CubDB.SnapshotTest do
 
         {:ok, copy} = CubDB.start_link(data_dir: backup_dir)
 
-        assert CubDB.Snapshot.select(snap) == CubDB.select(copy)
+        assert CubDB.Snapshot.select(snap) |> Enum.to_list() ==
+                 CubDB.select(copy) |> Enum.to_list()
       end)
     end
   end

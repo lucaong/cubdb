@@ -1,14 +1,23 @@
 defmodule CubDB.Tx do
+  @moduledoc """
+  The `CubDB.Tx` module contains functions to read or write within atomic
+  transactions created with `CubDB.transaction/2`.
+
+  The functions in this module mirror the ones with the same name in the `CubDB`
+  module, but work on transactions instead of on the live database.
+  """
+
   alias CubDB.Btree
   alias CubDB.Reader
   alias CubDB.Snapshot
   alias CubDB.Tx
 
-  @enforce_keys [:btree, :compacting, :owner]
+  @enforce_keys [:btree, :compacting, :owner, :db]
   defstruct [
     :btree,
     :compacting,
     :owner,
+    :db,
     recompact: false
   ]
 
@@ -16,6 +25,7 @@ defmodule CubDB.Tx do
            btree: Btree.t(),
            compacting: boolean,
            owner: GenServer.from(),
+           db: GenServer.server(),
            recompact: boolean
          }
 
@@ -32,7 +42,8 @@ defmodule CubDB.Tx do
   It works the same as `CubDB.get/3`, but reads from a transaction instead of
   the live database.
   """
-  def get(%Tx{btree: btree}, key, default \\ nil) do
+  def get(tx = %Tx{btree: btree}, key, default \\ nil) do
+    validate_transaction!(tx)
     Reader.get(btree, key, default)
   end
 
@@ -48,7 +59,8 @@ defmodule CubDB.Tx do
   It works the same as `CubDB.fetch/2`, but reads from a transaction instead of
   the live database.
   """
-  def fetch(%Tx{btree: btree}, key) do
+  def fetch(tx = %Tx{btree: btree}, key) do
+    validate_transaction!(tx)
     Reader.fetch(btree, key)
   end
 
@@ -60,21 +72,41 @@ defmodule CubDB.Tx do
   It works the same as `CubDB.has_key?/2`, but reads from a transaction instead
   of the live database.
   """
-  def has_key?(%Tx{btree: btree}, key) do
+  def has_key?(tx = %Tx{btree: btree}, key) do
+    validate_transaction!(tx)
     Reader.has_key?(btree, key)
   end
 
-  @spec select(Tx.t(), [CubDB.select_option()]) :: any
+  @spec select(Tx.t(), [CubDB.select_option()]) :: Enumerable.t()
 
   @doc """
-  Selects a range of entries from the transaction, and optionally performs a
-  pipeline of operations on them.
+  Selects a range of entries from the transaction, returning a lazy stream.
+
+  The lazy stream can only be consumed within the transaction scope, or a
+  `RuntimeError` will be raised.
 
   It works the same and accepts the same options as `CubDB.select/2`, but reads
   from a transaction instead of the live database.
   """
-  def select(%Tx{btree: btree}, options \\ []) when is_list(options) do
-    Reader.select(btree, options)
+  def select(%Tx{btree: btree} = tx, options \\ []) when is_list(options) do
+    Stream.resource(
+      fn ->
+        validate_transaction!(tx)
+        stream = Reader.select(btree, options)
+        step = fn val, _acc -> {:suspend, val} end
+        &Enumerable.reduce(stream, &1, step)
+      end,
+      fn next ->
+        case next.({:cont, nil}) do
+          {:done, _} ->
+            {:halt, nil}
+
+          {:suspended, value, next} ->
+            {[value], next}
+        end
+      end,
+      fn _ -> nil end
+    )
   end
 
   @spec refetch(Tx.t(), CubDB.key(), Snapshot.t()) :: :unchanged | {:ok, CubDB.value()} | :error
@@ -152,7 +184,13 @@ defmodule CubDB.Tx do
   """
   def refetch(tx, key, snapshot)
 
-  def refetch(%Tx{btree: btree}, key, %Snapshot{btree: reference_btree}) do
+  def refetch(%Tx{db: db}, _key, %Snapshot{db: other_db}) when db != other_db do
+    raise "Invalid snapshot from another CubDB process"
+  end
+
+  def refetch(tx = %Tx{btree: btree}, key, %Snapshot{btree: reference_btree}) do
+    validate_transaction!(tx)
+
     case Btree.written_since?(btree, key, reference_btree) do
       false ->
         :unchanged
@@ -170,7 +208,8 @@ defmodule CubDB.Tx do
   It works the same as `CubDB.size/1`, but works on a transaction instead of the
   live database.
   """
-  def size(%Tx{btree: btree}) do
+  def size(tx = %Tx{btree: btree}) do
+    validate_transaction!(tx)
     Reader.size(btree)
   end
 
@@ -185,6 +224,7 @@ defmodule CubDB.Tx do
   place, and instead returns a modified transaction.
   """
   def put(tx = %Tx{btree: btree}, key, value) do
+    validate_transaction!(tx)
     %Tx{tx | btree: Btree.insert(btree, key, value)}
   end
 
@@ -201,6 +241,8 @@ defmodule CubDB.Tx do
   place, and instead returns a modified transaction.
   """
   def put_new(tx = %Tx{btree: btree}, key, value) do
+    validate_transaction!(tx)
+
     case Btree.insert_new(btree, key, value) do
       {:error, :exists} = reply ->
         reply
@@ -221,6 +263,8 @@ defmodule CubDB.Tx do
   place, and instead returns a modified transaction.
   """
   def delete(tx = %Tx{btree: btree, compacting: compacting}, key) do
+    validate_transaction!(tx)
+
     if compacting do
       %Tx{tx | btree: Btree.mark_deleted(btree, key)}
     else
@@ -246,6 +290,17 @@ defmodule CubDB.Tx do
   place, and instead returns a modified transaction.
   """
   def clear(tx = %Tx{btree: btree, compacting: compacting}) do
+    validate_transaction!(tx)
     %Tx{tx | btree: Btree.clear(btree), recompact: compacting}
+  end
+
+  defp validate_transaction!(tx = %Tx{db: db}) do
+    case GenServer.call(db, {:validate_transaction, tx}, :infinity) do
+      :ok ->
+        :ok
+
+      :error ->
+        raise "Invalid transaction, likely because it was used outside of its scope"
+    end
   end
 end

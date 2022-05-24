@@ -12,7 +12,9 @@ defmodule CubDB.TransactionTest do
     {:ok, tmp_dir: tmp_dir}
   end
 
-  test "get, get_multi, fetch, has_key?, size, and select work as expected", %{tmp_dir: tmp_dir} do
+  test "get, get_multi, fetch, has_key?, size, select work as expected", %{
+    tmp_dir: tmp_dir
+  } do
     {:ok, db} = CubDB.start_link(tmp_dir)
     CubDB.put_multi(db, a: 1, c: 3)
 
@@ -34,12 +36,12 @@ defmodule CubDB.TransactionTest do
 
       assert 2 = CubDB.Tx.size(tx)
 
-      assert [a: 1, b: 2] = CubDB.Tx.select(tx)
+      assert [a: 1, b: 2] = CubDB.Tx.select(tx) |> Enum.into([])
 
       {:cancel, nil}
     end)
 
-    assert [a: 1, c: 3] = CubDB.select(db)
+    assert [a: 1, c: 3] = CubDB.select(db) |> Enum.into([])
   end
 
   test "refetch/3 returns :unchanged if the entry was not written, otherwise fetches it", %{
@@ -156,5 +158,56 @@ defmodule CubDB.TransactionTest do
     refute CubDB.has_key?(db, :a)
     refute CubDB.has_key?(db, :b)
     assert 0 = CubDB.size(db)
+  end
+
+  test "using the transaction outside of its scope raises an exception", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    tx =
+      CubDB.transaction(db, fn tx ->
+        {:cancel, tx}
+      end)
+
+    assert_raise RuntimeError,
+                 "Invalid transaction, likely because it was used outside of its scope",
+                 fn ->
+                   CubDB.Tx.get(tx, :a)
+                 end
+
+    assert_raise RuntimeError,
+                 "Invalid transaction, likely because it was used outside of its scope",
+                 fn ->
+                   CubDB.Tx.fetch(tx, :a)
+                 end
+
+    assert_raise RuntimeError,
+                 "Invalid transaction, likely because it was used outside of its scope",
+                 fn ->
+                   CubDB.Tx.size(tx)
+                 end
+
+    assert_raise RuntimeError,
+                 "Invalid transaction, likely because it was used outside of its scope",
+                 fn ->
+                   CubDB.Tx.select(tx) |> Enum.into([])
+                 end
+
+    assert_raise RuntimeError,
+                 "Invalid transaction, likely because it was used outside of its scope",
+                 fn ->
+                   CubDB.Tx.put(tx, :a, 1)
+                 end
+
+    assert_raise RuntimeError,
+                 "Invalid transaction, likely because it was used outside of its scope",
+                 fn ->
+                   CubDB.Tx.delete(tx, :a)
+                 end
+
+    assert_raise RuntimeError,
+                 "Invalid transaction, likely because it was used outside of its scope",
+                 fn ->
+                   CubDB.Tx.clear(tx)
+                 end
   end
 end

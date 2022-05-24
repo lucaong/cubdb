@@ -86,7 +86,8 @@ defmodule CubDB.Mixfile do
         LICENSE: [title: "License"],
         "README.md": [title: "Overview"],
         "FAQ.md": [],
-        "HOWTO.md": []
+        "HOWTO.md": [],
+        "UPGRADING.md": [title: "Upgrade Guide"]
       ],
       main: "readme",
       logo: "assets/cubdb_logo.png",

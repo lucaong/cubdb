@@ -7,13 +7,6 @@ defmodule CubDB.Reader do
 
   alias CubDB.Btree
 
-  @type operation ::
-          {:get, CubDB.key(), CubDB.value()}
-          | {:get_multi, [CubDB.key()]}
-          | {:fetch, CubDB.key()}
-          | {:has_key?, CubDB.key()}
-          | {:select, Keyword.t()}
-
   @spec get(Btree.t(), CubDB.key(), any) :: any
 
   def get(btree, key, default) do
@@ -53,9 +46,11 @@ defmodule CubDB.Reader do
 
   def size(btree), do: Enum.count(btree)
 
-  @spec select(Btree.t(), [CubDB.select_option()]) :: any
+  @spec select(Btree.t(), [CubDB.select_option()]) :: Enumerable.t()
 
   def select(btree, options) when is_list(options) do
+    check_legacy_select_options!(options)
+
     min_key =
       case Keyword.fetch(options, :min_key) do
         {:ok, key} ->
@@ -74,27 +69,22 @@ defmodule CubDB.Reader do
           nil
       end
 
-    pipe = Keyword.get(options, :pipe, [])
-    reduce = Keyword.get(options, :reduce)
     reverse = Keyword.get(options, :reverse, false)
 
-    key_range = Btree.key_range(btree, min_key, max_key, reverse)
+    Btree.key_range(btree, min_key, max_key, reverse)
+  end
 
-    stream =
-      Enum.reduce(pipe, key_range, fn
-        {:filter, fun}, stream when is_function(fun) -> Stream.filter(stream, fun)
-        {:map, fun}, stream when is_function(fun) -> Stream.map(stream, fun)
-        {:take, n}, stream when is_integer(n) -> Stream.take(stream, n)
-        {:drop, n}, stream when is_integer(n) -> Stream.drop(stream, n)
-        {:take_while, fun}, stream when is_function(fun) -> Stream.take_while(stream, fun)
-        {:drop_while, fun}, stream when is_function(fun) -> Stream.drop_while(stream, fun)
-        op, _ -> raise(ArgumentError, message: "invalid pipe operation #{inspect(op)}")
-      end)
+  @spec check_legacy_select_options!(Keyword.t()) :: :ok
 
-    case reduce do
-      fun when is_function(fun) -> Enum.reduce(stream, fun)
-      {acc, fun} when is_function(fun) -> Enum.reduce(stream, acc, fun)
-      nil -> Enum.to_list(stream)
+  defp check_legacy_select_options!(options) do
+    if Keyword.has_key?(options, :reduce) do
+      raise "select/2 does not have a :reduce option anymore. Use Enum.reduce on the returned lazy stream instead."
     end
+
+    if Keyword.has_key?(options, :pipe) do
+      raise "select/2 does not have a :pipe option anymore. Pipe the returned lazy stream into functions in Stream or Enum instead."
+    end
+
+    :ok
   end
 end

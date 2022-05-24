@@ -1,4 +1,12 @@
 defmodule CubDB.Snapshot do
+  @moduledoc """
+  The `CubDB.Snapshot` module contains functions to read from snapshots obtained
+  with `CubDB.with_snapshot/2` or `CubDB.snapshot/2`.
+
+  The functions in this module mirror the ones with the same name in the `CubDB`
+  module, but work on snapshots instead of on the live database.
+  """
+
   alias CubDB.Btree
   alias CubDB.Store
   alias CubDB.Snapshot
@@ -32,7 +40,7 @@ defmodule CubDB.Snapshot do
   It works the same as `CubDB.get/3`, but reads from a snapshot instead of the
   live database.
   """
-  def get(%Snapshot{} = snapshot, key, default \\ nil) do
+  def get(snapshot = %Snapshot{}, key, default \\ nil) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
       Reader.get(btree, key, default)
     end)
@@ -47,7 +55,7 @@ defmodule CubDB.Snapshot do
   It works the same as `CubDB.get_multi/2`, but reads from a snapshot instead of
   the live database.
   """
-  def get_multi(%Snapshot{} = snapshot, keys) do
+  def get_multi(snapshot = %Snapshot{}, keys) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
       Reader.get_multi(btree, keys)
     end)
@@ -65,7 +73,7 @@ defmodule CubDB.Snapshot do
   It works the same as `CubDB.fetch/2`, but reads from a snapshot instead of
   the live database.
   """
-  def fetch(%Snapshot{} = snapshot, key) do
+  def fetch(snapshot = %Snapshot{}, key) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
       Reader.fetch(btree, key)
     end)
@@ -79,25 +87,44 @@ defmodule CubDB.Snapshot do
   It works the same as `CubDB.has_key?/2`, but reads from a snapshot instead of
   the live database.
   """
-  def has_key?(%Snapshot{} = snapshot, key) do
+  def has_key?(snapshot = %Snapshot{}, key) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
       Reader.has_key?(btree, key)
     end)
   end
 
-  @spec select(Snapshot.t(), [CubDB.select_option()]) :: any
+  @spec select(GenServer.server(), [CubDB.select_option()]) :: Enumerable.t()
 
   @doc """
-  Selects a range of entries from the snapshot, and optionally performs a
-  pipeline of operations on them.
+  Selects a range of entries from the snapshot, returning a lazy stream.
+
+  The lazy stream can only be consumed while the snapshot is still valid, or a
+  `RuntimeError` will be raised.
 
   It works the same and accepts the same options as `CubDB.select/2`, but reads
   from a snapshot instead of the live database.
   """
-  def select(%Snapshot{} = snapshot, options \\ []) when is_list(options) do
-    extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
-      Reader.select(btree, options)
-    end)
+  def select(snap, options \\ []) when is_list(options) do
+    Stream.resource(
+      fn ->
+        snap = extend_snapshot(snap)
+        %Snapshot{btree: btree} = snap
+        stream = Reader.select(btree, options)
+        step = fn val, _acc -> {:suspend, val} end
+        next = &Enumerable.reduce(stream, &1, step)
+        {snap, next}
+      end,
+      fn {snap, next} ->
+        case next.({:cont, nil}) do
+          {:done, _} ->
+            {:halt, {snap, nil}}
+
+          {:suspended, value, next} ->
+            {[value], {snap, next}}
+        end
+      end,
+      fn {snap, _} -> CubDB.release_snapshot(snap) end
+    )
   end
 
   @spec size(Snapshot.t()) :: non_neg_integer
@@ -108,7 +135,7 @@ defmodule CubDB.Snapshot do
   It works the same as `CubDB.size/1`, but works on a snapshot instead of the
   live database.
   """
-  def size(%Snapshot{} = snapshot) do
+  def size(snapshot = %Snapshot{}) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
       Reader.size(btree)
     end)
@@ -122,7 +149,7 @@ defmodule CubDB.Snapshot do
   It works the same as `CubDB.back_up/2`, but works on a snapshot instead of the
   live database.
   """
-  def back_up(%Snapshot{} = snapshot, target_path) do
+  def back_up(snapshot = %Snapshot{}, target_path) do
     extend_snapshot(snapshot, fn %Snapshot{btree: btree} ->
       with :ok <- File.mkdir(target_path),
            {:ok, store} <- Store.File.create(Path.join(target_path, "0#{@db_file_extension}")) do
@@ -142,6 +169,18 @@ defmodule CubDB.Snapshot do
         after
           CubDB.release_snapshot(snap)
         end
+
+      _ ->
+        raise "Attempt to use CubDB snapshot after it was released or it timed out"
+    end
+  end
+
+  @spec extend_snapshot(Snapshot.t()) :: Snapshot.t()
+
+  defp extend_snapshot(snapshot = %Snapshot{db: db}) do
+    case GenServer.call(db, {:extend_snapshot, snapshot}, :infinity) do
+      {:ok, snap} ->
+        snap
 
       _ ->
         raise "Attempt to use CubDB snapshot after it was released or it timed out"

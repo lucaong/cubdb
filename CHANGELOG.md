@@ -12,6 +12,9 @@ Version `2.0.0` brings better concurrency, atomic transactions with arbitrary
 operations, zero cost read-only snapshots, database backup, and more, all with a
 simpler and more scalable internal architecture.
 
+Refer to the [upgrade guide](https://hexdocs.pm/cubdb/upgrading.html) for how to
+upgrade from previous versions.
+
   - [breaking] The functions `get_and_update/3`, `get_and_update_multi/3`, and
     `select/2` now return directly `result`, instead of a `{:ok, result}` tuple.
   - [breaking] `get_and_update_multi/4` does not take an option argument
@@ -22,6 +25,9 @@ simpler and more scalable internal architecture.
     spawned `Task` to the client process. This makes the `:timeout` option
     unnecessary: by stopping the process calling `CubDB`, any running read
     operation by that process is stopped.
+  - [breaking] `select/2` now returns a lazy stream that can be used with
+    functions in `Enum` and `Stream`. This makes the `:pipe` and `:reduce`
+    options unnecessary, so those options were removed.
   - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
     cost read-only snapshots of the database. The functions in `CubDB.Snapshot`
     allow to read from a snapshot.
@@ -35,22 +41,6 @@ simpler and more scalable internal architecture.
   - Move read and write operations to the caller process as opposed to the
     `CubDB` server process.
   - Improve concurrency of read operations while writing
-
-### Upgrading from v1 to v2
-
-Upgrading from `v1` to `v2` requires a few simple code changes:
-
-  1. When calling `get_and_update`, `get_and_update_multi`, and `select` the
-     return value is not a `{:ok, result}` tuple anymore, but just `result`.
-  2. `get_and_update_multi` does not take a fourth option argument anymore. The
-     only available option was `:timeout`, which was now removed. In case you
-     want to enforce a timeout for the update function, you can use a `Task` and
-     `Task.yield` like explained
-     [here](https://hexdocs.pm/elixir/1.12/Task.html#yield/2).
-  3. The `select` function does not support a `:timeout` option anymore, so it
-     will be ignored if passed. In order to enforce a timeout, you can wrap the
-     `select` in a `Task` and use `Task.yield` like shown
-     [here](https://hexdocs.pm/elixir/1.12/Task.html#yield/2)
 
 ## v1.1.0 (2021-10-14)
 
