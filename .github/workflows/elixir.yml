@@ -90,13 +90,13 @@ jobs:
             elixir: '1.9.4'
           - otp: '23.3'
             elixir: '1.10.4'
-          - otp: '24.1'
+          - otp: '24.3'
             elixir: '1.7.4'
-          - otp: '24.1'
+          - otp: '24.3'
             elixir: '1.8.2'
-          - otp: '24.1'
+          - otp: '24.3'
             elixir: '1.9.4'
-          - otp: '24.1'
+          - otp: '24.3'
             elixir: '1.10.4'
     steps:
     - uses: actions/checkout@v2
