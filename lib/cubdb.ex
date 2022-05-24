@@ -1457,14 +1457,15 @@ defmodule CubDB do
     with :ok <- File.mkdir_p(data_dir),
          {:ok, files} <- File.ls(data_dir) do
       files
-      |> Enum.filter(&cubdb_file?/1)
-      |> Enum.filter(&String.ends_with?(&1, @db_file_extension))
+      |> Enum.filter(fn file_name ->
+        cubdb_file?(file_name) && String.ends_with?(file_name, @db_file_extension)
+      end)
       |> Enum.sort_by(&file_name_to_n/1)
       |> List.last()
     end
   end
 
-  @spec trigger_compaction(%State{}) :: {:ok, pid} | {:error, any}
+  @spec trigger_compaction(State.t()) :: {:ok, pid} | {:error, any}
 
   defp trigger_compaction(state = %State{data_dir: data_dir, clean_up: clean_up}) do
     case compaction_running?(state) do
@@ -1525,13 +1526,13 @@ defmodule CubDB do
     end
   end
 
-  @spec compaction_running?(%State{}) :: boolean
+  @spec compaction_running?(State.t()) :: boolean
 
   defp compaction_running?(%State{compactor: nil}), do: false
 
   defp compaction_running?(_), do: true
 
-  @spec do_halt_compaction(%State{}) :: %State{}
+  @spec do_halt_compaction(State.t()) :: State.t()
 
   defp do_halt_compaction(state = %State{compactor: nil}), do: state
 
@@ -1540,7 +1541,7 @@ defmodule CubDB do
     %State{state | compactor: nil}
   end
 
-  @spec trigger_clean_up(%State{}) :: %State{}
+  @spec trigger_clean_up(State.t()) :: State.t()
 
   defp trigger_clean_up(state) do
     if can_clean_up?(state),
@@ -1548,7 +1549,7 @@ defmodule CubDB do
       else: clean_up_when_possible(state)
   end
 
-  @spec can_clean_up?(%State{}) :: boolean
+  @spec can_clean_up?(State.t()) :: boolean
 
   defp can_clean_up?(%State{btree: %Btree{store: store}, readers: readers}) do
     %Store.File{file_path: file_path} = store
@@ -1558,7 +1559,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec clean_up_now(%State{}) :: %State{}
+  @spec clean_up_now(State.t()) :: State.t()
 
   defp clean_up_now(state = %State{btree: btree, clean_up: clean_up}) do
     for old_btree <- state.old_btrees do
@@ -1570,13 +1571,13 @@ defmodule CubDB do
     %State{state | clean_up_pending: false, old_btrees: []}
   end
 
-  @spec clean_up_when_possible(%State{}) :: %State{}
+  @spec clean_up_when_possible(State.t()) :: State.t()
 
   defp clean_up_when_possible(state) do
     %State{state | clean_up_pending: true}
   end
 
-  @spec maybe_auto_compact(%State{}) :: %State{}
+  @spec maybe_auto_compact(State.t()) :: State.t()
 
   defp maybe_auto_compact(state) do
     if should_auto_compact?(state) do
@@ -1592,7 +1593,7 @@ defmodule CubDB do
     end
   end
 
-  @spec should_auto_compact?(%State{}) :: boolean
+  @spec should_auto_compact?(State.t()) :: boolean
 
   defp should_auto_compact?(%State{auto_compact: false}), do: false
 

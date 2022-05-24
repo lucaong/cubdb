@@ -54,9 +54,8 @@ defmodule CubDB.CleanUp do
 
     with {:ok, file_names} <- File.ls(data_dir) do
       file_names
-      |> Enum.filter(&CubDB.cubdb_file?/1)
       |> Enum.filter(fn file_name ->
-        CubDB.file_name_to_n(file_name) < latest_file_n
+        CubDB.cubdb_file?(file_name) && CubDB.file_name_to_n(file_name) < latest_file_n
       end)
       |> Enum.reduce(:ok, fn file_name, _ ->
         :ok = File.rm(Path.join(data_dir, file_name))
