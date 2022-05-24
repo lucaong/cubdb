@@ -7,8 +7,8 @@ defmodule CubDB do
 
     - Both keys and values can be any Elixir (or Erlang) term.
 
-    - Basic `get`, `put`, and `delete` operations, selection of ranges of
-    entries sorted by key with `select`.
+    - Basic `get/3`, `put/3`, and `delete/2` operations, selection of ranges of
+    entries sorted by key with `select/2`.
 
     - Atomic, Consistent, Isolated, Durable (ACID) transactions.
 
