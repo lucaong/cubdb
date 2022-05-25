@@ -29,7 +29,7 @@ upgrade from previous versions.
   - [breaking] `CubDB.select/2` now returns a lazy stream that can be used with
     functions in `Enum` and `Stream`. This makes the `:pipe` and `:reduce`
     options unnecessary, so those options were removed.
-  - Add `CubDB.snapshot/2`, `CubDB.with_snapshot/1` and
+  - Add `CubDB.snapshot/2`, `CubDB.with_snapshot/2` and
     `CubDB.release_snapshot/1` to get zero cost read-only snapshots of the
     database. The functions in `CubDB.Snapshot` allow to read from a snapshot.
   - Add `CubDB.transaction/2` to perform multiple write (and read) operations in

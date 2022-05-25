@@ -105,7 +105,7 @@ defmodule CubDB do
 
       # Take the sum of the last 3 even values:
       CubDB.select(db, reverse: true) # select entries in reverse order
-      |> Stream.map(fn {_key, value} -> value end) # map each entry discarding the key and keeping only the value
+      |> Stream.map(fn {_key, value} -> value end) # discard the key and keep only the value
       |> Stream.filter(fn value -> is_integer(value) && Integer.is_even(value) end) # filter only even integers
       |> Stream.take(3) # take the first 3 values
       |> Enum.sum() # sum the values
@@ -132,7 +132,8 @@ defmodule CubDB do
 
   The functions that read multiple entries like `get_multi/2`, `select/2`, etc.
   are internally using a snapshot, so they always ensure consistency and
-  isolation from concurrent writes.
+  isolation from concurrent writes, implementing multi version concurrency
+  control (MVCC).
 
   Because `CubDB` uses an immutable, append-only data structure, write
   operations cause the data file to grow. When necessary, `CubDB` runs a
@@ -340,9 +341,9 @@ defmodule CubDB do
   @doc """
   Selects a range of entries from the database, returning a lazy stream.
 
-  The returned lazy stream can be used with functions in the `Enum` and `Stream`
-  modules. The actual database read is performed only when the stream is
-  consumed.
+  The returned lazy stream can be filtered, mapped, and transformed with
+  standard functions in the `Stream` and `Enum` modules. The actual database
+  read is deferred to when the stream is iterated or consumed.
 
   ## Options
 
@@ -365,14 +366,15 @@ defmodule CubDB do
       # Select entries where key <= "a"
       CubDB.select(db, max_key: "a")
 
-  As `nil` is a valid key, setting `min_key` or `max_key` to `nil` does NOT
+  Since `nil` is a valid key, setting `min_key` or `max_key` to `nil` *does NOT*
   leave the range open ended:
 
       # Select entries where nil <= key <= "a"
       CubDB.select(db, min_key: nil, max_key: "a")
 
   The `reverse` option, when set to true, causes the entries to be selected and
-  traversed in reverse order.
+  traversed in reverse order. This is more efficient than selecting them in
+  normal ascending order and then reversing the resulting collection.
 
   Note that, when selecting a key range, specifying `min_key` and/or `max_key`
   is more performant than using functions in `Enum` or `Stream` to filter out
@@ -381,10 +383,16 @@ defmodule CubDB do
 
   ## Examples
 
-  To select all entries with keys between `:a` and `:c` as a list of `{key,
+  To select all entries with keys between `:a` and `:c` as a stream of `{key,
   value}` entries we can do:
 
-      entries = CubDB.select(db, min_key: :a, max_key: :c) |> Enum.to_list()
+      entries = CubDB.select(db, min_key: :a, max_key: :c)
+
+  Since `select/2` returns a lazy stream, at this point nothing has been fetched
+  from the database yet. We can turn the stream into a list, performing the
+  actual query:
+
+      Enum.to_list(entries)
 
   If we want to get all entries with keys between `:a` and `:c`, with `:c`
   excluded, we can do:
@@ -413,6 +421,11 @@ defmodule CubDB do
         |> Stream.filter(fn n -> is_number(n) and n > 0 end) # only positive numbers
         |> Stream.take(10) # take only the first 10 entries in the range
         |> Enum.sum() # sum the selected values
+
+  Using functions from the `Stream` module for mapping and filtering ensures
+  that we do not fetch unnecessary items from the database. In the example
+  above, for example, after fetching the first 10 entries satisfying the filter
+  condition, no further entry is fetched from the database.
   """
   def select(db, options \\ []) when is_list(options) do
     Stream.resource(

@@ -107,7 +107,7 @@ relevant entries:
 ```elixir
 # Take the sum of the last 3 even values:
 CubDB.select(db, reverse: true) # select entries in reverse order
-|> Stream.map(fn {_key, value} -> value end) # map each entry discarding the key and keeping only the value
+|> Stream.map(fn {_key, value} -> value end) # discard the key and keep only the value
 |> Stream.filter(fn value -> is_integer(value) && Integer.is_even(value) end) # filter only even integers
 |> Stream.take(3) # take the first 3 values
 |> Enum.sum() # sum the values
@@ -137,7 +137,7 @@ end)
 
 The functions that read multiple entries like `get_multi`, `select`, etc. are
 internally using a snapshot, so they always ensure consistency and isolation
-from concurrent writes.
+from concurrent writes, implementing multi version concurrency control (MVCC).
 
 For more details, read the [API documentation](https://hexdocs.pm/cubdb/CubDB.html).
 
