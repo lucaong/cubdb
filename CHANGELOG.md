@@ -6,7 +6,7 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
-## v2.0.0 (unreleased)
+## v2.0.0 (unreleased, currently in release candidate state)
 
 Version `2.0.0` brings better concurrency, atomic transactions with arbitrary
 operations, zero cost read-only snapshots, database backup, and more, all with a
@@ -15,29 +15,30 @@ simpler and more scalable internal architecture.
 Refer to the [upgrade guide](https://hexdocs.pm/cubdb/upgrading.html) for how to
 upgrade from previous versions.
 
-  - [breaking] The functions `get_and_update/3`, `get_and_update_multi/3`, and
-    `select/2` now return directly `result`, instead of a `{:ok, result}` tuple.
-  - [breaking] `get_and_update_multi/4` does not take an option argument
-    anymore, making it `get_and_update_multi/3`. The only available option used
-    to be `:timeout`, which is not supported anymore.
-  - [breaking] Remove the `:timeout` option on `select/2`. This is part of a
-    refactoring and improvement that moves read operations from an internally
+  - [breaking] The functions `CubDB.get_and_update/3`,
+    `CubDB.get_and_update_multi/3`, and `CubDB.select/2` now return directly
+    `result`, instead of a `{:ok, result}` tuple.
+  - [breaking] `CubDB.get_and_update_multi/4` does not take an option argument
+    anymore, making it `CubDB.get_and_update_multi/3`. The only available option
+    used to be `:timeout`, which is not supported anymore.
+  - [breaking] Remove the `:timeout` option on `CubDB.select/2`. This is part of
+    a refactoring and improvement that moves read operations from an internally
     spawned `Task` to the client process. This makes the `:timeout` option
     unnecessary: by stopping the process calling `CubDB`, any running read
     operation by that process is stopped.
-  - [breaking] `select/2` now returns a lazy stream that can be used with
+  - [breaking] `CubDB.select/2` now returns a lazy stream that can be used with
     functions in `Enum` and `Stream`. This makes the `:pipe` and `:reduce`
     options unnecessary, so those options were removed.
-  - Add `snapshot/2`, `with_snapshot/1` and `release_snapshot/1` to get zero
-    cost read-only snapshots of the database. The functions in `CubDB.Snapshot`
-    allow to read from a snapshot.
-  - Add `transaction/2` to perform multiple write (and read) operations in a
-    single atomic transaction. The functions in `CubDB.Tx` allow to read and
+  - Add `CubDB.snapshot/2`, `CubDB.with_snapshot/1` and
+    `CubDB.release_snapshot/1` to get zero cost read-only snapshots of the
+    database. The functions in `CubDB.Snapshot` allow to read from a snapshot.
+  - Add `CubDB.transaction/2` to perform multiple write (and read) operations in
+    a single atomic transaction. The functions in `CubDB.Tx` allow to read and
     write inside a transaction.
-  - Add `back_up/2` to produce a database backup. The backup process does not
-    block readers or writers, and is isolated from concurrent writes.
-  - Add `halt_compaction/1` to stop any running compaction operation
-  - Add `compacting?/1` to check if a compaction is currently running
+  - Add `CubDB.back_up/2` to produce a database backup. The backup process does
+    not block readers or writers, and is isolated from concurrent writes.
+  - Add `CubDB.halt_compaction/1` to stop any running compaction operation
+  - Add `CubDB.compacting?/1` to check if a compaction is currently running
   - Move read and write operations to the caller process as opposed to the
     `CubDB` server process.
   - Improve concurrency of read operations while writing
