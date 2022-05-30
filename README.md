@@ -1,7 +1,7 @@
 <p align="center"><img src="assets/cubdb_banner.png" width="80%"/></p>
 
 [![Build Status](https://github.com/lucaong/cubdb/workflows/CI%20Build/badge.svg)](https://github.com/lucaong/cubdb/actions)
-[![Coverage Status](https://coveralls.io/repos/github/lucaong/cubdb/badge.svg?branch=master)](https://coveralls.io/github/lucaong/cubdb?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/lucaong/cubdb/badge.svg?branch=master&cachebust=1)](https://coveralls.io/github/lucaong/cubdb?branch=master)
 [![Module Version](https://img.shields.io/hexpm/v/cubdb.svg)](https://hex.pm/packages/cubdb)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/cubdb/)
 [![License](https://img.shields.io/hexpm/l/cubdb.svg)](https://github.com/lucaong/cubdb/blob/master/LICENSE)
