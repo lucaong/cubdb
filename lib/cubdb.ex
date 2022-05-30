@@ -72,8 +72,8 @@ defmodule CubDB do
       #=> %{foo: "a map value"}
 
 
-  Multiple operations can be performed as an atomic transaction with
-  `transaction/2` and the `CubDB.Tx` module:
+  Multiple operations can be performed atomically with the `transaction/2`
+  function and the `CubDB.Tx` module:
 
       # Swapping `:a` and `:b` atomically:
       CubDB.transaction(db, fn tx ->
@@ -111,9 +111,10 @@ defmodule CubDB do
       |> Enum.sum() # sum the values
       #=> 18
 
-  Snapshots are useful when one needs to perform several reads or selects,
-  ensuring isolation from concurrent writes, but without blocking writers. This
-  is useful, for example, when reading multiple keys that depend on each other.
+  Read-only snapshots are useful when one needs to perform several reads or
+  selects, ensuring isolation from concurrent writes, but without blocking them.
+  When nothing needs to be written, using a snapshot is preferable to using a
+  transaction, because it will not block writes.
 
   Snapshots come at no cost: nothing is actually copied or written on disk or in
   memory, apart from some small internal bookkeeping. After obtaining a snapshot
