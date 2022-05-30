@@ -82,7 +82,7 @@ defmodule CubDB.Tx do
   @doc """
   Selects a range of entries from the transaction, returning a lazy stream.
 
-  The lazy stream can only be consumed within the transaction scope, or a
+  The lazy stream should be evaluated within the transaction scope, or a
   `RuntimeError` will be raised.
 
   It works the same and accepts the same options as `CubDB.select/2`, but reads

@@ -343,7 +343,7 @@ defmodule CubDB do
 
   The returned lazy stream can be filtered, mapped, and transformed with
   standard functions in the `Stream` and `Enum` modules. The actual database
-  read is deferred to when the stream is iterated or consumed.
+  read is deferred to when the stream is iterated or evaluated.
 
   ## Options
 
