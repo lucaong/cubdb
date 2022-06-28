@@ -31,6 +31,9 @@ jobs:
     - name: Check format
       run: mix format --check-formatted
 
+    - name: Check credo
+      run: mix credo --strict
+
     - name: Restore build Cache
       uses: actions/cache@v1
       id: build-cache
