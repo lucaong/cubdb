@@ -156,8 +156,8 @@ defmodule CubDB do
   alias CubDB.CleanUp
   alias CubDB.Compactor
   alias CubDB.Reader
-  alias CubDB.Store
   alias CubDB.Snapshot
+  alias CubDB.Store
   alias CubDB.Tx
 
   @db_file_extension ".cub"

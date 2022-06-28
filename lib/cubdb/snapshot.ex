@@ -8,9 +8,9 @@ defmodule CubDB.Snapshot do
   """
 
   alias CubDB.Btree
-  alias CubDB.Store
-  alias CubDB.Snapshot
   alias CubDB.Reader
+  alias CubDB.Snapshot
+  alias CubDB.Store
 
   @db_file_extension ".cub"
 

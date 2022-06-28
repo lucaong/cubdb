@@ -18,8 +18,8 @@ defmodule CubDB.Compactor do
   # snapshots of the same (live) store.
 
   alias CubDB.Btree
-  alias CubDB.Store
   alias CubDB.Snapshot
+  alias CubDB.Store
   alias CubDB.Tx
 
   @value Btree.__value__()
