@@ -17,7 +17,6 @@ jobs:
       with:
         elixir-version: '1.13.4'
         otp-version: '24.3'
-        experimental-otp: true
 
     - name: Restore dependencies cache
       uses: actions/cache@v2
@@ -49,7 +48,6 @@ jobs:
       with:
         elixir-version: '1.13.4'
         otp-version: '24.3'
-        experimental-otp: true
 
     - name: Restore dependencies cache
       uses: actions/cache@v2
@@ -105,7 +103,6 @@ jobs:
       with:
         elixir-version: ${{matrix.elixir}}
         otp-version: ${{matrix.otp}}
-        experimental-otp: true
 
     - name: Restore dependencies cache
       uses: actions/cache@v2
