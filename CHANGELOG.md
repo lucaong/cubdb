@@ -6,7 +6,7 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
-## v2.0.0 (unreleased, currently in release candidate state)
+## v2.0.0 (2022-06-28)
 
 Version `2.0.0` brings better concurrency, atomic transactions with arbitrary
 operations, zero cost read-only snapshots, database backup, and more, all with a
