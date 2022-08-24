@@ -80,6 +80,5 @@ defmodule CubDB.Compactor do
       {key, @deleted}, compacted_btree ->
         Btree.delete(compacted_btree, key)
     end)
-    |> Btree.commit()
   end
 end
