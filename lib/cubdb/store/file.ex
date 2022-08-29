@@ -58,15 +58,16 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
         case append_blocks(file, bytes, pos) do
           {:ok, written_size} ->
-            {pos, {file, pos + written_size}}
+            {{:ok, pos}, {file, pos + written_size}}
 
-          _ ->
+          error ->
             {:ok, pos} = :file.position(file, :eof)
-            {{:error, "Write error"}, {file, pos}}
+            {error, {file, pos}}
         end
       end,
       :infinity
     )
+    |> raise_if_error()
   end
 
   def put_header(%Store.File{pid: pid}, header) do
@@ -77,38 +78,37 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
         case append_header(file, header_bytes, pos) do
           {:ok, loc, written_size} ->
-            {loc, {file, pos + written_size}}
+            {{:ok, loc}, {file, pos + written_size}}
 
-          _ ->
+          error ->
             {:ok, pos} = :file.position(file, :eof)
-            {{:error, "Write error"}, {file, pos}}
+            {error, {file, pos}}
         end
       end,
       :infinity
     )
+    |> raise_if_error()
   end
 
   def sync(%Store.File{pid: pid}) do
     Agent.get(
       pid,
       fn {file, _} ->
-        :file.sync(file)
+        :file.datasync(file)
       end,
       :infinity
     )
   end
 
   def get_node(%Store.File{pid: pid}, location) do
-    case Agent.get(
-           pid,
-           fn {file, _} ->
-             read_term(file, location)
-           end,
-           :infinity
-         ) do
-      {:ok, term} -> term
-      {:error, error} -> raise(error)
-    end
+    Agent.get(
+      pid,
+      fn {file, _} ->
+        read_term(file, location)
+      end,
+      :infinity
+    )
+    |> raise_if_error()
   end
 
   def get_latest_header(%Store.File{pid: pid}) do
@@ -145,6 +145,12 @@ defimpl CubDB.Store, for: CubDB.Store.File do
   def open?(%Store.File{pid: pid}) do
     Process.alive?(pid)
   end
+
+  defp raise_if_error({:ok, value}), do: value
+
+  defp raise_if_error({:error, :enospc}), do: raise("No space left on device")
+
+  defp raise_if_error({:error, error}), do: raise(error)
 
   defp read_term(file, location) do
     with {:ok, <<length::32>>, len} <- read_blocks(file, location, 4),
