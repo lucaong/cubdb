@@ -604,7 +604,7 @@ defmodule CubDB do
   block writers (see `with_snapshot/2`).
 
   The module `CubDB.Tx` contains functions to perform read and write operations
-  whithin the transaction. The function `fun` is called with the transaction as
+  within the transaction. The function `fun` is called with the transaction as
   argument, and should return `{:commit, tx, results}` to commit the transaction
   `tx` and return `result`, or `{:cancel, result}` to cancel the transaction and
   return `result`.
