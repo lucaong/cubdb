@@ -112,6 +112,19 @@ defmodule CubDBTest do
     assert Process.alive?(pid)
   end
 
+  test "stop/1 cleans up", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_file_sync: false, auto_compact: false)
+    CubDB.put_multi(db, Enum.map(1..100, fn n -> {n, n} end))
+
+    :ok = CubDB.compact(db)
+    CubDB.stop(db)
+
+    File.rm_rf!(tmp_dir)
+    {:ok, db} = CubDB.start_link(tmp_dir, auto_file_sync: false, auto_compact: false)
+
+    assert :ok = CubDB.compact(db)
+  end
+
   test "put/3, get/3, fetch/2, delete/2, has_key?/2, and put_new/3 work as expected", %{
     tmp_dir: tmp_dir
   } do

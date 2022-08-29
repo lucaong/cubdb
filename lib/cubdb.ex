@@ -183,6 +183,7 @@ defmodule CubDB do
             data_dir: String.t(),
             task_supervisor: pid,
             compactor: pid | nil,
+            compacting_store: Store.File.t() | nil,
             clean_up: pid,
             clean_up_pending: boolean,
             old_btrees: [Btree.t()],
@@ -200,6 +201,7 @@ defmodule CubDB do
       btree: nil,
       data_dir: nil,
       compactor: nil,
+      compacting_store: nil,
       clean_up: nil,
       clean_up_pending: false,
       old_btrees: [],
@@ -1241,8 +1243,16 @@ defmodule CubDB do
   end
 
   @doc false
-  def terminate(_reason, %State{btree: btree}) do
-    Btree.stop(btree)
+  def terminate(_reason, state) do
+    do_halt_compaction(state)
+
+    GenServer.stop(state.clean_up)
+
+    Btree.stop(state.btree)
+
+    for old_btree <- state.old_btrees do
+      if Btree.alive?(old_btree), do: :ok = Btree.stop(old_btree)
+    end
   end
 
   def handle_call({:snapshot, ttl}, _, state) do
@@ -1343,8 +1353,7 @@ defmodule CubDB do
     state =
       if recompact do
         state = do_halt_compaction(state)
-        trigger_compaction(state)
-        state
+        do_compact(state)
       else
         maybe_auto_compact(state)
       end
@@ -1362,8 +1371,8 @@ defmodule CubDB do
 
   def handle_call(:compact, _, state) do
     case trigger_compaction(state) do
-      {:ok, compactor} ->
-        {:reply, :ok, %State{state | compactor: compactor}}
+      {:ok, state} ->
+        {:reply, :ok, state}
 
       error ->
         {:reply, error, state}
@@ -1424,7 +1433,11 @@ defmodule CubDB do
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state = %State{compactor: pid}) do
-    {:noreply, %State{state | compactor: nil}}
+    if state.compacting_store != nil && Store.open?(state.compacting_store) do
+      Store.close(state.compacting_store)
+    end
+
+    {:noreply, %State{state | compactor: nil, compacting_store: nil}}
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
@@ -1477,7 +1490,7 @@ defmodule CubDB do
     end
   end
 
-  @spec trigger_compaction(State.t()) :: {:ok, pid} | {:error, any}
+  @spec trigger_compaction(State.t()) :: {:ok, State.t()} | {:error, any}
 
   defp trigger_compaction(state = %State{data_dir: data_dir, clean_up: clean_up}) do
     case compaction_running?(state) do
@@ -1486,18 +1499,33 @@ defmodule CubDB do
         {:ok, store} = new_compaction_store(data_dir)
         CleanUp.clean_up_old_compaction_files(clean_up, store)
 
-        with result <-
-               Task.Supervisor.start_child(state.task_supervisor, Compactor, :run, [
-                 self(),
-                 store
-               ]),
-             {:ok, pid} <- result do
-          Process.monitor(pid)
-          result
+        case Task.Supervisor.start_child(state.task_supervisor, Compactor, :run, [
+               self(),
+               store
+             ]) do
+          {:ok, pid} ->
+            Process.monitor(pid)
+            {:ok, %State{state | compactor: pid, compacting_store: store}}
+
+          {:error, cause} ->
+            Store.close(store)
+            {:error, cause}
         end
 
       true ->
         {:error, :pending_compaction}
+    end
+  end
+
+  @spec do_compact(State.t()) :: State.t()
+
+  defp do_compact(state) do
+    case trigger_compaction(state) do
+      {:ok, state} ->
+        state
+
+      {:error, _} ->
+        state
     end
   end
 
@@ -1549,8 +1577,12 @@ defmodule CubDB do
   defp do_halt_compaction(state = %State{compactor: nil}), do: state
 
   defp do_halt_compaction(state = %State{compactor: pid}) do
-    if pid != nil, do: Process.exit(pid, :halt)
-    %State{state | compactor: nil}
+    if pid != nil do
+      Process.exit(pid, :halt)
+      Store.close(state.compacting_store)
+    end
+
+    %State{state | compactor: nil, compacting_store: nil}
   end
 
   @spec trigger_clean_up(State.t()) :: State.t()
@@ -1593,13 +1625,7 @@ defmodule CubDB do
 
   defp maybe_auto_compact(state) do
     if should_auto_compact?(state) do
-      case trigger_compaction(state) do
-        {:ok, compactor} ->
-          %State{state | compactor: compactor}
-
-        {:error, _} ->
-          state
-      end
+      do_compact(state)
     else
       state
     end
