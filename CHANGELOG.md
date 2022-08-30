@@ -6,6 +6,14 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
+## v2.0.1 (2022-08-30)
+
+Various bug fixes:
+
+  - Avoid unnecessary commits in the compaction catching up phase
+  - More informative error when running out of disk space
+  - Avoid leaking processes when stopping `CubDB` during a compaction
+
 ## v2.0.0 (2022-06-28)
 
 Version `2.0.0` brings better concurrency, atomic transactions with arbitrary
