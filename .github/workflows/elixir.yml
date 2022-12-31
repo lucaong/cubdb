@@ -49,8 +49,8 @@ jobs:
     - name: Set up Elixir
       uses: erlef/setup-beam@v1
       with:
-        elixir-version: '1.13.4'
-        otp-version: '24.3'
+        elixir-version: '1.14.2'
+        otp-version: '25.2'
 
     - name: Restore dependencies cache
       uses: actions/cache@v2
@@ -77,12 +77,14 @@ jobs:
 
   test:
     name: Test OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04 # Later Ubuntu versions do not have OTP 22
     strategy:
       matrix:
-        otp: ['22.2', '23.3', '24.3']
-        elixir: ['1.7.4', '1.8.2', '1.9.4', '1.10.4', '1.11.4', '1.12.3', '1.13.4']
+        otp: ['22.3', '23.3', '24.3', '25.2']
+        elixir: ['1.7.4', '1.8.2', '1.9.4', '1.10.4', '1.11.4', '1.12.3', '1.13.4', '1.14.2']
         exclude:
+          - otp: '22.3'
+            elixir: '1.14.2'
           - otp: '23.3'
             elixir: '1.7.4'
           - otp: '23.3'
@@ -99,6 +101,18 @@ jobs:
             elixir: '1.9.4'
           - otp: '24.3'
             elixir: '1.10.4'
+          - otp: '25.2'
+            elixir: '1.7.4'
+          - otp: '25.2'
+            elixir: '1.8.2'
+          - otp: '25.2'
+            elixir: '1.9.4'
+          - otp: '25.2'
+            elixir: '1.10.4'
+          - otp: '25.2'
+            elixir: '1.11.4'
+          - otp: '25.2'
+            elixir: '1.12.3'
     steps:
     - uses: actions/checkout@v2
     - name: Set up Elixir
