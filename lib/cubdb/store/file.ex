@@ -150,7 +150,10 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
   defp raise_if_error({:error, :enospc}), do: raise("No space left on device")
 
-  defp raise_if_error({:error, error}) when is_exception(error), do: raise(error)
+  defp raise_if_error({:error, error})
+       # is_exception is only available from Elixir 1.11
+       when is_map(error) and :erlang.is_map_key(:__exception__, error),
+       do: raise(error)
 
   defp raise_if_error({:error, error}), do: raise("File error: #{inspect(error)}")
 
