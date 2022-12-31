@@ -150,7 +150,9 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
   defp raise_if_error({:error, :enospc}), do: raise("No space left on device")
 
-  defp raise_if_error({:error, error}), do: raise(error)
+  defp raise_if_error({:error, error}) when is_exception(error), do: raise(error)
+
+  defp raise_if_error({:error, error}), do: raise("File error: #{inspect(error)}")
 
   defp read_term(file, location) do
     with {:ok, <<length::32>>, len} <- read_blocks(file, location, 4),
