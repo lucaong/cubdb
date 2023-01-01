@@ -6,6 +6,12 @@ releases](https://github.com/lucaong/cubdb/releases).
 Since `v1.0.0`, `CubDB` follows [semantic versioning](https://semver.org), and
 reports changes here.
 
+## v2.0.2 (2023-01-01)
+
+Bug fixes:
+
+  - Better exception in case of file errors (such as `:efbig`)
+
 ## v2.0.1 (2022-08-30)
 
 Various bug fixes:
