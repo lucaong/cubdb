@@ -39,38 +39,30 @@ defmodule CubDB.CleanUp do
   @impl true
   def handle_cast({:clean_up, %Store.File{file_path: latest_file_path}}, data_dir) do
     latest_file_name = Path.basename(latest_file_path)
-    :ok = remove_older_files(data_dir, latest_file_name)
+    remove_older_files!(data_dir, latest_file_name)
     {:noreply, data_dir}
   end
 
   def handle_cast({:clean_up_old_compaction_files, %Store.File{file_path: file_path}}, data_dir) do
     current_compaction_file_name = Path.basename(file_path)
-    :ok = remove_other_compaction_files(data_dir, current_compaction_file_name)
+    remove_other_compaction_files!(data_dir, current_compaction_file_name)
     {:noreply, data_dir}
   end
 
-  defp remove_older_files(data_dir, latest_file_name) do
+  defp remove_older_files!(data_dir, latest_file_name) do
     latest_file_n = CubDB.file_name_to_n(latest_file_name)
 
-    with {:ok, file_names} <- File.ls(data_dir) do
-      file_names
-      |> Enum.filter(fn file_name ->
-        CubDB.cubdb_file?(file_name) && CubDB.file_name_to_n(file_name) < latest_file_n
-      end)
-      |> Enum.reduce(:ok, fn file_name, _ ->
-        :ok = File.rm(Path.join(data_dir, file_name))
-      end)
-    end
+    data_dir
+    |> File.ls!()
+    |> Enum.filter(&(CubDB.cubdb_file?(&1) && CubDB.file_name_to_n(&1) < latest_file_n))
+    |> Enum.each(&File.rm!(Path.join(data_dir, &1)))
   end
 
-  defp remove_other_compaction_files(data_dir, file_name) do
-    with {:ok, files} <- File.ls(data_dir) do
-      files
-      |> Enum.filter(&CubDB.compaction_file?/1)
-      |> Enum.reject(&(&1 == file_name))
-      |> Enum.reduce(:ok, fn file, _ ->
-        :ok = File.rm(Path.join(data_dir, file))
-      end)
-    end
+  defp remove_other_compaction_files!(data_dir, file_name) do
+    data_dir
+    |> File.ls!()
+    |> Enum.filter(&CubDB.compaction_file?/1)
+    |> Enum.reject(&(&1 == file_name))
+    |> Enum.each(&File.rm!(Path.join(data_dir, &1)))
   end
 end
