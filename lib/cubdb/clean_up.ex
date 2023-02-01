@@ -12,7 +12,7 @@ defmodule CubDB.CleanUp do
   alias CubDB.Btree
   alias CubDB.Store
 
-  @spec start_link(binary, Keyword.t()) :: GenServer.on_start()
+  @spec start_link(binary, GenServer.options()) :: GenServer.on_start()
 
   def start_link(data_dir, options \\ []) do
     GenServer.start_link(__MODULE__, data_dir, options)
