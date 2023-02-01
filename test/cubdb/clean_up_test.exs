@@ -30,7 +30,7 @@ defmodule CubDB.Store.CleanUpTest do
     btree = Btree.new(store)
 
     {:ok, pid} = CleanUp.start_link(tmp_dir)
-    :ok = CleanUp.clean_up(pid, btree)
+    :ok = CleanUp.clean_up(pid, btree.store)
 
     # this is to wait for clean up to complete
     :sys.get_state(pid)

@@ -9,7 +9,6 @@ defmodule CubDB.CleanUp do
 
   use GenServer
 
-  alias CubDB.Btree
   alias CubDB.Store
 
   @spec start_link(binary, GenServer.options()) :: GenServer.on_start()
@@ -18,10 +17,10 @@ defmodule CubDB.CleanUp do
     GenServer.start_link(__MODULE__, data_dir, options)
   end
 
-  @spec clean_up(GenServer.server(), Btree.t()) :: :ok
+  @spec clean_up(GenServer.server(), Store.File.t()) :: :ok
 
-  def clean_up(pid, btree) do
-    GenServer.cast(pid, {:clean_up, btree})
+  def clean_up(pid, store) do
+    GenServer.cast(pid, {:clean_up, store})
   end
 
   @spec clean_up_old_compaction_files(GenServer.server(), Store.File.t()) :: :ok
@@ -38,8 +37,7 @@ defmodule CubDB.CleanUp do
   end
 
   @impl true
-  def handle_cast({:clean_up, %Btree{store: store}}, data_dir) do
-    %Store.File{file_path: latest_file_path} = store
+  def handle_cast({:clean_up, %Store.File{file_path: latest_file_path}}, data_dir) do
     latest_file_name = Path.basename(latest_file_path)
     :ok = remove_older_files(data_dir, latest_file_name)
     {:noreply, data_dir}

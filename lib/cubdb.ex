@@ -1617,7 +1617,7 @@ defmodule CubDB do
       if Btree.alive?(old_btree), do: :ok = Btree.stop(old_btree)
     end
 
-    :ok = CleanUp.clean_up(clean_up, btree)
+    :ok = CleanUp.clean_up(clean_up, btree.store)
     for pid <- state.subs, do: send(pid, :clean_up_started)
     %State{state | clean_up_pending: false, old_btrees: []}
   end
