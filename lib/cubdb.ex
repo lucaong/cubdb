@@ -1226,7 +1226,7 @@ defmodule CubDB do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, true))
     auto_file_sync = Keyword.get(options, :auto_file_sync, true)
 
-    with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
+    with {:ok, file_name} <- find_db_file(data_dir),
          {:ok, store} <-
            Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
          {:ok, clean_up} <- CleanUp.start_link(data_dir),
@@ -1482,17 +1482,20 @@ defmodule CubDB do
     end
   end
 
-  @spec find_db_file(String.t()) :: String.t() | nil | {:error, any}
+  @spec find_db_file(String.t()) :: {:ok, String.t() | nil} | {:error, any}
 
   defp find_db_file(data_dir) do
     with :ok <- File.mkdir_p(data_dir),
          {:ok, files} <- File.ls(data_dir) do
-      files
-      |> Enum.filter(fn file_name ->
-        cubdb_file?(file_name) && String.ends_with?(file_name, @db_file_extension)
-      end)
-      |> Enum.sort_by(&file_name_to_n/1)
-      |> List.last()
+      file =
+        files
+        |> Enum.filter(fn file_name ->
+          cubdb_file?(file_name) && String.ends_with?(file_name, @db_file_extension)
+        end)
+        |> Enum.sort_by(&file_name_to_n/1)
+        |> List.last()
+
+      {:ok, file}
     end
   end
 
