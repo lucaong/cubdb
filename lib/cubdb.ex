@@ -162,6 +162,7 @@ defmodule CubDB do
 
   @db_file_extension ".cub"
   @compaction_file_extension ".compact"
+  @known_file_extensions [@db_file_extension, @compaction_file_extension]
   @auto_compact_defaults {100, 0.25}
 
   @type key :: any
@@ -1190,11 +1191,10 @@ defmodule CubDB do
 
   @doc false
   def cubdb_file?(file_name) do
-    file_extensions = [@db_file_extension, @compaction_file_extension]
-    basename = Path.basename(file_name, Path.extname(file_name))
+    extension = Path.extname(file_name)
+    basename = Path.basename(file_name, extension)
 
-    Enum.member?(file_extensions, Path.extname(file_name)) &&
-      Regex.match?(~r/^[\da-fA-F]+$/, basename)
+    extension in @known_file_extensions && basename =~ ~r/^[\da-fA-F]+$/
   end
 
   @spec compaction_file?(String.t()) :: boolean
@@ -1489,9 +1489,7 @@ defmodule CubDB do
          {:ok, files} <- File.ls(data_dir) do
       file =
         files
-        |> Enum.filter(fn file_name ->
-          cubdb_file?(file_name) && String.ends_with?(file_name, @db_file_extension)
-        end)
+        |> Enum.filter(&(cubdb_file?(&1) && String.ends_with?(&1, @db_file_extension)))
         |> Enum.sort_by(&file_name_to_n/1)
         |> List.last()
 
