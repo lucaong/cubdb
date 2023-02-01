@@ -32,10 +32,12 @@ defmodule CubDB.CleanUp do
 
   # OTP callbacks
 
+  @impl true
   def init(data_dir) do
     {:ok, data_dir}
   end
 
+  @impl true
   def handle_cast({:clean_up, %Btree{store: store}}, data_dir) do
     %Store.File{file_path: latest_file_path} = store
     latest_file_name = Path.basename(latest_file_path)

@@ -1217,7 +1217,7 @@ defmodule CubDB do
 
   # OTP callbacks
 
-  @doc false
+  @impl true
   def init([data_dir, options]) do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, true))
     auto_file_sync = Keyword.get(options, :auto_file_sync, true)
@@ -1242,7 +1242,7 @@ defmodule CubDB do
     end
   end
 
-  @doc false
+  @impl true
   def terminate(_reason, state) do
     do_halt_compaction(state)
 
@@ -1255,6 +1255,7 @@ defmodule CubDB do
     end
   end
 
+  @impl true
   def handle_call({:snapshot, ttl}, _, state) do
     %State{btree: btree} = state
 
@@ -1422,6 +1423,7 @@ defmodule CubDB do
     {:reply, compaction_running?(state), state}
   end
 
+  @impl true
   def handle_info(message, state)
       when message == :compaction_completed or message == :catch_up_completed do
     for pid <- state.subs, do: send(pid, message)
