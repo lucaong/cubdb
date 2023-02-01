@@ -11,7 +11,7 @@ defmodule CubDB.CleanUp do
 
   alias CubDB.Store
 
-  @spec start_link(binary, GenServer.options()) :: GenServer.on_start()
+  @spec start_link(String.t(), GenServer.options()) :: GenServer.on_start()
 
   def start_link(data_dir, options \\ []) do
     GenServer.start_link(__MODULE__, data_dir, options)
@@ -49,6 +49,8 @@ defmodule CubDB.CleanUp do
     {:noreply, data_dir}
   end
 
+  @spec remove_older_files!(String.t(), String.t()) :: :ok
+
   defp remove_older_files!(data_dir, latest_file_name) do
     latest_file_n = CubDB.file_name_to_n(latest_file_name)
 
@@ -57,6 +59,8 @@ defmodule CubDB.CleanUp do
     |> Enum.filter(&(CubDB.cubdb_file?(&1) && CubDB.file_name_to_n(&1) < latest_file_n))
     |> Enum.each(&File.rm!(Path.join(data_dir, &1)))
   end
+
+  @spec remove_other_compaction_files!(String.t(), String.t()) :: :ok
 
   defp remove_other_compaction_files!(data_dir, file_name) do
     data_dir
