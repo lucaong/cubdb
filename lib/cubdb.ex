@@ -1204,10 +1204,14 @@ defmodule CubDB do
     Path.extname(file_name) == @compaction_file_extension
   end
 
+  @spec subscribe(GenServer.server()) :: :ok
+
   @doc false
   def subscribe(db) do
     GenServer.call(db, {:subscribe, self()}, :infinity)
   end
+
+  @spec file_name_to_n(String.t()) :: integer
 
   @doc false
   def file_name_to_n(file_name) do
