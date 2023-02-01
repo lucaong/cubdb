@@ -1227,8 +1227,8 @@ defmodule CubDB do
     auto_file_sync = Keyword.get(options, :auto_file_sync, true)
 
     with {:ok, file_name} <- find_db_file(data_dir),
-         {:ok, store} <-
-           Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
+         file_name = file_name || "0#{@db_file_extension}",
+         {:ok, store} <- Store.File.create(Path.join(data_dir, file_name)),
          {:ok, clean_up} <- CleanUp.start_link(data_dir),
          {:ok, task_supervisor} <- Task.Supervisor.start_link() do
       {:ok,
