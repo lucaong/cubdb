@@ -16,19 +16,19 @@ defmodule CubDB.BtreeTest do
   def compose_btree do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, 0, Btree.leaf()})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0}
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0, dirt: 0}
   end
 
   def compose_btree(root = {@leaf, cs}) do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, length(cs), root})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: length(cs)}
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: length(cs), dirt: 0}
   end
 
   def compose_btree(root = {@branch, _}, size \\ 0) do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, size, root})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size}
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size, dirt: 0}
   end
 
   test "insert/3 called on non-full leaf inserts the key/value tuple" do

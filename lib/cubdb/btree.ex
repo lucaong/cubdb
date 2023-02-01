@@ -48,13 +48,14 @@ defmodule CubDB.Btree do
           root: branch_node | leaf_node,
           root_loc: location,
           size: btree_size,
+          dirt: dirt,
           store: Store.t(),
-          capacity: non_neg_integer
+          capacity: capacity
         }
 
   @default_capacity 32
-  @enforce_keys [:root, :root_loc, :size, :store, :capacity]
-  defstruct root: nil, root_loc: nil, size: 0, dirt: 0, store: nil, capacity: @default_capacity
+  @enforce_keys [:root, :root_loc, :size, :dirt, :store, :capacity]
+  defstruct @enforce_keys
 
   @spec new(Store.t(), pos_integer) :: Btree.t()
 
@@ -68,7 +69,7 @@ defmodule CubDB.Btree do
         root = leaf()
         loc = Store.put_node(store, root)
         Store.put_header(store, {0, loc, 0})
-        %Btree{root: root, root_loc: loc, size: 0, capacity: cap, store: store}
+        %Btree{root: root, root_loc: loc, dirt: 0, size: 0, capacity: cap, store: store}
     end
   end
 
@@ -94,7 +95,7 @@ defmodule CubDB.Btree do
     else
       {root, root_loc} = finalize_load(store, st, 1, cap)
       Store.put_header(store, {count, root_loc, 0})
-      %Btree{root: root, root_loc: root_loc, capacity: cap, store: store, size: count}
+      %Btree{root: root, root_loc: root_loc, capacity: cap, store: store, size: count, dirt: 0}
     end
   end
 
