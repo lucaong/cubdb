@@ -17,7 +17,9 @@ defmodule CubDB.Store.File do
 
   alias CubDB.Store
 
-  @type t :: %Store.File{pid: pid, file_path: binary}
+  @type state :: {:file.io_device(), integer}
+
+  @type t :: %Store.File{pid: pid, file_path: String.t()}
 
   @enforce_keys [:pid, :file_path]
   defstruct [:pid, :file_path]
@@ -30,6 +32,8 @@ defmodule CubDB.Store.File do
     end
   end
 
+  @spec init(String.t()) :: state
+
   defp init(file_path) do
     ensure_exclusive_access!(file_path)
     {:ok, file} = :file.open(file_path, [:read, :append, :raw, :binary])
@@ -37,6 +41,8 @@ defmodule CubDB.Store.File do
 
     {file, pos}
   end
+
+  @spec ensure_exclusive_access!(String.t()) :: nil
 
   defp ensure_exclusive_access!(file_path) do
     unless :global.set_lock({{__MODULE__, file_path}, self()}, [node()], 0) do
