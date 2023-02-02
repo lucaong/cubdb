@@ -187,7 +187,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     iolist = Blocks.add_markers(bytes, pos)
 
     with :ok <- :file.write(file, iolist) do
-      {:ok, iolist_byte_size(iolist)}
+      {:ok, :erlang.iolist_size(iolist)}
     end
   end
 
@@ -195,7 +195,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     {loc, iolist} = Blocks.add_header_marker(bytes, pos)
 
     with :ok <- :file.write(file, iolist) do
-      {:ok, loc, iolist_byte_size(iolist)}
+      {:ok, loc, :erlang.iolist_size(iolist)}
     end
   end
 
@@ -235,10 +235,5 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
   defp deserialize(bytes) do
     :erlang.binary_to_term(bytes)
-  end
-
-  defp iolist_byte_size(iolist) do
-    iolist
-    |> Enum.reduce(0, fn bytes, size -> size + byte_size(bytes) end)
   end
 end
