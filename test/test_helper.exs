@@ -25,6 +25,8 @@ defmodule TestHelper do
     alias CubDB.Btree
     alias CubDB.Store
 
+    import Btree, only: [header: 1]
+
     @value Btree.__value__()
     @deleted Btree.__deleted__()
 
@@ -53,7 +55,7 @@ defmodule TestHelper do
 
     def load(store, {:Btree, size, root}) do
       {root_loc, root_node} = load_node(store, root)
-      Store.put_header(store, {size, root_loc, 0})
+      Store.put_header(store, header(size: size, location: root_loc, dirt: 0))
       {root_loc, root_node}
     end
 

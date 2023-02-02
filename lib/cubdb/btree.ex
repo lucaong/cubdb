@@ -57,18 +57,26 @@ defmodule CubDB.Btree do
   @enforce_keys [:root, :root_loc, :size, :dirt, :store, :capacity]
   defstruct @enforce_keys
 
+  @spec header(size: btree_size, location: location, dirt: dirt) :: Macro.t()
+
+  defmacro header(size: size, location: location, dirt: dirt) do
+    quote do
+      {unquote(size), unquote(location), unquote(dirt)}
+    end
+  end
+
   @spec new(Store.t(), pos_integer) :: Btree.t()
 
   def new(store, cap \\ @default_capacity) do
     case Store.get_latest_header(store) do
-      {_, {s, loc, dirt}} ->
+      {_, header(size: s, location: loc, dirt: dirt)} ->
         root = Store.get_node(store, loc)
         %Btree{root: root, root_loc: loc, dirt: dirt, size: s, capacity: cap, store: store}
 
       nil ->
         root = leaf()
         loc = Store.put_node(store, root)
-        Store.put_header(store, {0, loc, 0})
+        Store.put_header(store, header(size: 0, location: loc, dirt: 0))
         %Btree{root: root, root_loc: loc, dirt: 0, size: 0, capacity: cap, store: store}
     end
   end
@@ -94,7 +102,7 @@ defmodule CubDB.Btree do
       new(store, cap)
     else
       {root, root_loc} = finalize_load(store, st, 1, cap)
-      Store.put_header(store, {count, root_loc, 0})
+      Store.put_header(store, header(size: count, location: root_loc, dirt: 0))
       %Btree{root: root, root_loc: root_loc, capacity: cap, store: store, size: count, dirt: 0}
     end
   end
@@ -235,7 +243,7 @@ defmodule CubDB.Btree do
   # updates won't be committed to the database and will be lost in case of a
   # restart.
   def commit(tree = %Btree{store: store, size: size, root_loc: root_loc, dirt: dirt}) do
-    Store.put_header(store, {size, root_loc, dirt + 1})
+    Store.put_header(store, header(size: size, location: root_loc, dirt: dirt + 1))
     tree
   end
 

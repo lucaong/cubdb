@@ -2,6 +2,8 @@ defmodule CubDB.Store.FileTest do
   use ExUnit.Case, async: true
   use CubDB.StoreExamples
 
+  import CubDB.Btree, only: [header: 1]
+
   setup do
     {tmp_path, 0} = System.cmd("mktemp", [])
     tmp_path = tmp_path |> String.trim()
@@ -26,10 +28,10 @@ defmodule CubDB.Store.FileTest do
   test "get_latest_header/1 skips corrupted header and locates latest good header", %{
     store: store
   } do
-    good_header = {1, 2, 3}
+    good_header = header(size: 1, location: 2, dirt: 3)
     CubDB.Store.put_header(store, good_header)
 
-    CubDB.Store.put_header(store, {0, 0, 0})
+    CubDB.Store.put_header(store, header(size: 0, location: 0, dirt: 0))
 
     # corrupt the last header
     {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])
@@ -42,10 +44,10 @@ defmodule CubDB.Store.FileTest do
   test "get_latest_header/1 skips truncated header and locates latest good header", %{
     store: store
   } do
-    good_header = {1, 2, 3}
+    good_header = header(size: 1, location: 2, dirt: 3)
     CubDB.Store.put_header(store, good_header)
 
-    CubDB.Store.put_header(store, {0, 0, 0})
+    CubDB.Store.put_header(store, header(size: 0, location: 0, dirt: 0))
 
     # truncate the last header
     {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])
@@ -57,7 +59,7 @@ defmodule CubDB.Store.FileTest do
   end
 
   test "get_latest_header/1 skips data and locates latest good header", %{store: store} do
-    header = {1, 2, 3}
+    header = header(size: 1, location: 2, dirt: 3)
     CubDB.Store.put_header(store, header)
 
     data_longer_than_one_block = String.duplicate("x", 1030)
