@@ -66,7 +66,7 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec new(Store.t(), pos_integer) :: Btree.t()
+  @spec new(Store.t(), capacity) :: Btree.t()
 
   def new(store, cap \\ @default_capacity) do
     case Store.get_latest_header(store) do
@@ -82,7 +82,7 @@ defmodule CubDB.Btree do
     end
   end
 
-  @spec load(Enumerable.t(), Store.t(), pos_integer) :: Btree.t()
+  @spec load(Enumerable.t(), Store.t(), capacity) :: Btree.t()
 
   # `load/3` takes an enumerable of `{key, value}` entries that should be
   # strictly sorted by key and an empty store, and creates a Btree with those
