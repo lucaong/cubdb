@@ -22,8 +22,7 @@ defmodule CubDB.Compactor do
   alias CubDB.Store
   alias CubDB.Tx
 
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
+  import Btree, only: [value: 1, deleted: 0]
 
   @spec run(pid, Store.File.t()) :: :ok
 
@@ -74,10 +73,10 @@ defmodule CubDB.Compactor do
     diff = Btree.Diff.new(original_btree, latest_btree)
 
     Enum.reduce(diff, compacted_btree, fn
-      {key, {@value, value}}, compacted_btree ->
+      {key, value(val: value)}, compacted_btree ->
         Btree.insert(compacted_btree, key, value)
 
-      {key, @deleted}, compacted_btree ->
+      {key, deleted()}, compacted_btree ->
         Btree.delete(compacted_btree, key)
     end)
   end

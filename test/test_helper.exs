@@ -25,10 +25,7 @@ defmodule TestHelper do
     alias CubDB.Btree
     alias CubDB.Store
 
-    import Btree, only: [header: 1]
-
-    @value Btree.__value__()
-    @deleted Btree.__deleted__()
+    import Btree, only: [header: 1, value: 1, deleted: 0]
 
     def debug(store) do
       {_, {size, root_loc, _}} = Store.get_latest_header(store)
@@ -37,11 +34,11 @@ defmodule TestHelper do
 
     defp debug_node(store, loc) do
       case Store.get_node(store, loc) do
-        {@value, value} ->
+        value(val: value) ->
           value
 
-        @deleted ->
-          @deleted
+        deleted() ->
+          deleted()
 
         {type, locs} ->
           children =
@@ -70,12 +67,12 @@ defmodule TestHelper do
       {Store.put_node(store, node), node}
     end
 
-    defp load_node(store, @deleted) do
-      {Store.put_node(store, @deleted), @deleted}
+    defp load_node(store, deleted()) do
+      {Store.put_node(store, deleted()), deleted()}
     end
 
     defp load_node(store, value) do
-      node = {@value, value}
+      node = value(val: value)
       {Store.put_node(store, node), node}
     end
   end

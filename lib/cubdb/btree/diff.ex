@@ -33,8 +33,7 @@ defimpl Enumerable, for: CubDB.Btree.Diff do
   alias CubDB.Store
   alias CubDB.Btree.Diff
 
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
+  import Btree, only: [value: 1, deleted: 0]
 
   def reduce(%Diff{from_btree: %Btree{root_loc: root_loc}, to_btree: to_btree}, cmd_acc, fun) do
     Btree.Enumerable.reduce(to_btree, cmd_acc, fun, &get_children(root_loc, &1, &2))
@@ -46,9 +45,9 @@ defimpl Enumerable, for: CubDB.Btree.Diff do
 
   def slice(_), do: {:error, __MODULE__}
 
-  defp get_children(_, value = {@value, _}, _), do: value
+  defp get_children(_, value = value(val: _), _), do: value
 
-  defp get_children(_, @deleted, _), do: @deleted
+  defp get_children(_, deleted(), _), do: deleted()
 
   defp get_children(from_root_loc, {_, locs}, store) do
     locs

@@ -6,8 +6,7 @@ defmodule PropertyBased.Btree.DiffTest do
   alias CubDB.Btree.Diff
   alias CubDB.Store
 
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
+  require Btree
 
   import TestHelper
 
@@ -43,13 +42,13 @@ defmodule PropertyBased.Btree.DiffTest do
       from_btree = make_btree(store, entries, cap)
 
       to_btree =
-        Enum.reduce(updates, from_btree, fn {key, value}, btree ->
-          Btree.insert(btree, key, value)
+        Enum.reduce(updates, from_btree, fn {key, val}, btree ->
+          Btree.insert(btree, key, val)
         end)
 
       deletions =
         Enum.take_random(entries, div(length(entries), 3))
-        |> Enum.map(fn {key, _} -> {key, @deleted} end)
+        |> Enum.map(fn {key, _} -> {key, Btree.deleted()} end)
 
       to_btree =
         Enum.reduce(deletions, to_btree, fn {key, _}, btree ->
@@ -60,7 +59,7 @@ defmodule PropertyBased.Btree.DiffTest do
 
       expected_diff =
         updates
-        |> Enum.map(fn {key, value} -> {key, {@value, value}} end)
+        |> Enum.map(fn {key, val} -> {key, Btree.value(val: val)} end)
         |> Enum.concat(deletions)
         |> Enum.reverse()
         |> Enum.uniq_by(&elem(&1, 0))

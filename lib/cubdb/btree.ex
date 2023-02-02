@@ -23,6 +23,7 @@ defmodule CubDB.Btree do
   Record.defrecord(:leaf, @leaf, children: [])
   Record.defrecord(:branch, @branch, children: [])
   Record.defrecord(:value, @value, val: nil)
+  defmacro deleted, do: @deleted
 
   @type key :: CubDB.key()
   @type val :: CubDB.value()
@@ -112,7 +113,7 @@ defmodule CubDB.Btree do
   # `fetch/2` returns `{:ok, value}` if an entry with key `key` is present
   # in the Btree, or `:error` otherwise.
   def fetch(%Btree{root: root, store: store}, key) do
-    {{@leaf, children}, _} = lookup_leaf(root, store, key, [])
+    {leaf(children: children), _} = lookup_leaf(root, store, key, [])
 
     case Enum.find(children, &match?({^key, _}, &1)) do
       nil ->
@@ -120,8 +121,8 @@ defmodule CubDB.Btree do
 
       {_, loc} ->
         case Store.get_node(store, loc) do
-          {@value, value} -> {:ok, value}
-          @deleted -> :error
+          value(val: value) -> {:ok, value}
+          deleted() -> :error
         end
     end
   end
@@ -186,7 +187,7 @@ defmodule CubDB.Btree do
       {^key, loc} ->
         size =
           case Store.get_node(store, loc) do
-            @deleted -> s
+            deleted() -> s
             _ -> s - 1
           end
 
@@ -218,7 +219,7 @@ defmodule CubDB.Btree do
   # `commit/1` must be explicitly called to commit the deletion.
   def mark_deleted(btree, key) do
     case fetch(btree, key) do
-      {:ok, _} -> insert_terminal_node(btree, key, @deleted)
+      {:ok, _} -> insert_terminal_node(btree, key, deleted())
       :error -> btree
     end
   end
@@ -288,11 +289,6 @@ defmodule CubDB.Btree do
     Store.open?(store)
   end
 
-  def __leaf__, do: @leaf
-  def __branch__, do: @branch
-  def __value__, do: @value
-  def __deleted__, do: @deleted
-
   @spec insert_terminal_node(Btree.t(), key, terminal_node, boolean) ::
           Btree.t() | {:error, :exists}
 
@@ -309,10 +305,10 @@ defmodule CubDB.Btree do
 
       size =
         case {terminal_node, was_set} do
-          {{@value, _}, true} -> s
-          {{@value, _}, false} -> s + 1
-          {@deleted, true} -> s - 1
-          {@deleted, false} -> s
+          {value(val: _), true} -> s
+          {value(val: _), false} -> s + 1
+          {deleted(), true} -> s - 1
+          {deleted(), false} -> s
         end
 
       %Btree{
@@ -331,7 +327,7 @@ defmodule CubDB.Btree do
   defp child_is_set?(store, children, key) do
     case List.keyfind(children, key, 0) do
       nil -> false
-      {_, pos} -> Store.get_node(store, pos) != @deleted
+      {_, pos} -> Store.get_node(store, pos) != deleted()
     end
   end
 
@@ -394,7 +390,7 @@ defmodule CubDB.Btree do
   @spec lookup_leaf(internal_node, Store.t(), key, [internal_node]) ::
           {leaf_node, [internal_node]}
 
-  defp lookup_leaf(branch = {@branch, children}, store, key, path) do
+  defp lookup_leaf(branch = branch(children: children), store, key, path) do
     loc =
       Enum.reduce_while(children, nil, fn
         {_, loc}, nil ->
@@ -415,7 +411,7 @@ defmodule CubDB.Btree do
 
   @spec key_past_location?(internal_node, Store.t(), key, location) :: boolean | :not_found
 
-  defp key_past_location?({@branch, children}, store, key, target_loc) do
+  defp key_past_location?(branch(children: children), store, key, target_loc) do
     loc =
       Enum.reduce_while(children, nil, fn
         {_, loc}, nil ->
@@ -432,7 +428,7 @@ defmodule CubDB.Btree do
     end
   end
 
-  defp key_past_location?({@leaf, children}, _store, key, target_loc) do
+  defp key_past_location?(leaf(children: children), _store, key, target_loc) do
     case Enum.find(children, &match?({^key, _}, &1)) do
       nil ->
         :not_found
@@ -453,7 +449,7 @@ defmodule CubDB.Btree do
         root = leaf()
         {Store.put_node(store, root), root}
 
-      [{_, {@branch, [{_, loc}]}}] ->
+      [{_, branch(children: [{_, loc}])}] ->
         {loc, Store.get_node(store, loc)}
 
       [{_, node}] ->
@@ -565,7 +561,7 @@ defmodule CubDB.Btree do
 
   @spec left_sibling(Store.t(), branch_node, key) :: [child_pointer]
 
-  defp left_sibling(store, {@branch, children}, key) do
+  defp left_sibling(store, branch(children: children), key) do
     left =
       children
       |> Enum.take_while(fn {k, _} -> k < key end)
@@ -601,8 +597,7 @@ defimpl Enumerable, for: CubDB.Btree do
   alias CubDB.Btree
   alias CubDB.Store
 
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
+  import Btree, only: [value: 1, deleted: 0]
 
   def reduce(btree, cmd_acc, fun) do
     Btree.Enumerable.reduce(btree, cmd_acc, fun, &get_children/2)
@@ -623,7 +618,7 @@ defimpl Enumerable, for: CubDB.Btree do
 
   @spec get_children(Btree.btree_node(), Store.t()) :: any
 
-  defp get_children({@value, v}, _), do: v
+  defp get_children(value(val: v), _), do: v
 
   defp get_children({_, locs}, store) do
     locs
@@ -631,7 +626,7 @@ defimpl Enumerable, for: CubDB.Btree do
       {k, Store.get_node(store, loc)}
     end)
     |> Enum.filter(fn {_, node} ->
-      node != @deleted
+      node != deleted()
     end)
   end
 end

@@ -5,12 +5,10 @@ defmodule CubDB.Btree.DiffTest do
   alias CubDB.Btree.Diff
   alias CubDB.Store
 
+  import Btree, only: [value: 1, deleted: 0]
   import TestHelper
 
   doctest Btree.Diff
-
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
 
   test "Diff implements Enumerable" do
     Protocol.assert_impl!(Enumerable, Diff)
@@ -53,7 +51,11 @@ defmodule CubDB.Btree.DiffTest do
 
     diff = Diff.new(from_btree, to_btree)
 
-    assert Enum.to_list(diff) == [{:bar, @deleted}, {:quux, {@value, 5}}, {:qux, {@value, 4}}]
+    assert Enum.to_list(diff) == [
+             {:bar, deleted()},
+             {:quux, value(val: 5)},
+             {:qux, value(val: 4)}
+           ]
   end
 
   test "Enumerable.count, Enumerable.member?, and Enumerable.slice return {:error, __MODULE__}" do

@@ -10,10 +10,7 @@ defmodule CubDB.Btree.Enumerable do
   alias CubDB.Btree
   alias CubDB.Store
 
-  @leaf Btree.__leaf__()
-  @branch Btree.__branch__()
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
+  import Btree, only: [leaf: 1, branch: 1, value: 1, deleted: 0]
 
   @spec reduce(
           Btree.t(),
@@ -53,23 +50,23 @@ defmodule CubDB.Btree.Enumerable do
     end
   end
 
-  defp next({[], [[{_, leaf = {@leaf, _}} | rest] | todo]}, store, get_children) do
+  defp next({[], [[{_, leaf = leaf(children: _)} | rest] | todo]}, store, get_children) do
     children = get_children.(leaf, store)
 
     next({children, [rest | todo]}, store, get_children)
   end
 
-  defp next({[], [[{_, branch = {@branch, _}} | rest] | todo]}, store, get_children) do
+  defp next({[], [[{_, branch = branch(children: _)} | rest] | todo]}, store, get_children) do
     children = get_children.(branch, store)
 
     next({[], [children | [rest | todo]]}, store, get_children)
   end
 
-  defp next({[{k, value = {@value, _}} | rest], todo}, store, get_children) do
+  defp next({[{k, value = value(val: _)} | rest], todo}, store, get_children) do
     {{rest, todo}, {k, get_children.(value, store)}}
   end
 
-  defp next({[{k, @deleted} | rest], todo}, store, get_children) do
-    {{rest, todo}, {k, get_children.(@deleted, store)}}
+  defp next({[{k, deleted()} | rest], todo}, store, get_children) do
+    {{rest, todo}, {k, get_children.(deleted(), store)}}
   end
 end
