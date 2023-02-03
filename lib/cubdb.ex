@@ -1009,7 +1009,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec compact(server) :: :ok | {:error, String.t()}
+  @spec compact(server) :: :ok | {:error, :pending_compaction | term}
 
   @doc """
   Runs a database compaction.
