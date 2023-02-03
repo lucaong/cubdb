@@ -24,7 +24,7 @@ defmodule CubDB.Compactor do
 
   import Btree, only: [value: 1, deleted: 0]
 
-  @spec run(pid, Store.File.t()) :: :ok
+  @spec run(CubDB.server(), Store.File.t()) :: :ok
 
   def run(db, store) do
     {original_btree, compacted_btree} =
@@ -45,7 +45,7 @@ defmodule CubDB.Compactor do
     Btree.load(btree, store) |> Btree.sync()
   end
 
-  @spec catch_up(GenServer.server(), Btree.t(), Btree.t()) :: :ok
+  @spec catch_up(CubDB.server(), Btree.t(), Btree.t()) :: :ok
 
   def catch_up(db, compacted_btree, original_btree) do
     result =

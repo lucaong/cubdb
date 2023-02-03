@@ -176,6 +176,8 @@ defmodule CubDB do
           | {:max_key_inclusive, boolean}
           | {:reverse, boolean}
 
+  @type server :: GenServer.server()
+
   defmodule State do
     @moduledoc false
 
@@ -288,7 +290,7 @@ defmodule CubDB do
     start(Keyword.merge(options, data_dir: data_dir))
   end
 
-  @spec stop(GenServer.server(), term(), timeout()) :: :ok
+  @spec stop(server, term(), timeout()) :: :ok
 
   @doc """
   Synchronously stops the `CubDB` database.
@@ -300,7 +302,7 @@ defmodule CubDB do
     GenServer.stop(db, reason, timeout)
   end
 
-  @spec get(GenServer.server(), key, value) :: value
+  @spec get(server, key, value) :: value
 
   @doc """
   Gets the value associated to `key` from the database.
@@ -314,7 +316,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec fetch(GenServer.server(), key) :: {:ok, value} | :error
+  @spec fetch(server, key) :: {:ok, value} | :error
 
   @doc """
   Fetches the value for the given `key` in the database, or returns `:error` if
@@ -329,7 +331,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec has_key?(GenServer.server(), key) :: boolean
+  @spec has_key?(server, key) :: boolean
 
   @doc """
   Returns whether an entry with the given `key` exists in the database.
@@ -340,7 +342,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec select(GenServer.server(), [select_option]) :: Enumerable.t()
+  @spec select(server, [select_option]) :: Enumerable.t()
 
   @doc """
   Selects a range of entries from the database, returning a lazy stream.
@@ -454,7 +456,7 @@ defmodule CubDB do
     )
   end
 
-  @spec size(GenServer.server()) :: non_neg_integer
+  @spec size(server) :: non_neg_integer
 
   @doc """
   Returns the number of entries present in the database.
@@ -465,7 +467,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec snapshot(GenServer.server(), timeout) :: Snapshot.t()
+  @spec snapshot(server, timeout) :: Snapshot.t()
 
   @doc """
   Returns a snapshot of the database in its current state.
@@ -541,7 +543,7 @@ defmodule CubDB do
     GenServer.call(db, {:release_snapshot, snapshot}, :infinity)
   end
 
-  @spec with_snapshot(GenServer.server(), (Snapshot.t() -> result)) :: result when result: any
+  @spec with_snapshot(server, (Snapshot.t() -> result)) :: result when result: any
 
   @doc """
   Calls `fun` passing a snapshot, and automatically releases the snapshot when
@@ -593,7 +595,7 @@ defmodule CubDB do
     end
   end
 
-  @spec transaction(GenServer.server(), (Tx.t() -> {:commit, Tx.t(), result} | {:cancel, result})) ::
+  @spec transaction(server, (Tx.t() -> {:commit, Tx.t(), result} | {:cancel, result})) ::
           result
         when result: any
 
@@ -700,7 +702,7 @@ defmodule CubDB do
     end
   end
 
-  @spec start_transaction(GenServer.server()) :: Tx.t()
+  @spec start_transaction(server) :: Tx.t()
 
   defp start_transaction(db) do
     case GenServer.call(db, :start_transaction, :infinity) do
@@ -712,13 +714,13 @@ defmodule CubDB do
     end
   end
 
-  @spec cancel_transaction(GenServer.server()) :: :ok
+  @spec cancel_transaction(server) :: :ok
 
   defp cancel_transaction(db) do
     GenServer.call(db, :cancel_transaction, :infinity)
   end
 
-  @spec commit_transaction(GenServer.server(), Tx.t()) :: :ok
+  @spec commit_transaction(server, Tx.t()) :: :ok
 
   defp commit_transaction(db, tx) do
     case GenServer.call(db, {:commit_transaction, tx}, :infinity) do
@@ -730,7 +732,7 @@ defmodule CubDB do
     end
   end
 
-  @spec dirt_factor(GenServer.server()) :: float
+  @spec dirt_factor(server) :: float
 
   @doc """
   Returns the dirt factor.
@@ -745,7 +747,7 @@ defmodule CubDB do
     GenServer.call(db, :dirt_factor, :infinity)
   end
 
-  @spec put(GenServer.server(), key, value) :: :ok
+  @spec put(server, key, value) :: :ok
 
   @doc """
   Writes an entry in the database, associating `key` to `value`.
@@ -758,7 +760,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec put_new(GenServer.server(), key, value) :: :ok | {:error, :exists}
+  @spec put_new(server, key, value) :: :ok | {:error, :exists}
 
   @doc """
   Writes an entry in the database, associating `key` to `value`, only if `key`
@@ -779,7 +781,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec delete(GenServer.server(), key) :: :ok
+  @spec delete(server, key) :: :ok
 
   @doc """
   Deletes the entry associated to `key` from the database.
@@ -792,7 +794,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec update(GenServer.server(), key, value, (value -> value)) :: :ok
+  @spec update(server, key, value, (value -> value)) :: :ok
 
   @doc """
   Updates the entry corresponding to `key` using the given function.
@@ -813,7 +815,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec get_and_update(GenServer.server(), key, (value -> {any, value} | :pop)) :: any
+  @spec get_and_update(server, key, (value -> {any, value} | :pop)) :: any
 
   @doc """
   Gets the value corresponding to `key` and updates it, in one atomic transaction.
@@ -839,7 +841,7 @@ defmodule CubDB do
   end
 
   @spec get_and_update_multi(
-          GenServer.server(),
+          server,
           [key],
           (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, [key] | nil})
         ) :: any
@@ -906,7 +908,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec put_and_delete_multi(GenServer.server(), %{key => value}, [key]) :: :ok
+  @spec put_and_delete_multi(server, %{key => value}, [key]) :: :ok
 
   @doc """
   Writes and deletes multiple entries all at once, atomically.
@@ -942,7 +944,7 @@ defmodule CubDB do
     {:commit, tx, :ok}
   end
 
-  @spec get_multi(GenServer.server(), [key]) :: %{key => value}
+  @spec get_multi(server, [key]) :: %{key => value}
 
   @doc """
   Gets multiple entries corresponding by the given keys all at once, atomically.
@@ -964,7 +966,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec put_multi(GenServer.server(), %{key => value} | [entry]) :: :ok
+  @spec put_multi(server, %{key => value} | [entry]) :: :ok
 
   @doc """
   Writes multiple entries all at once, atomically.
@@ -975,7 +977,7 @@ defmodule CubDB do
     put_and_delete_multi(db, entries, [])
   end
 
-  @spec delete_multi(GenServer.server(), [key]) :: :ok
+  @spec delete_multi(server, [key]) :: :ok
 
   @doc """
   Deletes multiple entries corresponding to the given keys all at once, atomically.
@@ -986,7 +988,7 @@ defmodule CubDB do
     put_and_delete_multi(db, %{}, keys)
   end
 
-  @spec clear(GenServer.server()) :: :ok
+  @spec clear(server) :: :ok
 
   @doc """
   Deletes all entries, resulting in an empty database.
@@ -1008,7 +1010,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec compact(GenServer.server()) :: :ok | {:error, String.t()}
+  @spec compact(server) :: :ok | {:error, String.t()}
 
   @doc """
   Runs a database compaction.
@@ -1033,7 +1035,7 @@ defmodule CubDB do
     GenServer.call(db, :compact, :infinity)
   end
 
-  @spec set_auto_compact(GenServer.server(), boolean | {integer, integer | float}) ::
+  @spec set_auto_compact(server, boolean | {integer, integer | float}) ::
           :ok | {:error, String.t()}
 
   @doc """
@@ -1057,7 +1059,7 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_compact, setting}, :infinity)
   end
 
-  @spec halt_compaction(GenServer.server()) :: :ok | {:error, :no_compaction_running}
+  @spec halt_compaction(server) :: :ok | {:error, :no_compaction_running}
 
   @doc """
   Stops a running compaction.
@@ -1077,7 +1079,7 @@ defmodule CubDB do
     GenServer.call(db, :halt_compaction, :infinity)
   end
 
-  @spec compacting?(GenServer.server()) :: boolean
+  @spec compacting?(server) :: boolean
 
   @doc """
   Returns true if a compaction operation is currently running, false otherwise.
@@ -1086,7 +1088,7 @@ defmodule CubDB do
     GenServer.call(db, :compacting?, :infinity)
   end
 
-  @spec file_sync(GenServer.server()) :: :ok
+  @spec file_sync(server) :: :ok
 
   @doc """
   Performs a `fsync`, forcing to flush all data that might be buffered by the OS
@@ -1109,7 +1111,7 @@ defmodule CubDB do
     GenServer.call(db, :file_sync, :infinity)
   end
 
-  @spec set_auto_file_sync(GenServer.server(), boolean) :: :ok
+  @spec set_auto_file_sync(server, boolean) :: :ok
 
   @doc """
   Configures whether to automatically force file sync upon each write operation.
@@ -1129,7 +1131,7 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_file_sync, bool}, :infinity)
   end
 
-  @spec data_dir(GenServer.server()) :: String.t()
+  @spec data_dir(server) :: String.t()
 
   @doc """
   Returns the path of the data directory, as given when the `CubDB` process was
@@ -1147,7 +1149,7 @@ defmodule CubDB do
     GenServer.call(db, :data_dir, :infinity)
   end
 
-  @spec current_db_file(GenServer.server()) :: String.t()
+  @spec current_db_file(server) :: String.t()
 
   @doc """
   Returns the path of the current database file.
@@ -1166,7 +1168,7 @@ defmodule CubDB do
     GenServer.call(db, :current_db_file, :infinity)
   end
 
-  @spec back_up(GenServer.server(), Path.t()) :: :ok | {:error, term}
+  @spec back_up(server, Path.t()) :: :ok | {:error, term}
 
   @doc """
   Creates a backup of the database into the target directory path
@@ -1204,7 +1206,7 @@ defmodule CubDB do
     Path.extname(file_name) == @compaction_file_extension
   end
 
-  @spec subscribe(GenServer.server()) :: :ok
+  @spec subscribe(server) :: :ok
 
   @doc false
   def subscribe(db) do
