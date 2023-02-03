@@ -168,7 +168,8 @@ defmodule CubDB do
   @type key :: any
   @type value :: any
   @type entry :: {key, value}
-  @type option :: {:auto_compact, {pos_integer, number} | boolean} | {:auto_file_sync, boolean}
+  @type auto_compact :: {pos_integer, number} | boolean
+  @type option :: {:auto_compact, auto_compact} | {:auto_file_sync, boolean}
   @type select_option ::
           {:min_key, any}
           | {:max_key, any}
@@ -191,7 +192,7 @@ defmodule CubDB do
             clean_up_pending: boolean,
             old_btrees: [Btree.t()],
             readers: %{required(reference) => String.t()},
-            auto_compact: {pos_integer, number} | false,
+            auto_compact: CubDB.auto_compact(),
             auto_file_sync: boolean,
             subs: list(pid),
             writer: GenServer.from() | nil,
@@ -1672,7 +1673,7 @@ defmodule CubDB do
     %State{state | writer: writer, write_queue: queue}
   end
 
-  @spec parse_auto_compact(any) :: {:ok, false | {pos_integer, number}} | {:error, any}
+  @spec parse_auto_compact(any) :: {:ok, auto_compact} | {:error, any}
 
   defp parse_auto_compact(setting) do
     case setting do
@@ -1692,7 +1693,7 @@ defmodule CubDB do
     end
   end
 
-  @spec parse_auto_compact!(any) :: false | {pos_integer, number}
+  @spec parse_auto_compact!(any) :: auto_compact
 
   defp parse_auto_compact!(setting) do
     case parse_auto_compact(setting) do
