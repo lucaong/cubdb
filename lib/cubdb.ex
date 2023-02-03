@@ -169,6 +169,7 @@ defmodule CubDB do
   @type value :: any
   @type entry :: {key, value}
   @type auto_compact :: {pos_integer, number} | boolean
+  @type data_dir_option :: {:data_dir, String.t()}
   @type option :: {:auto_compact, auto_compact} | {:auto_file_sync, boolean}
   @type select_option ::
           {:min_key, any}
@@ -217,7 +218,7 @@ defmodule CubDB do
 
   @spec start_link(
           String.t()
-          | [option | {:data_dir, String.t()} | GenServer.option()]
+          | [option | data_dir_option | GenServer.option()]
         ) :: GenServer.on_start()
 
   @doc """
@@ -266,7 +267,7 @@ defmodule CubDB do
     start_link(Keyword.merge(options, data_dir: data_dir))
   end
 
-  @spec start(String.t() | [option | {:data_dir, String.t()} | GenServer.option()]) ::
+  @spec start(String.t() | [option | data_dir_option | GenServer.option()]) ::
           GenServer.on_start()
 
   @doc """
@@ -1703,7 +1704,7 @@ defmodule CubDB do
   end
 
   @spec split_options(
-          [option | {:data_dir, String.t()} | GenServer.option()]
+          [option | data_dir_option | GenServer.option()]
           | String.t()
         ) :: {:ok, {String.t(), [option], GenServer.options()}} | {:error, term}
 
