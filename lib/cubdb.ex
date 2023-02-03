@@ -185,9 +185,9 @@ defmodule CubDB do
             btree: Btree.t(),
             data_dir: String.t(),
             task_supervisor: pid,
+            clean_up: CleanUp.server(),
             compactor: pid | nil,
             compacting_store: Store.File.t() | nil,
-            clean_up: CleanUp.server(),
             clean_up_pending: boolean,
             old_btrees: [Btree.t()],
             readers: %{required(reference) => String.t()},
@@ -198,23 +198,20 @@ defmodule CubDB do
             write_queue: :queue.queue()
           }
 
-    @enforce_keys [:btree, :data_dir, :clean_up]
-    defstruct [
-      :task_supervisor,
-      btree: nil,
-      data_dir: nil,
-      compactor: nil,
-      compacting_store: nil,
-      clean_up: nil,
-      clean_up_pending: false,
-      old_btrees: [],
-      readers: %{},
-      auto_compact: true,
-      auto_file_sync: true,
-      subs: [],
-      writer: nil,
-      write_queue: :queue.new()
-    ]
+    @enforce_keys [:btree, :data_dir, :task_supervisor, :clean_up]
+    defstruct @enforce_keys ++
+                [
+                  compactor: nil,
+                  compacting_store: nil,
+                  clean_up_pending: false,
+                  old_btrees: [],
+                  readers: %{},
+                  auto_compact: true,
+                  auto_file_sync: true,
+                  subs: [],
+                  writer: nil,
+                  write_queue: :queue.new()
+                ]
   end
 
   @spec start_link(
