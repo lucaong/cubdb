@@ -187,7 +187,7 @@ defmodule CubDB do
             task_supervisor: pid,
             compactor: pid | nil,
             compacting_store: Store.File.t() | nil,
-            clean_up: pid,
+            clean_up: CleanUp.server(),
             clean_up_pending: boolean,
             old_btrees: [Btree.t()],
             readers: %{required(reference) => String.t()},

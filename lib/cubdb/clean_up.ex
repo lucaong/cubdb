@@ -11,19 +11,21 @@ defmodule CubDB.CleanUp do
 
   alias CubDB.Store
 
+  @type server :: GenServer.server()
+
   @spec start_link(String.t(), GenServer.options()) :: GenServer.on_start()
 
   def start_link(data_dir, options \\ []) do
     GenServer.start_link(__MODULE__, data_dir, options)
   end
 
-  @spec clean_up(GenServer.server(), Store.File.t()) :: :ok
+  @spec clean_up(server, Store.File.t()) :: :ok
 
   def clean_up(pid, store) do
     GenServer.cast(pid, {:clean_up, store})
   end
 
-  @spec clean_up_old_compaction_files(GenServer.server(), Store.File.t()) :: :ok
+  @spec clean_up_old_compaction_files(server, Store.File.t()) :: :ok
 
   def clean_up_old_compaction_files(pid, store) do
     GenServer.cast(pid, {:clean_up_old_compaction_files, store})
