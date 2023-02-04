@@ -41,9 +41,11 @@ defmodule CubDB do
 
       {:ok, db} = CubDB.start_link(data_dir: "my/data/directory", auto_compact: true)
 
-  _Important: avoid starting multiple `CubDB` processes on the same data
-  directory. Only one `CubDB` process should use a specific data directory at any
-  time._
+  > #### Important {: .warning}
+  >
+  > Avoid starting multiple `CubDB` processes on the same data
+  > directory. Only one `CubDB` process should use a specific data directory at any
+  > time.
 
   `CubDB` functions can be called concurrently from different processes, but it
   is important that only one `CubDB` process is started on the same data
@@ -471,9 +473,11 @@ defmodule CubDB do
   @doc """
   Returns a snapshot of the database in its current state.
 
-  _Note: it is usually better to use `with_snapshot/2` instead of `snapshot/2`,
-  as the former automatically manages the snapshot life cycle, even in case of
-  crashes._
+  > #### Note {: .neutral}
+  >
+  >  It is usually better to use `with_snapshot/2` instead of `snapshot/2`,
+  > as the former automatically manages the snapshot life cycle, even in case of
+  > crashes.
 
   A snapshot is an immutable, read-only representation of the database at a
   specific point in time. Getting a snapshot is basically zero-cost: nothing

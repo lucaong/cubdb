@@ -47,9 +47,11 @@ it will be created):
 {:ok, db} = CubDB.start_link(data_dir: "my/data/directory")
 ```
 
-_Important: avoid starting multiple `CubDB` processes on the same data
-directory. Only one `CubDB` process should use a specific data directory at any
-time._
+> #### Important {: .warning}
+>
+> Avoid starting multiple `CubDB` processes on the same data
+> directory. Only one `CubDB` process should use a specific data directory at any
+> time.
 
 `get`, `put`, and `delete` operations work as you probably expect:
 
