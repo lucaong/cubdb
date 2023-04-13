@@ -27,10 +27,7 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
   alias CubDB.Store
   alias CubDB.Btree.KeyRange
 
-  @leaf Btree.__leaf__()
-  @branch Btree.__branch__()
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
+  import Btree, only: [leaf: 1, branch: 1, value: 1, deleted: 0]
 
   def reduce(key_range, cmd_acc, fun) do
     %KeyRange{btree: btree, min_key: min_key, max_key: max_key, reverse: reverse} = key_range
@@ -66,7 +63,7 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
 
   def slice(_), do: {:error, __MODULE__}
 
-  defp get_children(min_key, max_key, reverse, {@branch, locs}, store) do
+  defp get_children(min_key, max_key, reverse, branch(children: locs), store) do
     children =
       locs
       |> Enum.chunk_every(2, 1)
@@ -81,7 +78,7 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
     if reverse, do: Enum.reverse(children), else: children
   end
 
-  defp get_children(min_key, max_key, reverse, {@leaf, locs}, store) do
+  defp get_children(min_key, max_key, reverse, leaf(children: locs), store) do
     children =
       locs
       |> Enum.filter(fn {key, _} ->
@@ -91,13 +88,13 @@ defimpl Enumerable, for: CubDB.Btree.KeyRange do
         {k, Store.get_node(store, loc)}
       end)
       |> Enum.filter(fn {_, node} ->
-        node != @deleted
+        node != deleted()
       end)
 
     if reverse, do: Enum.reverse(children), else: children
   end
 
-  defp get_children(_, _, _, {@value, v}, _), do: v
+  defp get_children(_, _, _, value(val: v), _), do: v
 
   defp filter_branch(nil, nil, _, _), do: true
   defp filter_branch(nil, {max, true}, key, _), do: key <= max

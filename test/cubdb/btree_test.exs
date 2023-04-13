@@ -9,109 +9,106 @@ defmodule CubDB.BtreeTest do
 
   doctest Btree
 
-  @leaf Btree.__leaf__()
-  @branch Btree.__branch__()
-  @deleted Btree.__deleted__()
+  import Btree, only: [leaf: 1, branch: 1, deleted: 0]
 
   def compose_btree do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, 0, Btree.leaf()})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0}
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0, dirt: 0}
   end
 
-  def compose_btree(root = {@leaf, cs}) do
+  def compose_btree(root = leaf(children: cs)) do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, length(cs), root})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: length(cs)}
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: length(cs), dirt: 0}
   end
 
-  def compose_btree(root = {@branch, _}, size \\ 0) do
+  def compose_btree(root = branch(children: _), size \\ 0) do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, size, root})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size}
+    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size, dirt: 0}
   end
 
   test "insert/3 called on non-full leaf inserts the key/value tuple" do
     tree = Btree.insert(compose_btree(), :foo, 1) |> Btree.commit()
-    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 1, leaf(children: [foo: 1])} = Utils.debug(tree.store)
 
     tree = Btree.insert(tree, :bar, 2) |> Btree.commit()
-    assert {:Btree, 2, {@leaf, [bar: 2, foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 2, leaf(children: [bar: 2, foo: 1])} = Utils.debug(tree.store)
     tree = Btree.insert(tree, :baz, 3) |> Btree.commit()
-    assert {:Btree, 3, {@leaf, [bar: 2, baz: 3, foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 3, leaf(children: [bar: 2, baz: 3, foo: 1])} = Utils.debug(tree.store)
     tree = Btree.insert(tree, :baz, 4) |> Btree.commit()
-    assert {:Btree, 3, {@leaf, [bar: 2, baz: 4, foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 3, leaf(children: [bar: 2, baz: 4, foo: 1])} = Utils.debug(tree.store)
   end
 
   test "insert/3 called on full leaf splits it when overflowing" do
-    tree = compose_btree({@leaf, [bar: 2, baz: 3, foo: 1]})
+    tree = compose_btree(leaf(children: [bar: 2, baz: 3, foo: 1]))
     tree = Btree.insert(tree, :qux, 4) |> Btree.commit()
 
     assert {:Btree, 4,
-            {
-              @branch,
-              [
-                bar: {@leaf, [bar: 2, baz: 3]},
-                foo: {@leaf, [foo: 1, qux: 4]}
+            branch(
+              children: [
+                bar: leaf(children: [bar: 2, baz: 3]),
+                foo: leaf(children: [foo: 1, qux: 4])
               ]
-            }} = Utils.debug(tree.store)
+            )} = Utils.debug(tree.store)
   end
 
   test "insert/3 called on a branch inserts the key/value" do
     btree =
-      compose_btree({
-        @branch,
-        [
-          bar: {@leaf, [bar: 2, baz: 3]},
-          foo: {@leaf, [foo: 1, qux: 4]}
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar: leaf(children: [bar: 2, baz: 3]),
+            foo: leaf(children: [foo: 1, qux: 4])
+          ]
+        )
+      )
       |> Btree.insert(:abc, 5)
       |> Btree.commit()
 
     assert {:Btree, _,
-            {
-              @branch,
-              [
-                abc: {@leaf, [abc: 5, bar: 2, baz: 3]},
-                foo: {@leaf, [foo: 1, qux: 4]}
+            branch(
+              children: [
+                abc: leaf(children: [abc: 5, bar: 2, baz: 3]),
+                foo: leaf(children: [foo: 1, qux: 4])
               ]
-            }} = Utils.debug(btree.store)
+            )} = Utils.debug(btree.store)
   end
 
   test "insert/3 called on a branch splits the branch if necessary" do
     btree =
-      compose_btree({
-        @branch,
-        [
-          bar: {@leaf, [bar: 2, baz: 3]},
-          foo: {@leaf, [foo: 1, quux: 5, qux: 4]},
-          xxx: {@leaf, [xxx: 6, yyy: 7]}
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar: leaf(children: [bar: 2, baz: 3]),
+            foo: leaf(children: [foo: 1, quux: 5, qux: 4]),
+            xxx: leaf(children: [xxx: 6, yyy: 7])
+          ]
+        )
+      )
 
     btree = Btree.insert(btree, :quuux, 8) |> Btree.commit()
 
     assert {:Btree, _,
-            {
-              @branch,
-              [
-                bar: {
-                  @branch,
-                  [
-                    bar: {@leaf, [bar: 2, baz: 3]},
-                    foo: {@leaf, [foo: 1, quuux: 8]}
-                  ]
-                },
-                quux: {
-                  @branch,
-                  [
-                    quux: {@leaf, [quux: 5, qux: 4]},
-                    xxx: {@leaf, [xxx: 6, yyy: 7]}
-                  ]
-                }
+            branch(
+              children: [
+                bar:
+                  branch(
+                    children: [
+                      bar: leaf(children: [bar: 2, baz: 3]),
+                      foo: leaf(children: [foo: 1, quuux: 8])
+                    ]
+                  ),
+                quux:
+                  branch(
+                    children: [
+                      quux: leaf(children: [quux: 5, qux: 4]),
+                      xxx: leaf(children: [xxx: 6, yyy: 7])
+                    ]
+                  )
               ]
-            }} = Utils.debug(btree.store)
+            )} = Utils.debug(btree.store)
   end
 
   test "insert/3 increments the size of the tree only when necessary" do
@@ -143,23 +140,24 @@ defmodule CubDB.BtreeTest do
   test "insert/3 does not write the header" do
     tree = Btree.insert(compose_btree(), :foo, 1)
 
-    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+    assert {:Btree, 0, leaf(children: [])} = Utils.debug(tree.store)
 
     tree = Btree.commit(tree)
 
-    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 1, leaf(children: [foo: 1])} = Utils.debug(tree.store)
   end
 
   test "insert_new/3 does not overwrite existing entries" do
     btree =
-      compose_btree({
-        @branch,
-        [
-          bar: {@leaf, [bar: 2, baz: 3]},
-          foo: {@leaf, [foo: 1, quux: 5, qux: 4]},
-          xxx: {@leaf, [xxx: 6, yyy: @deleted, zzz: 7]}
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar: leaf(children: [bar: 2, baz: 3]),
+            foo: leaf(children: [foo: 1, quux: 5, qux: 4]),
+            xxx: leaf(children: [xxx: 6, yyy: deleted(), zzz: 7])
+          ]
+        )
+      )
 
     assert {:error, :exists} = Btree.insert_new(btree, :bar, 123)
     assert {:error, :exists} = Btree.insert_new(btree, :baz, 123)
@@ -177,38 +175,39 @@ defmodule CubDB.BtreeTest do
   end
 
   test "fetch/2 finds key and returns {:ok, value} or :error" do
-    tiny_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
+    tiny_tree = compose_btree(leaf(children: [bar: 2, foo: 1]))
     assert {:ok, 1} = Btree.fetch(tiny_tree, :foo)
     assert :error == Btree.fetch(tiny_tree, :non_existing)
 
     big_tree =
-      compose_btree({
-        @branch,
-        [
-          bar: {
-            @branch,
-            [
-              bar: {@leaf, [bar: 2, baz: 3]},
-              foo: {@leaf, [foo: 1, quuux: 8]}
-            ]
-          },
-          quux: {
-            @branch,
-            [
-              quux: {@leaf, [quux: 5, qux: 4]},
-              xxx: {@leaf, [xxx: 6, yyy: 7]}
-            ]
-          }
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar:
+              branch(
+                children: [
+                  bar: leaf(children: [bar: 2, baz: 3]),
+                  foo: leaf(children: [foo: 1, quuux: 8])
+                ]
+              ),
+            quux:
+              branch(
+                children: [
+                  quux: leaf(children: [quux: 5, qux: 4]),
+                  xxx: leaf(children: [xxx: 6, yyy: 7])
+                ]
+              )
+          ]
+        )
+      )
 
     assert {:ok, 1} = Btree.fetch(big_tree, :foo)
     assert :error == Btree.fetch(big_tree, :non_existing)
   end
 
   test "written_since?/2 checks if the entry with the given key was written since a reference btree" do
-    tiny_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
-    different_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
+    tiny_tree = compose_btree(leaf(children: [bar: 2, foo: 1]))
+    different_tree = compose_btree(leaf(children: [bar: 2, foo: 1]))
 
     assert Btree.written_since?(tiny_tree, :foo, tiny_tree) == false
 
@@ -226,25 +225,26 @@ defmodule CubDB.BtreeTest do
              Btree.written_since?(modified_tiny_tree, :foo, different_tree)
 
     big_tree =
-      compose_btree({
-        @branch,
-        [
-          bar: {
-            @branch,
-            [
-              bar: {@leaf, [bar: 2, baz: 3]},
-              foo: {@leaf, [foo: 1, quuux: 8]}
-            ]
-          },
-          quux: {
-            @branch,
-            [
-              quux: {@leaf, [quux: 5, qux: 4]},
-              xxx: {@leaf, [xxx: 6, yyy: 7]}
-            ]
-          }
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar:
+              branch(
+                children: [
+                  bar: leaf(children: [bar: 2, baz: 3]),
+                  foo: leaf(children: [foo: 1, quuux: 8])
+                ]
+              ),
+            quux:
+              branch(
+                children: [
+                  quux: leaf(children: [quux: 5, qux: 4]),
+                  xxx: leaf(children: [xxx: 6, yyy: 7])
+                ]
+              )
+          ]
+        )
+      )
 
     assert Btree.written_since?(big_tree, :foo, big_tree) == false
 
@@ -267,85 +267,86 @@ defmodule CubDB.BtreeTest do
   end
 
   test "delete/2 removes a key/value" do
-    tiny_tree = compose_btree({@leaf, [bar: 2, foo: 1]})
+    tiny_tree = compose_btree(leaf(children: [bar: 2, foo: 1]))
     btree = Btree.delete(tiny_tree, :foo) |> Btree.commit()
 
-    assert {:Btree, _, {@leaf, [bar: 2]}} = Utils.debug(btree.store)
+    assert {:Btree, _, leaf(children: [bar: 2])} = Utils.debug(btree.store)
     assert tiny_tree == Btree.delete(tiny_tree, :non_existing) |> Btree.commit()
 
     big_tree =
-      compose_btree({
-        @branch,
-        [
-          bar: {@leaf, [bar: 2, baz: 3]},
-          foo: {@leaf, [foo: 1, fox: 5, qux: 4]}
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar: leaf(children: [bar: 2, baz: 3]),
+            foo: leaf(children: [foo: 1, fox: 5, qux: 4])
+          ]
+        )
+      )
 
     btree = Btree.delete(big_tree, :foo) |> Btree.commit()
 
     assert {:Btree, _,
-            {
-              @branch,
-              [
-                bar: {@leaf, [bar: 2, baz: 3]},
-                fox: {@leaf, [fox: 5, qux: 4]}
+            branch(
+              children: [
+                bar: leaf(children: [bar: 2, baz: 3]),
+                fox: leaf(children: [fox: 5, qux: 4])
               ]
-            }} = Utils.debug(btree.store)
+            )} = Utils.debug(btree.store)
 
     assert big_tree == Btree.delete(big_tree, :non_existing) |> Btree.commit()
   end
 
   test "delete/2 merges nodes if necessary" do
     big_tree =
-      compose_btree({
-        @branch,
-        [
-          bar: {
-            @branch,
-            [
-              bar: {@leaf, [bar: 2, baz: 3]},
-              foo: {@leaf, [foo: 1, quuux: 8]}
-            ]
-          },
-          quux: {
-            @branch,
-            [
-              quux: {@leaf, [quux: 5, qux: 4]},
-              xxx: {@leaf, [xxx: 6, yyy: 7]}
-            ]
-          }
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar:
+              branch(
+                children: [
+                  bar: leaf(children: [bar: 2, baz: 3]),
+                  foo: leaf(children: [foo: 1, quuux: 8])
+                ]
+              ),
+            quux:
+              branch(
+                children: [
+                  quux: leaf(children: [quux: 5, qux: 4]),
+                  xxx: leaf(children: [xxx: 6, yyy: 7])
+                ]
+              )
+          ]
+        )
+      )
 
     btree = Btree.delete(big_tree, :xxx) |> Btree.commit()
 
     assert {:Btree, _,
-            {
-              @branch,
-              [
-                bar: {@leaf, [bar: 2, baz: 3]},
-                foo: {@leaf, [foo: 1, quuux: 8]},
-                quux: {@leaf, [quux: 5, qux: 4, yyy: 7]}
+            branch(
+              children: [
+                bar: leaf(children: [bar: 2, baz: 3]),
+                foo: leaf(children: [foo: 1, quuux: 8]),
+                quux: leaf(children: [quux: 5, qux: 4, yyy: 7])
               ]
-            }} = Utils.debug(btree.store)
+            )} = Utils.debug(btree.store)
   end
 
   test "delete/2 removes a node when empty" do
     tree =
-      compose_btree({
-        @branch,
-        [
-          bar: {@leaf, [bar: 2]},
-          foo: {@leaf, [foo: 1]}
-        ]
-      })
+      compose_btree(
+        branch(
+          children: [
+            bar: leaf(children: [bar: 2]),
+            foo: leaf(children: [foo: 1])
+          ]
+        )
+      )
 
     tree = Btree.delete(tree, :bar) |> Btree.commit()
-    assert {:Btree, _, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, _, leaf(children: [foo: 1])} = Utils.debug(tree.store)
 
     tree = Btree.delete(tree, :foo) |> Btree.commit()
-    assert {:Btree, _, {@leaf, []}} = Utils.debug(tree.store)
+    assert {:Btree, _, leaf(children: [])} = Utils.debug(tree.store)
   end
 
   test "delete/2 decrements the size of the tree only when necessary" do
@@ -369,13 +370,13 @@ defmodule CubDB.BtreeTest do
   end
 
   test "delete/2 does not write the header" do
-    tree = Btree.delete(compose_btree({@leaf, [foo: 1]}), :foo)
+    tree = Btree.delete(compose_btree(leaf(children: [foo: 1])), :foo)
 
-    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 1, leaf(children: [foo: 1])} = Utils.debug(tree.store)
 
     tree = Btree.commit(tree)
 
-    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+    assert {:Btree, 0, leaf(children: [])} = Utils.debug(tree.store)
   end
 
   test "mark_deleted/2 removes an entry" do
@@ -414,30 +415,30 @@ defmodule CubDB.BtreeTest do
   end
 
   test "mark_deleted/2 does not write the header" do
-    tree = Btree.mark_deleted(compose_btree({@leaf, [foo: 1]}), :foo)
+    tree = Btree.mark_deleted(compose_btree(leaf(children: [foo: 1])), :foo)
 
-    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 1, leaf(children: [foo: 1])} = Utils.debug(tree.store)
 
     tree = Btree.commit(tree)
 
-    assert {:Btree, 0, {@leaf, [foo: @deleted]}} = Utils.debug(tree.store)
+    assert {:Btree, 0, leaf(children: [foo: deleted()])} = Utils.debug(tree.store)
   end
 
   test "clear/1 deletes all entries" do
-    tree = compose_btree({@leaf, [foo: 1, bar: 2, baz: 3]})
+    tree = compose_btree(leaf(children: [foo: 1, bar: 2, baz: 3]))
     tree = Btree.clear(tree) |> Btree.commit()
 
-    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+    assert {:Btree, 0, leaf(children: [])} = Utils.debug(tree.store)
   end
 
   test "clear/1 does not write the header" do
-    tree = Btree.clear(compose_btree({@leaf, [foo: 1]}))
+    tree = Btree.clear(compose_btree(leaf(children: [foo: 1])))
 
-    assert {:Btree, 1, {@leaf, [foo: 1]}} = Utils.debug(tree.store)
+    assert {:Btree, 1, leaf(children: [foo: 1])} = Utils.debug(tree.store)
 
     tree = Btree.commit(tree)
 
-    assert {:Btree, 0, {@leaf, []}} = Utils.debug(tree.store)
+    assert {:Btree, 0, leaf(children: [])} = Utils.debug(tree.store)
   end
 
   test "clear/1 result in a size of 0 but increases the dirt" do
@@ -570,24 +571,6 @@ defmodule CubDB.BtreeTest do
     {:ok, store} = Store.TestStore.create()
     tree = make_btree(store, [a: 1, b: 2, c: 3, d: 4], 3) |> Btree.mark_deleted(:b)
     assert Enum.to_list(tree) == [a: 1, c: 3, d: 4]
-  end
-
-  test "Btree.leaf creates a leaf node" do
-    leaf_marker = Btree.__leaf__()
-    assert {^leaf_marker, []} = Btree.leaf()
-    assert {^leaf_marker, [1, 2, 3]} = Btree.leaf(children: [1, 2, 3])
-  end
-
-  test "Btree.branch creates a branch node" do
-    branch_marker = Btree.__branch__()
-    assert {^branch_marker, []} = Btree.branch()
-    assert {^branch_marker, [1, 2, 3]} = Btree.branch(children: [1, 2, 3])
-  end
-
-  test "Btree.value creates a value node" do
-    value_marker = Btree.__value__()
-    assert {^value_marker, nil} = Btree.value()
-    assert {^value_marker, "hello"} = Btree.value(val: "hello")
   end
 
   test "Btree.alive? returns true if the Store is open, otherwise false" do

@@ -41,9 +41,11 @@ defmodule CubDB do
 
       {:ok, db} = CubDB.start_link(data_dir: "my/data/directory", auto_compact: true)
 
-  _Important: avoid starting multiple `CubDB` processes on the same data
-  directory. Only one `CubDB` process should use a specific data directory at any
-  time._
+  > #### Important {: .warning}
+  >
+  > Avoid starting multiple `CubDB` processes on the same data
+  > directory. Only one `CubDB` process should use a specific data directory at any
+  > time.
 
   `CubDB` functions can be called concurrently from different processes, but it
   is important that only one `CubDB` process is started on the same data
@@ -162,18 +164,23 @@ defmodule CubDB do
 
   @db_file_extension ".cub"
   @compaction_file_extension ".compact"
+  @known_file_extensions [@db_file_extension, @compaction_file_extension]
   @auto_compact_defaults {100, 0.25}
 
   @type key :: any
   @type value :: any
   @type entry :: {key, value}
-  @type option :: {:auto_compact, {pos_integer, number} | boolean} | {:auto_file_sync, boolean}
+  @type auto_compact :: {pos_integer, number} | boolean
+  @type data_dir_option :: {:data_dir, String.t()}
+  @type option :: {:auto_compact, auto_compact} | {:auto_file_sync, boolean}
   @type select_option ::
           {:min_key, any}
           | {:max_key, any}
           | {:min_key_inclusive, boolean}
           | {:max_key_inclusive, boolean}
           | {:reverse, boolean}
+
+  @type server :: GenServer.server()
 
   defmodule State do
     @moduledoc false
@@ -182,41 +189,38 @@ defmodule CubDB do
             btree: Btree.t(),
             data_dir: String.t(),
             task_supervisor: pid,
+            clean_up: CleanUp.server(),
             compactor: pid | nil,
             compacting_store: Store.File.t() | nil,
-            clean_up: pid,
             clean_up_pending: boolean,
             old_btrees: [Btree.t()],
             readers: %{required(reference) => String.t()},
-            auto_compact: {pos_integer, number} | false,
+            auto_compact: CubDB.auto_compact(),
             auto_file_sync: boolean,
             subs: list(pid),
             writer: GenServer.from() | nil,
             write_queue: :queue.queue()
           }
 
-    @enforce_keys [:btree, :data_dir, :clean_up]
-    defstruct [
-      :task_supervisor,
-      btree: nil,
-      data_dir: nil,
-      compactor: nil,
-      compacting_store: nil,
-      clean_up: nil,
-      clean_up_pending: false,
-      old_btrees: [],
-      readers: %{},
-      auto_compact: true,
-      auto_file_sync: true,
-      subs: [],
-      writer: nil,
-      write_queue: :queue.new()
-    ]
+    @enforce_keys [:btree, :data_dir, :task_supervisor, :clean_up]
+    defstruct @enforce_keys ++
+                [
+                  compactor: nil,
+                  compacting_store: nil,
+                  clean_up_pending: false,
+                  old_btrees: [],
+                  readers: %{},
+                  auto_compact: true,
+                  auto_file_sync: true,
+                  subs: [],
+                  writer: nil,
+                  write_queue: :queue.new()
+                ]
   end
 
   @spec start_link(
           String.t()
-          | [option | {:data_dir, String.t()} | GenServer.option()]
+          | [option | data_dir_option | GenServer.option()]
         ) :: GenServer.on_start()
 
   @doc """
@@ -265,7 +269,7 @@ defmodule CubDB do
     start_link(Keyword.merge(options, data_dir: data_dir))
   end
 
-  @spec start(String.t() | [option | {:data_dir, String.t()} | GenServer.option()]) ::
+  @spec start(String.t() | [option | data_dir_option | GenServer.option()]) ::
           GenServer.on_start()
 
   @doc """
@@ -287,7 +291,7 @@ defmodule CubDB do
     start(Keyword.merge(options, data_dir: data_dir))
   end
 
-  @spec stop(GenServer.server(), term(), timeout()) :: :ok
+  @spec stop(server, term(), timeout()) :: :ok
 
   @doc """
   Synchronously stops the `CubDB` database.
@@ -299,7 +303,7 @@ defmodule CubDB do
     GenServer.stop(db, reason, timeout)
   end
 
-  @spec get(GenServer.server(), key, value) :: value
+  @spec get(server, key, value) :: value
 
   @doc """
   Gets the value associated to `key` from the database.
@@ -313,7 +317,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec fetch(GenServer.server(), key) :: {:ok, value} | :error
+  @spec fetch(server, key) :: {:ok, value} | :error
 
   @doc """
   Fetches the value for the given `key` in the database, or returns `:error` if
@@ -328,7 +332,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec has_key?(GenServer.server(), key) :: boolean
+  @spec has_key?(server, key) :: boolean
 
   @doc """
   Returns whether an entry with the given `key` exists in the database.
@@ -339,7 +343,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec select(GenServer.server(), [select_option]) :: Enumerable.t()
+  @spec select(server, [select_option]) :: Enumerable.t()
 
   @doc """
   Selects a range of entries from the database, returning a lazy stream.
@@ -453,7 +457,7 @@ defmodule CubDB do
     )
   end
 
-  @spec size(GenServer.server()) :: non_neg_integer
+  @spec size(server) :: non_neg_integer
 
   @doc """
   Returns the number of entries present in the database.
@@ -464,14 +468,16 @@ defmodule CubDB do
     end)
   end
 
-  @spec snapshot(GenServer.server(), timeout) :: Snapshot.t()
+  @spec snapshot(server, timeout) :: Snapshot.t()
 
   @doc """
   Returns a snapshot of the database in its current state.
 
-  _Note: it is usually better to use `with_snapshot/2` instead of `snapshot/2`,
-  as the former automatically manages the snapshot life cycle, even in case of
-  crashes._
+  > #### Note {: .neutral}
+  >
+  >  It is usually better to use `with_snapshot/2` instead of `snapshot/2`,
+  > as the former automatically manages the snapshot life cycle, even in case of
+  > crashes.
 
   A snapshot is an immutable, read-only representation of the database at a
   specific point in time. Getting a snapshot is basically zero-cost: nothing
@@ -540,7 +546,7 @@ defmodule CubDB do
     GenServer.call(db, {:release_snapshot, snapshot}, :infinity)
   end
 
-  @spec with_snapshot(GenServer.server(), (Snapshot.t() -> result)) :: result when result: any
+  @spec with_snapshot(server, (Snapshot.t() -> result)) :: result when result: any
 
   @doc """
   Calls `fun` passing a snapshot, and automatically releases the snapshot when
@@ -592,7 +598,7 @@ defmodule CubDB do
     end
   end
 
-  @spec transaction(GenServer.server(), (Tx.t() -> {:commit, Tx.t(), result} | {:cancel, result})) ::
+  @spec transaction(server, (Tx.t() -> {:commit, Tx.t(), result} | {:cancel, result})) ::
           result
         when result: any
 
@@ -699,7 +705,7 @@ defmodule CubDB do
     end
   end
 
-  @spec start_transaction(GenServer.server()) :: Tx.t()
+  @spec start_transaction(server) :: Tx.t()
 
   defp start_transaction(db) do
     case GenServer.call(db, :start_transaction, :infinity) do
@@ -711,13 +717,13 @@ defmodule CubDB do
     end
   end
 
-  @spec cancel_transaction(GenServer.server()) :: :ok
+  @spec cancel_transaction(server) :: :ok
 
   defp cancel_transaction(db) do
     GenServer.call(db, :cancel_transaction, :infinity)
   end
 
-  @spec commit_transaction(GenServer.server(), Tx.t()) :: :ok
+  @spec commit_transaction(server, Tx.t()) :: :ok
 
   defp commit_transaction(db, tx) do
     case GenServer.call(db, {:commit_transaction, tx}, :infinity) do
@@ -729,7 +735,7 @@ defmodule CubDB do
     end
   end
 
-  @spec dirt_factor(GenServer.server()) :: float
+  @spec dirt_factor(server) :: float
 
   @doc """
   Returns the dirt factor.
@@ -744,7 +750,7 @@ defmodule CubDB do
     GenServer.call(db, :dirt_factor, :infinity)
   end
 
-  @spec put(GenServer.server(), key, value) :: :ok
+  @spec put(server, key, value) :: :ok
 
   @doc """
   Writes an entry in the database, associating `key` to `value`.
@@ -757,7 +763,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec put_new(GenServer.server(), key, value) :: :ok | {:error, :exists}
+  @spec put_new(server, key, value) :: :ok | {:error, :exists}
 
   @doc """
   Writes an entry in the database, associating `key` to `value`, only if `key`
@@ -778,7 +784,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec delete(GenServer.server(), key) :: :ok
+  @spec delete(server, key) :: :ok
 
   @doc """
   Deletes the entry associated to `key` from the database.
@@ -791,7 +797,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec update(GenServer.server(), key, value, (value -> value)) :: :ok
+  @spec update(server, key, value, (value -> value)) :: :ok
 
   @doc """
   Updates the entry corresponding to `key` using the given function.
@@ -812,7 +818,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec get_and_update(GenServer.server(), key, (value -> {any, value} | :pop)) :: any
+  @spec get_and_update(server, key, (value -> {any, value} | :pop)) :: any
 
   @doc """
   Gets the value corresponding to `key` and updates it, in one atomic transaction.
@@ -838,7 +844,7 @@ defmodule CubDB do
   end
 
   @spec get_and_update_multi(
-          GenServer.server(),
+          server,
           [key],
           (%{optional(key) => value} -> {any, %{optional(key) => value} | nil, [key] | nil})
         ) :: any
@@ -905,7 +911,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec put_and_delete_multi(GenServer.server(), %{key => value}, [key]) :: :ok
+  @spec put_and_delete_multi(server, %{key => value}, [key]) :: :ok
 
   @doc """
   Writes and deletes multiple entries all at once, atomically.
@@ -941,7 +947,7 @@ defmodule CubDB do
     {:commit, tx, :ok}
   end
 
-  @spec get_multi(GenServer.server(), [key]) :: %{key => value}
+  @spec get_multi(server, [key]) :: %{key => value}
 
   @doc """
   Gets multiple entries corresponding by the given keys all at once, atomically.
@@ -963,7 +969,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec put_multi(GenServer.server(), %{key => value} | [entry]) :: :ok
+  @spec put_multi(server, %{key => value} | [entry]) :: :ok
 
   @doc """
   Writes multiple entries all at once, atomically.
@@ -974,7 +980,7 @@ defmodule CubDB do
     put_and_delete_multi(db, entries, [])
   end
 
-  @spec delete_multi(GenServer.server(), [key]) :: :ok
+  @spec delete_multi(server, [key]) :: :ok
 
   @doc """
   Deletes multiple entries corresponding to the given keys all at once, atomically.
@@ -985,7 +991,7 @@ defmodule CubDB do
     put_and_delete_multi(db, %{}, keys)
   end
 
-  @spec clear(GenServer.server()) :: :ok
+  @spec clear(server) :: :ok
 
   @doc """
   Deletes all entries, resulting in an empty database.
@@ -1007,7 +1013,7 @@ defmodule CubDB do
     end)
   end
 
-  @spec compact(GenServer.server()) :: :ok | {:error, String.t()}
+  @spec compact(server) :: :ok | {:error, :pending_compaction | term}
 
   @doc """
   Runs a database compaction.
@@ -1032,7 +1038,7 @@ defmodule CubDB do
     GenServer.call(db, :compact, :infinity)
   end
 
-  @spec set_auto_compact(GenServer.server(), boolean | {integer, integer | float}) ::
+  @spec set_auto_compact(server, boolean | {integer, integer | float}) ::
           :ok | {:error, String.t()}
 
   @doc """
@@ -1056,7 +1062,7 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_compact, setting}, :infinity)
   end
 
-  @spec halt_compaction(GenServer.server()) :: :ok | {:error, :no_compaction_running}
+  @spec halt_compaction(server) :: :ok | {:error, :no_compaction_running}
 
   @doc """
   Stops a running compaction.
@@ -1076,7 +1082,7 @@ defmodule CubDB do
     GenServer.call(db, :halt_compaction, :infinity)
   end
 
-  @spec compacting?(GenServer.server()) :: boolean
+  @spec compacting?(server) :: boolean
 
   @doc """
   Returns true if a compaction operation is currently running, false otherwise.
@@ -1085,7 +1091,7 @@ defmodule CubDB do
     GenServer.call(db, :compacting?, :infinity)
   end
 
-  @spec file_sync(GenServer.server()) :: :ok
+  @spec file_sync(server) :: :ok
 
   @doc """
   Performs a `fsync`, forcing to flush all data that might be buffered by the OS
@@ -1108,7 +1114,7 @@ defmodule CubDB do
     GenServer.call(db, :file_sync, :infinity)
   end
 
-  @spec set_auto_file_sync(GenServer.server(), boolean) :: :ok
+  @spec set_auto_file_sync(server, boolean) :: :ok
 
   @doc """
   Configures whether to automatically force file sync upon each write operation.
@@ -1128,7 +1134,7 @@ defmodule CubDB do
     GenServer.call(db, {:set_auto_file_sync, bool}, :infinity)
   end
 
-  @spec data_dir(GenServer.server()) :: String.t()
+  @spec data_dir(server) :: String.t()
 
   @doc """
   Returns the path of the data directory, as given when the `CubDB` process was
@@ -1146,7 +1152,7 @@ defmodule CubDB do
     GenServer.call(db, :data_dir, :infinity)
   end
 
-  @spec current_db_file(GenServer.server()) :: String.t()
+  @spec current_db_file(server) :: String.t()
 
   @doc """
   Returns the path of the current database file.
@@ -1165,7 +1171,7 @@ defmodule CubDB do
     GenServer.call(db, :current_db_file, :infinity)
   end
 
-  @spec back_up(GenServer.server(), Path.t()) :: :ok | {:error, term}
+  @spec back_up(server, Path.t()) :: :ok | {:error, term}
 
   @doc """
   Creates a backup of the database into the target directory path
@@ -1190,11 +1196,10 @@ defmodule CubDB do
 
   @doc false
   def cubdb_file?(file_name) do
-    file_extensions = [@db_file_extension, @compaction_file_extension]
-    basename = Path.basename(file_name, Path.extname(file_name))
+    extension = Path.extname(file_name)
+    basename = Path.basename(file_name, extension)
 
-    Enum.member?(file_extensions, Path.extname(file_name)) &&
-      Regex.match?(~r/^[\da-fA-F]+$/, basename)
+    extension in @known_file_extensions && basename =~ ~r/^[\da-fA-F]+$/
   end
 
   @spec compaction_file?(String.t()) :: boolean
@@ -1204,10 +1209,14 @@ defmodule CubDB do
     Path.extname(file_name) == @compaction_file_extension
   end
 
+  @spec subscribe(server) :: :ok
+
   @doc false
   def subscribe(db) do
     GenServer.call(db, {:subscribe, self()}, :infinity)
   end
+
+  @spec file_name_to_n(String.t()) :: integer
 
   @doc false
   def file_name_to_n(file_name) do
@@ -1217,14 +1226,14 @@ defmodule CubDB do
 
   # OTP callbacks
 
-  @doc false
+  @impl true
   def init([data_dir, options]) do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, true))
     auto_file_sync = Keyword.get(options, :auto_file_sync, true)
 
-    with file_name when is_binary(file_name) or is_nil(file_name) <- find_db_file(data_dir),
-         {:ok, store} <-
-           Store.File.create(Path.join(data_dir, file_name || "0#{@db_file_extension}")),
+    with {:ok, file_name} <- find_db_file(data_dir),
+         file_name = file_name || "0#{@db_file_extension}",
+         {:ok, store} <- Store.File.create(Path.join(data_dir, file_name)),
          {:ok, clean_up} <- CleanUp.start_link(data_dir),
          {:ok, task_supervisor} <- Task.Supervisor.start_link() do
       {:ok,
@@ -1242,7 +1251,7 @@ defmodule CubDB do
     end
   end
 
-  @doc false
+  @impl true
   def terminate(_reason, state) do
     do_halt_compaction(state)
 
@@ -1255,6 +1264,7 @@ defmodule CubDB do
     end
   end
 
+  @impl true
   def handle_call({:snapshot, ttl}, _, state) do
     %State{btree: btree} = state
 
@@ -1422,6 +1432,7 @@ defmodule CubDB do
     {:reply, compaction_running?(state), state}
   end
 
+  @impl true
   def handle_info(message, state)
       when message == :compaction_completed or message == :catch_up_completed do
     for pid <- state.subs, do: send(pid, message)
@@ -1476,17 +1487,18 @@ defmodule CubDB do
     end
   end
 
-  @spec find_db_file(String.t()) :: String.t() | nil | {:error, any}
+  @spec find_db_file(String.t()) :: {:ok, String.t() | nil} | {:error, any}
 
   defp find_db_file(data_dir) do
     with :ok <- File.mkdir_p(data_dir),
          {:ok, files} <- File.ls(data_dir) do
-      files
-      |> Enum.filter(fn file_name ->
-        cubdb_file?(file_name) && String.ends_with?(file_name, @db_file_extension)
-      end)
-      |> Enum.sort_by(&file_name_to_n/1)
-      |> List.last()
+      file =
+        files
+        |> Enum.filter(&(cubdb_file?(&1) && String.ends_with?(&1, @db_file_extension)))
+        |> Enum.sort_by(&file_name_to_n/1)
+        |> List.last()
+
+      {:ok, file}
     end
   end
 
@@ -1610,7 +1622,7 @@ defmodule CubDB do
       if Btree.alive?(old_btree), do: :ok = Btree.stop(old_btree)
     end
 
-    :ok = CleanUp.clean_up(clean_up, btree)
+    :ok = CleanUp.clean_up(clean_up, btree.store)
     for pid <- state.subs, do: send(pid, :clean_up_started)
     %State{state | clean_up_pending: false, old_btrees: []}
   end
@@ -1666,7 +1678,7 @@ defmodule CubDB do
     %State{state | writer: writer, write_queue: queue}
   end
 
-  @spec parse_auto_compact(any) :: {:ok, false | {pos_integer, number}} | {:error, any}
+  @spec parse_auto_compact(any) :: {:ok, auto_compact} | {:error, any}
 
   defp parse_auto_compact(setting) do
     case setting do
@@ -1686,7 +1698,7 @@ defmodule CubDB do
     end
   end
 
-  @spec parse_auto_compact!(any) :: false | {pos_integer, number}
+  @spec parse_auto_compact!(any) :: auto_compact
 
   defp parse_auto_compact!(setting) do
     case parse_auto_compact(setting) do
@@ -1696,7 +1708,7 @@ defmodule CubDB do
   end
 
   @spec split_options(
-          [option | {:data_dir, String.t()} | GenServer.option()]
+          [option | data_dir_option | GenServer.option()]
           | String.t()
         ) :: {:ok, {String.t(), [option], GenServer.options()}} | {:error, term}
 

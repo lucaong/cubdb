@@ -22,10 +22,9 @@ defmodule CubDB.Compactor do
   alias CubDB.Store
   alias CubDB.Tx
 
-  @value Btree.__value__()
-  @deleted Btree.__deleted__()
+  import Btree, only: [value: 1, deleted: 0]
 
-  @spec run(pid, Store.File.t()) :: :ok
+  @spec run(CubDB.server(), Store.File.t()) :: :ok
 
   def run(db, store) do
     {original_btree, compacted_btree} =
@@ -46,7 +45,7 @@ defmodule CubDB.Compactor do
     Btree.load(btree, store) |> Btree.sync()
   end
 
-  @spec catch_up(GenServer.server(), Btree.t(), Btree.t()) :: :ok
+  @spec catch_up(CubDB.server(), Btree.t(), Btree.t()) :: :ok
 
   def catch_up(db, compacted_btree, original_btree) do
     result =
@@ -74,10 +73,10 @@ defmodule CubDB.Compactor do
     diff = Btree.Diff.new(original_btree, latest_btree)
 
     Enum.reduce(diff, compacted_btree, fn
-      {key, {@value, value}}, compacted_btree ->
+      {key, value(val: value)}, compacted_btree ->
         Btree.insert(compacted_btree, key, value)
 
-      {key, @deleted}, compacted_btree ->
+      {key, deleted()}, compacted_btree ->
         Btree.delete(compacted_btree, key)
     end)
   end

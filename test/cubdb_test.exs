@@ -777,36 +777,52 @@ defmodule CubDBTest do
   end
 
   test "readers are not blocked by a writer", %{tmp_dir: tmp_dir} do
+    test_pid = self()
+
     {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
-    :ok = CubDB.put(db, :a, 0)
+    :ok = CubDB.put(db, :a, :v0)
 
-    Task.async(fn ->
-      CubDB.get_and_update(db, :a, fn a ->
-        receive do
-          :continue -> {a, a + 1}
-        end
+    writer_task =
+      Task.async(fn ->
+        CubDB.get_and_update(db, :a, fn :v0 ->
+          send(test_pid, {self(), :writer_task})
+
+          receive do
+            :continue -> {:ok, :v1}
+          end
+        end)
       end)
-    end)
 
-    assert 0 = CubDB.get(db, :a)
+    assert_receive {writer_pid, :writer_task}
+    assert :v0 = CubDB.get(db, :a)
+    send(writer_pid, :continue)
+    assert :ok = Task.await(writer_task)
+    assert :v1 = CubDB.get(db, :a)
   end
 
   test "readers are not blocked by another reader", %{tmp_dir: tmp_dir} do
+    test_pid = self()
+
     {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
-    :ok = CubDB.put(db, :a, 0)
+    :ok = CubDB.put(db, :a, :v0)
 
-    Task.async(fn ->
-      CubDB.select(db,
-        reduce: fn _, _ ->
+    reader_task =
+      Task.async(fn ->
+        CubDB.select(db)
+        |> Enum.reduce(nil, fn {:a, :v0}, nil ->
+          send(test_pid, {self(), :reader_task})
+
           receive do
-            :continue -> nil
+            :continue -> :ok
           end
-        end
-      )
-      |> Enum.to_list()
-    end)
+        end)
+      end)
 
-    assert 0 = CubDB.get(db, :a)
+    assert_receive {reader_pid, :reader_task}
+    assert :ok = CubDB.put(db, :a, :v1)
+    send(reader_pid, :continue)
+    assert :ok = Task.await(reader_task)
+    assert :v1 = CubDB.get(db, :a)
   end
 
   test "get_and_update_multi/3 is persisted to disk", %{tmp_dir: tmp_dir} do

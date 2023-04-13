@@ -17,7 +17,9 @@ defmodule CubDB.Store.File do
 
   alias CubDB.Store
 
-  @type t :: %Store.File{pid: pid, file_path: binary}
+  @type state :: {:file.io_device(), integer}
+
+  @type t :: %Store.File{pid: pid, file_path: String.t()}
 
   @enforce_keys [:pid, :file_path]
   defstruct [:pid, :file_path]
@@ -30,6 +32,8 @@ defmodule CubDB.Store.File do
     end
   end
 
+  @spec init(String.t()) :: state
+
   defp init(file_path) do
     ensure_exclusive_access!(file_path)
     {:ok, file} = :file.open(file_path, [:read, :append, :raw, :binary])
@@ -37,6 +41,8 @@ defmodule CubDB.Store.File do
 
     {file, pos}
   end
+
+  @spec ensure_exclusive_access!(String.t()) :: nil
 
   defp ensure_exclusive_access!(file_path) do
     unless :global.set_lock({{__MODULE__, file_path}, self()}, [node()], 0) do
@@ -181,7 +187,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     iolist = Blocks.add_markers(bytes, pos)
 
     with :ok <- :file.write(file, iolist) do
-      {:ok, iolist_byte_size(iolist)}
+      {:ok, :erlang.iolist_size(iolist)}
     end
   end
 
@@ -189,7 +195,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
     {loc, iolist} = Blocks.add_header_marker(bytes, pos)
 
     with :ok <- :file.write(file, iolist) do
-      {:ok, loc, iolist_byte_size(iolist)}
+      {:ok, loc, :erlang.iolist_size(iolist)}
     end
   end
 
@@ -229,10 +235,5 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
   defp deserialize(bytes) do
     :erlang.binary_to_term(bytes)
-  end
-
-  defp iolist_byte_size(iolist) do
-    iolist
-    |> Enum.reduce(0, fn bytes, size -> size + byte_size(bytes) end)
   end
 end
