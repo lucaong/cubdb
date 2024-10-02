@@ -27,3 +27,6 @@ cubdb-*.tar
 
 # Elixir Language Server files
 /.elixir_ls
+
+# ASDF
+.tool-versions
