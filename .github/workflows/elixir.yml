@@ -99,6 +99,11 @@ jobs:
             elixir: '1.13.4'
           - otp: '25.3'
             elixir: '1.14.5'
+        exclude:
+          - otp: '27.1'
+            elixir: '1.15.8'
+          - otp: '27.1'
+            elixir: '1.16.3'
 
     steps:
     - uses: actions/checkout@v2
