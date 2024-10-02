@@ -22,6 +22,7 @@ defmodule TestHelper do
   defmacro trapping_exit(do: block) do
     quote do
       original = Process.flag(:trap_exit, true)
+
       try do
         unquote(block)
       after
