@@ -757,7 +757,15 @@ defmodule CubDB do
 
   This number is reset to 0 after a compaction operation, and increases by one
   on each write operation on the BTree. Deletions are considered writes, as they
-  modify the BTree.
+  modify the BTree. The way writes are computed depends on the specific BTree
+  implementation, and might not map one-to-one to the high level write
+  operations performed by the user. This metric is provided only as a hint in
+  case of manual compaction, where it is often a good idea to skip a wasteful
+  compaction if only a few write operations were performed since the last
+    compaction.
+
+    The number of writes does not include uncommitted operations, therefore old
+    halted transactions that are never committed are not counted.
   """
   def writes_since_compaction(db) do
     GenServer.call(db, :writes_since_compaction, :infinity)
