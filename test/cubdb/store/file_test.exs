@@ -1,6 +1,7 @@
 defmodule CubDB.Store.FileTest do
   use ExUnit.Case, async: true
   use CubDB.StoreExamples
+  require TestHelper
 
   import CubDB.Btree, only: [header: 1]
 
@@ -90,7 +91,9 @@ defmodule CubDB.Store.FileTest do
   test "returns error if the same file is already in use by another store", %{
     file_path: file_path
   } do
-    assert {:error, {%ArgumentError{message: message}, _}} = CubDB.Store.File.create(file_path)
-    assert message == "file \"#{file_path}\" is already in use by another CubDB.Store.File"
+    TestHelper.trapping_exit do
+      assert {:error, {%ArgumentError{message: message}, _}} = CubDB.Store.File.create(file_path)
+      assert message == "file \"#{file_path}\" is already in use by another CubDB.Store.File"
+    end
   end
 end

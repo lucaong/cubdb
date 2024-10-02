@@ -1,5 +1,6 @@
 defmodule CubDBTest do
   use ExUnit.Case, async: true
+  require TestHelper
   doctest CubDB
 
   setup do
@@ -40,7 +41,9 @@ defmodule CubDBTest do
   end
 
   test "start_link/1 returns error if options are invalid", %{tmp_dir: tmp_dir} do
-    assert {:error, _} = CubDB.start_link(data_dir: tmp_dir, auto_compact: "maybe")
+    TestHelper.trapping_exit do
+      assert {:error, _} = CubDB.start_link(data_dir: tmp_dir, auto_compact: "maybe")
+    end
   end
 
   test "start_link/1 returns error if data_dir is missing" do

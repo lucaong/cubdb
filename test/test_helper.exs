@@ -19,6 +19,17 @@ defmodule TestHelper do
     |> CubDB.Btree.commit()
   end
 
+  defmacro trapping_exit(do: block) do
+    quote do
+      original = Process.flag(:trap_exit, true)
+      try do
+        unquote(block)
+      after
+        Process.flag(:trap_exit, original)
+      end
+    end
+  end
+
   defmodule Btree.Utils do
     @moduledoc false
 
