@@ -984,13 +984,16 @@ defmodule CubDBTest do
     {:ok, db} = CubDB.start_link(tmp_dir, auto_compact: {3, 0.3})
 
     assert CubDB.dirt_factor(db) == 0
+    assert CubDB.writes_since_compaction(db) == 0
 
     CubDB.subscribe(db)
 
     CubDB.put(db, :a, 1)
+    assert CubDB.writes_since_compaction(db) == 1
     refute_received :compaction_started
 
     CubDB.put(db, :b, 2)
+    assert CubDB.writes_since_compaction(db) == 2
     refute_received :compaction_started
 
     CubDB.put(db, :a, 3)

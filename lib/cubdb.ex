@@ -750,6 +750,19 @@ defmodule CubDB do
     GenServer.call(db, :dirt_factor, :infinity)
   end
 
+  @spec writes_since_compaction(server) :: non_neg_integer
+
+  @doc """
+  Returns the number of writes performed since the last compaction.
+
+  This number is reset to 0 after a compaction operation, and increases by one
+  on each write operation on the BTree. Deletions are considered writes, as they
+  modify the BTree.
+  """
+  def writes_since_compaction(db) do
+    GenServer.call(db, :writes_since_compaction, :infinity)
+  end
+
   @spec put(server, key, value) :: :ok
 
   @doc """
@@ -1304,6 +1317,13 @@ defmodule CubDB do
 
   def handle_call(:dirt_factor, _, state = %State{btree: btree}) do
     {:reply, Btree.dirt_factor(btree), state}
+  end
+
+  def handle_call(:writes_since_compaction, _, state) do
+    %State{btree: btree} = state
+    %Btree{dirt: dirt} = btree
+
+    {:reply, dirt, state}
   end
 
   def handle_call(:start_transaction, from, state = %State{writer: nil}) do
