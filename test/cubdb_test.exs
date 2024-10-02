@@ -1003,6 +1003,26 @@ defmodule CubDBTest do
     refute_received :compaction_started
   end
 
+  test "dirt calculation is consistent after restart", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
+
+    CubDB.put(db, "foo", 123)
+    CubDB.put(db, "bar", 234)
+    CubDB.delete(db, "foo")
+    CubDB.clear(db)
+
+    original_dirt_factor = CubDB.dirt_factor(db)
+    original_writes_since_compaction = CubDB.writes_since_compaction(db)
+
+    assert original_writes_since_compaction == 4
+
+    CubDB.stop(db)
+
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir, auto_compact: false)
+    assert original_dirt_factor == CubDB.dirt_factor(db)
+    assert original_writes_since_compaction == CubDB.writes_since_compaction(db)
+  end
+
   test "auto compaction is active by default", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
 

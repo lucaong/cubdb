@@ -10,6 +10,10 @@ reports changes here.
 
   - Add function `CubDB.writes_since_compaction/1` to get the number of writes since the last successful compaction
 
+Bug fixes:
+
+  - Fix dirt calculation upon restart of `CubDB`
+
 ## v2.0.2 (2023-01-01)
 
 Bug fixes:

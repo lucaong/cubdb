@@ -244,7 +244,7 @@ defmodule CubDB.Btree do
   # updates won't be committed to the database and will be lost in case of a
   # restart.
   def commit(tree = %Btree{store: store, size: size, root_loc: root_loc, dirt: dirt}) do
-    Store.put_header(store, header(size: size, location: root_loc, dirt: dirt + 1))
+    Store.put_header(store, header(size: size, location: root_loc, dirt: dirt))
     tree
   end
 
