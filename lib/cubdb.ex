@@ -258,7 +258,11 @@ defmodule CubDB do
   def start_link(data_dir_or_options) do
     case split_options(data_dir_or_options) do
       {:ok, {data_dir, options, gen_server_options}} ->
-        GenServer.start_link(__MODULE__, [data_dir, options], gen_server_options)
+        GenServer.start_link(
+          __MODULE__,
+          [data_dir, options, gen_server_options],
+          gen_server_options
+        )
 
       error ->
         error
@@ -280,7 +284,7 @@ defmodule CubDB do
   def start(data_dir_or_options) do
     case split_options(data_dir_or_options) do
       {:ok, {data_dir, options, gen_server_options}} ->
-        GenServer.start(__MODULE__, [data_dir, options], gen_server_options)
+        GenServer.start(__MODULE__, [data_dir, options, gen_server_options], gen_server_options)
 
       error ->
         error
@@ -1227,14 +1231,15 @@ defmodule CubDB do
   # OTP callbacks
 
   @impl true
-  def init([data_dir, options]) do
+  def init([data_dir, options, gen_server_options]) do
     auto_compact = parse_auto_compact!(Keyword.get(options, :auto_compact, true))
     auto_file_sync = Keyword.get(options, :auto_file_sync, true)
+    gen_server_options = Keyword.take(gen_server_options, [:hibernate_after])
 
     with {:ok, file_name} <- find_db_file(data_dir),
          file_name = file_name || "0#{@db_file_extension}",
-         {:ok, store} <- Store.File.create(Path.join(data_dir, file_name)),
-         {:ok, clean_up} <- CleanUp.start_link(data_dir),
+         {:ok, store} <- Store.File.create(Path.join(data_dir, file_name), gen_server_options),
+         {:ok, clean_up} <- CleanUp.start_link(data_dir, gen_server_options),
          {:ok, task_supervisor} <- Task.Supervisor.start_link() do
       {:ok,
        %State{

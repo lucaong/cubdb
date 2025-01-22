@@ -24,10 +24,10 @@ defmodule CubDB.Store.File do
   @enforce_keys [:pid, :file_path]
   defstruct [:pid, :file_path]
 
-  @spec create(String.t()) :: {:ok, t} | {:error, term}
+  @spec create(String.t(), keyword()) :: {:ok, t} | {:error, term}
 
-  def create(file_path) do
-    with {:ok, pid} <- Agent.start_link(fn -> init(file_path) end) do
+  def create(file_path, options \\ []) do
+    with {:ok, pid} <- Agent.start_link(fn -> init(file_path) end, options) do
       {:ok, %Store.File{pid: pid, file_path: file_path}}
     end
   end
