@@ -159,6 +159,22 @@ defmodule CubDBTest do
     assert [{^key, 123}] = CubDB.select(db) |> Enum.to_list()
   end
 
+  test "put_metadata/3, delete_metadata/2, get_metadata/2 work as expected", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+
+    assert nil == CubDB.get_metadata(db, :foo)
+    assert :default == CubDB.get_metadata(db, :foo, :default)
+    assert {:error, :key_not_atom} == CubDB.get_metadata(db, "foo", :default)
+
+    assert :ok == CubDB.put_metadata(db, :foo, 123)
+    assert {:error, :key_not_atom} == CubDB.put_metadata(db, "foo", 456)
+    assert 123 == CubDB.get_metadata(db, :foo, :default)
+
+    assert :ok == CubDB.delete_metadata(db, :foo)
+    assert {:error, :key_not_atom} == CubDB.delete_metadata(db, "foo")
+    assert :default == CubDB.get_metadata(db, :foo, :default)
+  end
+
   test "delete/2 does not error and does not write to disk when deleting an entry that was not present",
        %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)

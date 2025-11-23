@@ -14,19 +14,46 @@ defmodule CubDB.BtreeTest do
   def compose_btree do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, 0, Btree.leaf()})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: 0, dirt: 0}
+
+    %Btree{
+      root: root,
+      root_loc: root_loc,
+      capacity: 3,
+      store: store,
+      size: 0,
+      dirt: 0,
+      metadata: []
+    }
   end
 
   def compose_btree(root = leaf(children: cs)) do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, length(cs), root})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: length(cs), dirt: 0}
+
+    %Btree{
+      root: root,
+      root_loc: root_loc,
+      capacity: 3,
+      store: store,
+      size: length(cs),
+      dirt: 0,
+      metadata: []
+    }
   end
 
   def compose_btree(root = branch(children: _), size \\ 0) do
     {:ok, store} = Store.TestStore.create()
     {root_loc, root} = Utils.load(store, {:Btree, size, root})
-    %Btree{root: root, root_loc: root_loc, capacity: 3, store: store, size: size, dirt: 0}
+
+    %Btree{
+      root: root,
+      root_loc: root_loc,
+      capacity: 3,
+      store: store,
+      size: size,
+      dirt: 0,
+      metadata: []
+    }
   end
 
   test "insert/3 called on non-full leaf inserts the key/value tuple" do
@@ -172,6 +199,31 @@ defmodule CubDB.BtreeTest do
 
     assert [bar: 2, baz: 3, foo: 1, quuux: 123, quux: 5, qux: 4, xxx: 6, yyy: 321, zzz: 7] =
              btree |> Enum.into([])
+  end
+
+  test "insert_metadata/3 inserts and overwrites existing keys" do
+    btree = compose_btree()
+    btree = Btree.insert_metadata(btree, :foo, 123)
+    assert [foo: 123] == btree.metadata
+    btree = Btree.insert_metadata(btree, :foo, 456)
+    assert [foo: 456] == btree.metadata
+  end
+
+  test "delete_metadata/3 deletes key if present, otherwise nothing" do
+    btree = compose_btree()
+    btree = Btree.insert_metadata(btree, :foo, 123)
+    btree = Btree.delete_metadata(btree, :foo)
+    assert [] = btree.metadata
+    btree = Btree.insert_metadata(btree, :foo, 123)
+    btree = Btree.delete_metadata(btree, :bar)
+    assert [foo: 123] = btree.metadata
+  end
+
+  test "fetch_metadata/2 fetches value associated with key in metadata if present" do
+    btree = compose_btree()
+    btree = Btree.insert_metadata(btree, :foo, 123)
+    assert {:ok, 123} == Btree.fetch_metadata(btree, :foo)
+    assert :error == Btree.fetch_metadata(btree, :bar)
   end
 
   test "fetch/2 finds key and returns {:ok, value} or :error" do

@@ -16,6 +16,15 @@ defmodule CubDB.Reader do
     end
   end
 
+  @spec get_metadata(Btree.t(), CubDB.key(), any) :: any
+
+  def get_metadata(btree, key, default) do
+    case Btree.fetch_metadata(btree, key) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
+
   @spec get_multi(Btree.t(), [CubDB.key()]) :: %{CubDB.key() => CubDB.value()}
 
   def get_multi(btree, keys) do

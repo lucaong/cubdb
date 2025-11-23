@@ -30,6 +30,7 @@ defmodule CubDB.Btree do
   @type btree_size :: non_neg_integer
   @type dirt :: non_neg_integer
   @type location :: non_neg_integer
+  @type metadata :: keyword
   @type capacity :: pos_integer
   @type child_pointer :: {key, location}
   @type leaf_node :: record(:leaf, children: [child_pointer])
@@ -51,18 +52,19 @@ defmodule CubDB.Btree do
           size: btree_size,
           dirt: dirt,
           store: Store.t(),
-          capacity: capacity
+          capacity: capacity,
+          metadata: metadata
         }
 
   @default_capacity 32
-  @enforce_keys [:root, :root_loc, :size, :dirt, :store, :capacity]
+  @enforce_keys [:root, :root_loc, :size, :dirt, :store, :capacity, :metadata]
   defstruct @enforce_keys
 
-  @spec header(size: btree_size, location: location, dirt: dirt) :: Macro.t()
+  @spec header(size: btree_size, location: location, dirt: dirt, metadata: metadata) :: Macro.t()
 
-  defmacro header(size: size, location: location, dirt: dirt) do
+  defmacro header(size: size, location: location, dirt: dirt, metadata: metadata) do
     quote do
-      {unquote(size), unquote(location), unquote(dirt)}
+      {unquote(size), unquote(location), unquote(dirt), unquote(metadata)}
     end
   end
 
@@ -70,15 +72,33 @@ defmodule CubDB.Btree do
 
   def new(store, cap \\ @default_capacity) do
     case Store.get_latest_header(store) do
-      {_, header(size: s, location: loc, dirt: dirt)} ->
+      {_, header(size: s, location: loc, dirt: dirt, metadata: metadata)} ->
         root = Store.get_node(store, loc)
-        %Btree{root: root, root_loc: loc, dirt: dirt, size: s, capacity: cap, store: store}
+
+        %Btree{
+          root: root,
+          root_loc: loc,
+          dirt: dirt,
+          size: s,
+          capacity: cap,
+          store: store,
+          metadata: metadata
+        }
 
       nil ->
         root = leaf()
         loc = Store.put_node(store, root)
-        Store.put_header(store, header(size: 0, location: loc, dirt: 0))
-        %Btree{root: root, root_loc: loc, dirt: 0, size: 0, capacity: cap, store: store}
+        Store.put_header(store, header(size: 0, location: loc, dirt: 0, metadata: []))
+
+        %Btree{
+          root: root,
+          root_loc: loc,
+          dirt: 0,
+          size: 0,
+          capacity: cap,
+          store: store,
+          metadata: []
+        }
     end
   end
 
@@ -94,6 +114,8 @@ defmodule CubDB.Btree do
     unless Store.blank?(store),
       do: raise(ArgumentError, message: "cannot load into non-empty store")
 
+    metadata = if match?(%Btree{}, enum), do: enum.metadata, else: []
+
     {st, count} =
       Enum.reduce(enum, {[], 0}, fn {k, v}, {st, count} ->
         {load_node(store, k, value(val: v), st, 1, cap), count + 1}
@@ -103,8 +125,17 @@ defmodule CubDB.Btree do
       new(store, cap)
     else
       {root, root_loc} = finalize_load(store, st, 1, cap)
-      Store.put_header(store, header(size: count, location: root_loc, dirt: 0))
-      %Btree{root: root, root_loc: root_loc, capacity: cap, store: store, size: count, dirt: 0}
+      Store.put_header(store, header(size: count, location: root_loc, dirt: 0, metadata: []))
+
+      %Btree{
+        root: root,
+        root_loc: root_loc,
+        capacity: cap,
+        store: store,
+        size: count,
+        dirt: 0,
+        metadata: metadata
+      }
     end
   end
 
@@ -124,6 +155,17 @@ defmodule CubDB.Btree do
           value(val: value) -> {:ok, value}
           deleted() -> :error
         end
+    end
+  end
+
+  @spec fetch_metadata(Btree.t(), key) :: {:ok, val} | :error
+
+  # `fetch_metadata/2` returns `{:ok, value}` if an entry with key `key` is present
+  # in the Btree metadata table, otherwise `:error`.
+  def fetch_metadata(%Btree{metadata: metadata}, key) do
+    case Keyword.get(metadata, key) do
+      nil -> :error
+      value -> {:ok, value}
     end
   end
 
@@ -174,13 +216,37 @@ defmodule CubDB.Btree do
     insert_terminal_node(btree, key, value(val: value), false)
   end
 
+  @spec insert_metadata(Btree.t(), key, val) :: Btree.t()
+
+  # `insert_metadata/3` inserts the key-value pair into the Btree metadata table,
+  # overwriting any existing values associated with the same key. It does not commit
+  # the operation, so `commit/1` must be explicitly called to commit the insertion.
+  def insert_metadata(btree, key, value) do
+    %Btree{metadata: metadata, dirt: dirt} = btree
+    metadata = Keyword.put(metadata, key, value)
+    %{btree | metadata: metadata, dirt: dirt + 1}
+  end
+
+  @spec delete_metadata(Btree.t(), key) :: Btree.t()
+
+  # `delete_metadata/2` deletes the entry associated to `key` in the Btree metadata
+  # table, if it exists, otherwise it does nothing. It does not commit the operation,
+  # so `commit/1` must be explicitly called to commit the deletion.
+  def delete_metadata(btree, key) do
+    %Btree{metadata: metadata, dirt: dirt} = btree
+    metadata = Keyword.delete(metadata, key)
+    %{btree | metadata: metadata, dirt: dirt + 1}
+  end
+
   @spec delete(Btree.t(), key) :: Btree.t()
 
   # `delete/2` deletes the entry associated to `key` in the Btree, if existing.
   # It does not commit the operation, so `commit/1` must be explicitly called to
   # commit the deletion.
   def delete(btree, key) do
-    %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
+    %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt, metadata: metadata} =
+      btree
+
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
 
     case List.keyfind(children, key, 0) do
@@ -199,7 +265,8 @@ defmodule CubDB.Btree do
           capacity: cap,
           store: store,
           size: size,
-          dirt: dirt + 1
+          dirt: dirt + 1,
+          metadata: metadata
         }
 
       nil ->
@@ -227,11 +294,20 @@ defmodule CubDB.Btree do
   @spec clear(Btree.t()) :: Btree.t()
 
   def clear(btree) do
-    %Btree{store: store, capacity: cap, dirt: dirt} = btree
+    %Btree{store: store, capacity: cap, dirt: dirt, metadata: metadata} = btree
 
     root = leaf()
     loc = Store.put_node(store, root)
-    %Btree{root: root, root_loc: loc, size: 0, dirt: dirt + 1, capacity: cap, store: store}
+
+    %Btree{
+      root: root,
+      root_loc: loc,
+      size: 0,
+      dirt: dirt + 1,
+      capacity: cap,
+      store: store,
+      metadata: metadata
+    }
   end
 
   @spec commit(Btree.t()) :: Btree.t()
@@ -243,8 +319,20 @@ defmodule CubDB.Btree do
   # If one or more updates are performed, but `commit/1` is not called, the
   # updates won't be committed to the database and will be lost in case of a
   # restart.
-  def commit(tree = %Btree{store: store, size: size, root_loc: root_loc, dirt: dirt}) do
-    Store.put_header(store, header(size: size, location: root_loc, dirt: dirt + 1))
+  def commit(
+        tree = %Btree{
+          store: store,
+          size: size,
+          root_loc: root_loc,
+          dirt: dirt,
+          metadata: metadata
+        }
+      ) do
+    Store.put_header(
+      store,
+      header(size: size, location: root_loc, dirt: dirt + 1, metadata: metadata)
+    )
+
     tree
   end
 
@@ -293,7 +381,8 @@ defmodule CubDB.Btree do
           Btree.t() | {:error, :exists}
 
   defp insert_terminal_node(btree, key, terminal_node, overwrite \\ true) do
-    %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt} = btree
+    %Btree{root: root, store: store, capacity: cap, size: s, dirt: dirt, metadata: metadata} =
+      btree
 
     {leaf = {@leaf, children}, path} = lookup_leaf(root, store, key, [])
     was_set = child_is_set?(store, children, key)
@@ -317,7 +406,8 @@ defmodule CubDB.Btree do
         capacity: cap,
         store: store,
         size: size,
-        dirt: dirt + 1
+        dirt: dirt + 1,
+        metadata: metadata
       }
     end
   end

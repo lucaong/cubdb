@@ -1,8 +1,9 @@
 defmodule CubDB.Mixfile do
   use Mix.Project
 
-  @source_url "https://github.com/lucaong/cubdb"
-  @version "2.0.2"
+  @source_url "https://github.com/zteln/cubdb"
+  @forked_url "https://github.com/lucaong/cubdb"
+  @version "2.0.6"
 
   def project do
     [
@@ -58,13 +59,14 @@ defmodule CubDB.Mixfile do
 
   defp package() do
     [
+      name: :cubdb_md_fork,
       description: "A pure-Elixir embedded key-value database",
       files: ["lib", "LICENSE", "mix.exs"],
       maintainers: ["Luca Ongaro"],
       licenses: ["Apache-2.0"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/cubdb/changelog.html",
-        "GitHub" => @source_url
+        "GitHub" => @source_url,
+        "Forked from" => @forked_url
       }
     ]
   end

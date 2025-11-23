@@ -29,10 +29,10 @@ defmodule CubDB.Store.FileTest do
   test "get_latest_header/1 skips corrupted header and locates latest good header", %{
     store: store
   } do
-    good_header = header(size: 1, location: 2, dirt: 3)
+    good_header = header(size: 1, location: 2, dirt: 3, metadata: [])
     CubDB.Store.put_header(store, good_header)
 
-    CubDB.Store.put_header(store, header(size: 0, location: 0, dirt: 0))
+    CubDB.Store.put_header(store, header(size: 0, location: 0, dirt: 0, metadata: []))
 
     # corrupt the last header
     {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])
@@ -45,10 +45,10 @@ defmodule CubDB.Store.FileTest do
   test "get_latest_header/1 skips truncated header and locates latest good header", %{
     store: store
   } do
-    good_header = header(size: 1, location: 2, dirt: 3)
+    good_header = header(size: 1, location: 2, dirt: 3, metadata: [])
     CubDB.Store.put_header(store, good_header)
 
-    CubDB.Store.put_header(store, header(size: 0, location: 0, dirt: 0))
+    CubDB.Store.put_header(store, header(size: 0, location: 0, dirt: 0, metadata: []))
 
     # truncate the last header
     {:ok, file} = :file.open(store.file_path, [:read, :write, :raw, :binary])
@@ -60,7 +60,7 @@ defmodule CubDB.Store.FileTest do
   end
 
   test "get_latest_header/1 skips data and locates latest good header", %{store: store} do
-    header = header(size: 1, location: 2, dirt: 3)
+    header = header(size: 1, location: 2, dirt: 3, metadata: [])
     CubDB.Store.put_header(store, header)
 
     data_longer_than_one_block = String.duplicate("x", 1030)

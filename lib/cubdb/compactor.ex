@@ -51,7 +51,7 @@ defmodule CubDB.Compactor do
     result =
       CubDB.transaction(db, fn
         %Tx{btree: ^original_btree} = tx ->
-          {:commit, %Tx{tx | btree: compacted_btree}, :done}
+          {:commit, %Tx{tx | btree: %{compacted_btree | metadata: tx.btree.metadata}}, :done}
 
         %Tx{btree: latest_btree} ->
           {:cancel, latest_btree}

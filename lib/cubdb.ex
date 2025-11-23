@@ -168,6 +168,7 @@ defmodule CubDB do
   @auto_compact_defaults {100, 0.25}
 
   @type key :: any
+  @type metadata_key :: atom
   @type value :: any
   @type entry :: {key, value}
   @type auto_compact :: {pos_integer, number} | boolean
@@ -316,6 +317,24 @@ defmodule CubDB do
       Reader.get(btree, key, default)
     end)
   end
+
+  @spec get_metadata(server, metadata_key, value) :: value | {:error, :key_not_atom}
+
+  @doc """
+  Gets the value associated to `key` from the database metadata table.
+
+  If no value is associated with `key`, `default` is returned (which is `nil`,
+  unless specified otherwise).
+  """
+  def get_metadata(db, key, default \\ nil)
+
+  def get_metadata(db, key, default) when is_atom(key) do
+    with_snapshot(db, fn %Snapshot{btree: btree} ->
+      Reader.get_metadata(btree, key, default)
+    end)
+  end
+
+  def get_metadata(_, _, _), do: {:error, :key_not_atom}
 
   @spec fetch(server, key) :: {:ok, value} | :error
 
@@ -784,6 +803,22 @@ defmodule CubDB do
     end)
   end
 
+  @spec put_metadata(server, metadata_key, value) :: :ok | {:error, :key_not_atom}
+
+  @doc """
+  Writes an entry in the database metadata table, associating `key` to `value`, 
+  overwriting any existing entries associated with the same key.
+
+  Returns `{:error, :key_not_atom}` if `key` is not an atom.
+  """
+  def put_metadata(db, key, value) when is_atom(key) do
+    transaction(db, fn tx ->
+      {:commit, Tx.put_metadata(tx, key, value), :ok}
+    end)
+  end
+
+  def put_metadata(_, _, _), do: {:error, :key_not_atom}
+
   @spec delete(server, key) :: :ok
 
   @doc """
@@ -796,6 +831,23 @@ defmodule CubDB do
       {:commit, Tx.delete(tx, key), :ok}
     end)
   end
+
+  @spec delete_metadata(server, metadata_key) :: :ok | {:error, :key_not_atom}
+
+  @doc """
+  Deletes the entry associated to `key` from the database metadata table.
+
+  If `key` was not present in the database, nothing is done.
+
+  Returns `{:error, :key_not_atom}` if `key` is not an atom.
+  """
+  def delete_metadata(db, key) when is_atom(key) do
+    transaction(db, fn tx ->
+      {:commit, Tx.delete_metadata(tx, key), :ok}
+    end)
+  end
+
+  def delete_metadata(_, _), do: {:error, :key_not_atom}
 
   @spec update(server, key, value, (value -> value)) :: :ok
 

@@ -222,6 +222,7 @@ defimpl CubDB.Store, for: CubDB.Store.File do
 
   defp read_header(file, location) do
     case read_term(file, location) do
+      {:ok, {size, loc, dirt}} -> {location, {size, loc, dirt, []}}
       {:ok, term} -> {location, term}
       {:error, _} -> get_latest_good_header(file, location - 1)
     end

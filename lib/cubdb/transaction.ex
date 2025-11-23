@@ -47,6 +47,11 @@ defmodule CubDB.Tx do
     Reader.get(btree, key, default)
   end
 
+  def get_metadata(tx = %Tx{btree: btree}, key, default \\ nil) do
+    validate_transaction!(tx)
+    Reader.get_metadata(btree, key, default)
+  end
+
   @spec fetch(Tx.t(), CubDB.key()) :: {:ok, CubDB.value()} | :error
 
   @doc """
@@ -252,6 +257,11 @@ defmodule CubDB.Tx do
     end
   end
 
+  def put_metadata(tx = %Tx{btree: btree}, key, value) do
+    validate_transaction!(tx)
+    %{tx | btree: Btree.insert_metadata(btree, key, value)}
+  end
+
   @spec delete(Tx.t(), CubDB.key()) :: Tx.t()
 
   @doc """
@@ -270,6 +280,11 @@ defmodule CubDB.Tx do
     else
       %Tx{tx | btree: Btree.delete(btree, key)}
     end
+  end
+
+  def delete_metadata(tx = %Tx{btree: btree}, key) do
+    validate_transaction!(tx)
+    %{tx | btree: Btree.delete_metadata(btree, key)}
   end
 
   @spec clear(Tx.t()) :: Tx.t()

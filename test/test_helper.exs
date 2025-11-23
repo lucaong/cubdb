@@ -40,7 +40,7 @@ defmodule TestHelper do
     import Btree, only: [header: 1, value: 1, deleted: 0]
 
     def debug(store) do
-      {_, {size, root_loc, _}} = Store.get_latest_header(store)
+      {_, {size, root_loc, _, _}} = Store.get_latest_header(store)
       {:Btree, size, debug_node(store, root_loc)}
     end
 
@@ -64,7 +64,7 @@ defmodule TestHelper do
 
     def load(store, {:Btree, size, root}) do
       {root_loc, root_node} = load_node(store, root)
-      Store.put_header(store, header(size: size, location: root_loc, dirt: 0))
+      Store.put_header(store, header(size: size, location: root_loc, dirt: 0, metadata: []))
       {root_loc, root_node}
     end
 

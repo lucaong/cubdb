@@ -44,6 +44,29 @@ defmodule CubDB.TransactionTest do
     assert [a: 1, c: 3] = CubDB.select(db) |> Enum.into([])
   end
 
+  test "get_metadata, delete_metadata, put_metadata work as expected", %{tmp_dir: tmp_dir} do
+    {:ok, db} = CubDB.start_link(tmp_dir)
+    CubDB.put_multi(db, a: 1, c: 3)
+    CubDB.put_metadata(db, :foo, 123)
+
+    CubDB.transaction(db, fn tx ->
+      tx = CubDB.Tx.put_metadata(tx, :foo, 456)
+      tx = CubDB.Tx.put_metadata(tx, :bar, 789)
+
+      assert 456 == CubDB.Tx.get_metadata(tx, :foo)
+      assert 789 == CubDB.Tx.get_metadata(tx, :bar)
+
+      tx = CubDB.Tx.delete_metadata(tx, :bar)
+
+      assert nil == CubDB.Tx.get_metadata(tx, :bar)
+
+      {:cancel, nil}
+    end)
+
+    assert 123 == CubDB.get_metadata(db, :foo)
+    assert [a: 1, c: 3] = CubDB.select(db) |> Enum.into([])
+  end
+
   test "refetch/3 returns :unchanged if the entry was not written, otherwise fetches it", %{
     tmp_dir: tmp_dir
   } do
