@@ -199,7 +199,8 @@ defmodule CubDB do
             auto_file_sync: boolean,
             subs: list(pid),
             writer: GenServer.from() | nil,
-            write_queue: :queue.queue()
+            write_queue: :queue.queue(),
+            writer_monitor_ref: reference() | nil
           }
 
     @enforce_keys [:btree, :data_dir, :task_supervisor, :clean_up]
@@ -214,7 +215,8 @@ defmodule CubDB do
                   auto_file_sync: true,
                   subs: [],
                   writer: nil,
-                  write_queue: :queue.new()
+                  write_queue: :queue.new(),
+                  writer_monitor_ref: nil
                 ]
   end
 
@@ -1306,7 +1308,7 @@ defmodule CubDB do
     {:reply, Btree.dirt_factor(btree), state}
   end
 
-  def handle_call(:start_transaction, from, state = %State{writer: nil}) do
+  def handle_call(:start_transaction, {pid, _} = from, state = %State{writer: nil}) do
     %State{btree: btree} = state
 
     tx = %Tx{
@@ -1316,7 +1318,9 @@ defmodule CubDB do
       db: self()
     }
 
-    {:reply, tx, %State{state | writer: from}}
+    writer_monitor_ref = Process.monitor(pid)
+
+    {:reply, tx, %State{state | writer: from, writer_monitor_ref: writer_monitor_ref}}
   end
 
   def handle_call(:start_transaction, {pid, _}, state = %State{writer: {pid, _}}) do
@@ -1449,6 +1453,10 @@ defmodule CubDB do
     end
 
     {:noreply, %State{state | compactor: nil, compacting_store: nil}}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, state = %State{writer: {pid, _}}) do
+    {:noreply, advance_write_queue(state)}
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
@@ -1659,9 +1667,11 @@ defmodule CubDB do
   defp advance_write_queue(state) do
     %State{write_queue: queue, btree: btree} = state
 
-    {writer, queue} =
+    Process.demonitor(state.writer_monitor_ref)
+
+    {writer, writer_monitor_ref, queue} =
       case :queue.out(queue) do
-        {{:value, next}, queue} ->
+        {{:value, {pid, _} = next}, queue} ->
           GenServer.reply(next, %Tx{
             btree: btree,
             compacting: compaction_running?(state),
@@ -1669,13 +1679,15 @@ defmodule CubDB do
             db: self()
           })
 
-          {next, queue}
+          ref = Process.monitor(pid)
+
+          {next, ref, queue}
 
         {:empty, queue} ->
-          {nil, queue}
+          {nil, nil, queue}
       end
 
-    %State{state | writer: writer, write_queue: queue}
+    %State{state | writer: writer, writer_monitor_ref: writer_monitor_ref, write_queue: queue}
   end
 
   @spec parse_auto_compact(any) :: {:ok, auto_compact} | {:error, any}

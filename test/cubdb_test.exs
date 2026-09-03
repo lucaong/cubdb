@@ -552,6 +552,37 @@ defmodule CubDBTest do
     assert CubDB.has_key?(db, :a) == false
   end
 
+  test "write queue advances if writer dies without cancelling transaction", %{tmp_dir: tmp_dir} do
+    test_pid = self()
+
+    {:ok, db} = CubDB.start_link(data_dir: tmp_dir)
+    :ok = CubDB.put(db, :a, 123)
+
+    # Use `spawn` to create a writer process not linked to the test
+    # process, in order to simulate a writer process dying "silently"
+    writer_pid =
+      spawn(fn ->
+        CubDB.get_and_update(db, :a, fn _ ->
+          send(test_pid, :write_lock_acquired)
+
+          # Spawned process will hold the write lock indefinitely
+          receive do: (:hold_write_lock -> :ok)
+        end)
+      end)
+
+    assert_receive :write_lock_acquired
+
+    # Kill the writer process while it still holds the write lock
+    Process.exit(writer_pid, :kill)
+
+    # Verify the write queue is able to advance -
+    # Use `Task.yield/2` to ensure the test suite doesn't hang
+    # indefinitely in case the lock is not released
+    next_write = Task.async(fn -> CubDB.put(db, :b, 123) end)
+    assert Task.yield(next_write, 500) == {:ok, :ok}
+    assert CubDB.get(db, :b) == 123
+  end
+
   test "reads are concurrent", %{tmp_dir: tmp_dir} do
     {:ok, db} = CubDB.start_link(tmp_dir)
     entries = [a: 1, b: 2, c: 3, d: 4]
